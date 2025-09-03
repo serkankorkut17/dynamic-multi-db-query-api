@@ -1,0 +1,6 @@
+@DynamicDbQueryApi_HostAddress = http://localhost:5177
+
+GET {{DynamicDbQueryApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

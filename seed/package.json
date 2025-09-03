@@ -1,0 +1,24 @@
+{
+  "name": "dynamic-multi-db-seed",
+  "version": "1.1.0",
+  "description": "Seed scripts to create schema and insert mock relational data into PostgreSQL, MSSQL, MySQL, and SQLite.",
+  "private": true,
+  "main": "seed-postgres.js",
+  "license": "MIT",
+  "scripts": {
+    "seed": "node seed-postgres.js",
+    "reset": "node seed-postgres.js --drop --create --seed",
+    "seed:postgres": "node seed-postgres.js",
+    "reset:postgres": "node seed-postgres.js --drop --create --seed",
+    "seed:mssql": "node seed-mssql.js",
+    "reset:mssql": "node seed-mssql.js --drop --create --seed",
+    "seed:mysql": "node seed-mysql.js",
+    "reset:mysql": "node seed-mysql.js --drop --create --seed"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^9.0.0",
+    "pg": "^8.11.5",
+    "mssql": "^10.0.1",
+    "mysql2": "^3.10.0"
+  }
+}
