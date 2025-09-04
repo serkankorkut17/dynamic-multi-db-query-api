@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data.Common;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using DynamicDbQueryApi.DTOs;
 using DynamicDbQueryApi.Interfaces;
@@ -30,15 +31,35 @@ namespace DynamicDbQueryApi.Controllers
             try
             {
                 var result = await _queryService.QueryAsync(request);
-                return Ok(result);
+                var test = result.ToList();
+                // return type json
+                return Ok(test);
             }
             catch (NotSupportedException ex)
             {
                 return BadRequest(ex.Message);
             }
-            catch (Exception ex)
+            // catch (Exception ex)
+            // {
+            //     return StatusCode(500, $"Internal server error: {ex.Message}");
+            // }
+        }
+
+        [HttpPost("inspect")]
+        public async Task<IActionResult> InspectDatabase([FromBody] QueryRequestDTO request)
+        {
+            if (!ModelState.IsValid)
             {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
+                return BadRequest(ModelState);
+            }
+            try
+            {
+                var result = await _queryService.InspectDatabaseAsync(request);
+                return Ok(result);
+            }
+            catch (NotSupportedException ex)
+            {
+                return BadRequest(ex.Message);
             }
         }
     }

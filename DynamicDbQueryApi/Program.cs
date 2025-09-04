@@ -24,6 +24,10 @@ app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
+// Serve wwwroot/index.html at '/'
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.MapControllers();
 
 app.Run();
