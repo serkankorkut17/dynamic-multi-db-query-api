@@ -103,43 +103,95 @@ async function createSchema(client) {
     );
   `);
 }
+// --- Turkish mock datasets & helpers ---
+const TR_FIRST_NAMES = [
+  'Ahmet','Mehmet','Ayşe','Fatma','Emre','Elif','Burak','Zeynep','Can','Ece',
+  'Hakan','Gamze','Murat','Seda','Oğuz','Melisa','Yusuf','Rabia','Kerem','Derya',
+  'Deniz','Merve','Ahsen','Cem','Ceren','Onur','Sinem','Berk','Şevval','Umut'
+];
+const TR_LAST_NAMES = [
+  'Yılmaz','Kaya','Demir','Şahin','Çelik','Yıldız','Yıldırım','Aydın','Öztürk','Arslan',
+  'Doğan','Kılıç','Aslan','Korkmaz','Koç','Çetin','Polat','Avcı','Taş','Aksoy',
+  'Kaplan','Bozkurt','Işık','Erdem','Erdoğan','Kurt','Bulut','Güneş','Özdemir','Turan'
+];
+const TR_CITIES = [
+  'İstanbul','Ankara','İzmir','Bursa','Antalya','Konya','Adana','Gaziantep','Kocaeli','Mersin',
+  'Diyarbakır','Kayseri','Eskişehir','Samsun','Trabzon','Malatya','Van','Sakarya','Manisa','Balıkesir'
+];
+const TR_SCHOOL_NAMES = [
+  'Atatürk Anadolu Lisesi','Cumhuriyet İlkokulu','Mevlana Ortaokulu','Fatih Fen Lisesi','Barbaros MTAL',
+  'Hacı Bektaş Veli Anadolu Lisesi','Gazi İlkokulu','Yunus Emre Ortaokulu','Şehitler Lisesi','İnönü Anadolu Lisesi'
+];
+const TR_COURSES = [
+  'Matematik','Fizik','Kimya','Biyoloji','Tarih','Coğrafya','Türk Dili ve Edebiyatı','İngilizce','Almanca',
+  'Din Kültürü','Beden Eğitimi','Müzik','Resim','Bilgisayar Bilimi','Felsefe'
+];
+const CLASS_SECTIONS = ['A','B','C','D','E','F','G'];
+
+function randChoice(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
 function pickRandom(arr, n) { const copy = [...arr]; const out = []; for (let i=0;i<n&&copy.length;i++){ const idx=Math.floor(Math.random()*copy.length); out.push(copy.splice(idx,1)[0]); } return out; }
+function trToAscii(s) {
+  return s
+    .replace(/ğ/gi,'g').replace(/ü/gi,'u').replace(/ş/gi,'s')
+    .replace(/ı/g,'i').replace(/İ/g,'i').replace(/ö/gi,'o').replace(/ç/gi,'c')
+    .replace(/[^A-Za-z0-9\.\-\_ ]+/g,'')
+    .toLowerCase()
+    .replace(/\s+/g,'.');
+}
+const usedEmails = new Set();
+function makeEmail(first, last, role) {
+  let local = `${first}.${last}`;
+  local = trToAscii(local).replace(/[^a-z0-9.]/g, '');
+  const base = local || 'kisi';
+  const domain = role === 'teacher' ? 'okul.k12.tr' : 'ogrenci.k12.tr';
+  let n = 1; let email;
+  do {
+    const suffix = n === 1 ? '' : '.'+n;
+    email = `${base}${suffix}@${domain}`;
+    n++;
+  } while (usedEmails.has(email));
+  usedEmails.add(email);
+  return email;
+}
+
 async function seedData(client) {
   console.log('Seeding data with counts:', COUNTS);
   await client.query('BEGIN');
   try {
     const schoolRows = [];
     for (let s = 0; s < COUNTS.SCHOOLS; s++) {
-      const name = `${faker.company.name()} School`;
-      const city = faker.location.city();
+      const city = randChoice(TR_CITIES);
+      const name = `${city} ${randChoice(TR_SCHOOL_NAMES)}`;
       const { rows } = await client.query('INSERT INTO schools(name, city) VALUES ($1, $2) RETURNING id', [name, city]);
       schoolRows.push(rows[0]);
     }
     const allClasses = [], allStudents = [], allCourses = [];
     for (const { id: schoolId } of schoolRows) {
       for (let t = 0; t < COUNTS.TEACHERS_PER_SCHOOL; t++) {
-        const first = faker.person.firstName(); const last = faker.person.lastName();
-        const email = faker.internet.email({ firstName: first, lastName: last }).toLowerCase();
+        const first = randChoice(TR_FIRST_NAMES); const last = randChoice(TR_LAST_NAMES);
+        const email = makeEmail(first, last, 'teacher');
         await client.query('INSERT INTO teachers(school_id, first_name, last_name, email) VALUES ($1, $2, $3, $4)', [schoolId, first, last, email]);
       }
       const thisSchoolClasses = [];
       for (let c = 0; c < COUNTS.CLASSES_PER_SCHOOL; c++) {
-        const name = `${faker.word.noun()} Class`; const gradeLevel = faker.number.int({ min: 1, max: 12 });
+        const gradeLevel = faker.number.int({ min: 1, max: 12 });
+        const section = randChoice(CLASS_SECTIONS);
+        const name = `${gradeLevel}-${section} Sınıfı`;
         const { rows } = await client.query('INSERT INTO classes(school_id, name, grade_level) VALUES ($1, $2, $3) RETURNING id', [schoolId, name, gradeLevel]);
         thisSchoolClasses.push(rows[0].id);
       }
       allClasses.push(...thisSchoolClasses);
       const thisSchoolCourses = [];
-      for (let c = 0; c < COUNTS.COURSES_PER_SCHOOL; c++) {
-        const name = faker.helpers.arrayElement(['Mathematics','Physics','Chemistry','Biology','History','Geography','Literature','Art','Music','Computer Science','PE']);
-        const { rows } = await client.query('INSERT INTO courses(school_id, name) VALUES ($1, $2) RETURNING id', [schoolId, name]);
+      const chosenCourses = pickRandom(TR_COURSES, Math.min(COUNTS.COURSES_PER_SCHOOL, TR_COURSES.length));
+      for (const courseName of chosenCourses) {
+        const { rows } = await client.query('INSERT INTO courses(school_id, name) VALUES ($1, $2) RETURNING id', [schoolId, courseName]);
         thisSchoolCourses.push(rows[0].id);
       }
       allCourses.push(...thisSchoolCourses);
       for (const classId of thisSchoolClasses) {
         for (let st = 0; st < COUNTS.STUDENTS_PER_CLASS; st++) {
-          const first = faker.person.firstName(); const last = faker.person.lastName();
-          const email = faker.internet.email({ firstName: first, lastName: last }).toLowerCase();
+          const first = randChoice(TR_FIRST_NAMES); const last = randChoice(TR_LAST_NAMES);
+          const email = makeEmail(first, last, 'student');
           const birth = faker.date.past({ years: faker.number.int({ min: 6, max: 18 }) });
           const { rows } = await client.query('INSERT INTO students(class_id, first_name, last_name, email, birth_date) VALUES ($1, $2, $3, $4, $5) RETURNING id', [classId, first, last, email, birth]);
           allStudents.push(rows[0].id);

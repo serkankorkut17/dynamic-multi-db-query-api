@@ -10,9 +10,7 @@ namespace DynamicDbQueryApi.Interfaces
     public interface IQueryService
     {
         Task<IEnumerable<dynamic>> QueryAsync(QueryRequestDTO request);
-        QueryModel ParseQueryString(IDbConnection connection, string dbType, string queryString);
         string BuildSqlQuery(QueryModel queryModel);
-        string GetIncludeQuery(string dbType, string fromTable, string includeTable);
         Task<IEnumerable<dynamic>> InspectDatabaseAsync(QueryRequestDTO request);
     }
 }

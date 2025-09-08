@@ -1,9 +1,14 @@
 # dynamic-multi-db-query-api
 
 FETCH(Ad, Soyad) FROM Dataset
-FETCH(Ad=Serkan, Soyad) FROM Dataset
+FETCH(Ad='Serkan', Soyad) FROM Dataset
 FETCH(Age>30, Salary<5000) FROM Employee
 FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City
+FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City GROUP Country
+FETCH(Ad, Soyad, City.Name, City.Country.Name) FROM Person INCLUDE City.Country
+
+FETCH(Ad, Soyad, Email) FILTER(Ad BEGINSWITH('...') AND Soyad CONTAINS('...') AND Email ENDSWITH('...')) FROM Person 
+
 FETCH(Country, COUNT(*)) FROM Person
 
 # POSTGRE
