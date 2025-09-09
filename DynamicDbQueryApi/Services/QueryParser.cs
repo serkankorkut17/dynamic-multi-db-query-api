@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Dapper;
 using DynamicDbQueryApi.DTOs;
 using DynamicDbQueryApi.Interfaces;
+using ZstdSharp.Unsafe;
 
 namespace DynamicDbQueryApi.Services
 {
@@ -15,6 +16,7 @@ namespace DynamicDbQueryApi.Services
     {
         private readonly IDbConnection _connection;
         private readonly string _dbType;
+        private string? _table;
         public QueryParser(IDbConnection connection, string dbType)
         {
             _connection = connection;
@@ -27,15 +29,19 @@ namespace DynamicDbQueryApi.Services
 
             // FROM Part
             queryModel.Table = ParseFromTable(queryString);
+            _table = queryModel.Table;
 
             // FETCH Part
-            queryModel.Columns = ParseFetchColumns(queryModel.Table, queryString);
+            queryModel.Columns = ParseFetchColumns(queryString);
 
             // DISTINCT Part
             queryModel.Distinct = queryString.Contains("FETCHD", StringComparison.OrdinalIgnoreCase) || queryString.Contains("FETCHDISTINCT", StringComparison.OrdinalIgnoreCase) || queryString.Contains("FETCH DISTINCT", StringComparison.OrdinalIgnoreCase);
 
             // INCLUDE Part
             queryModel.Includes = ParseIncludes(queryModel.Table, queryString);
+
+            // FILTER Part
+            queryModel.Filters = ParseFilters(queryString);
 
             // GROUP BY Part
             queryModel.GroupBy = ParseGroupBy(queryString);
@@ -52,7 +58,24 @@ namespace DynamicDbQueryApi.Services
             return queryModel;
         }
 
-        public List<string> ParseFetchColumns(string table, string queryString)
+        private string AddTablePrefixToColumn(string column)
+        {
+            if (string.IsNullOrWhiteSpace(column) || column == "*") return column;
+
+            var parts = column.Split('.');
+            // Eğer tablo ismi yoksa ekle
+            if (parts.Length == 1)
+            {
+                return $"{_table}.{parts[0]}";
+            }
+            else if (parts.Length > 1)
+            {
+                return $"{parts[parts.Length - 2]}.{parts[parts.Length - 1]}";
+            }
+            return column;
+        }
+
+        private List<string> ParseFetchColumns(string queryString)
         {
             // "FETCH(", "FETCHD(", "FETCHDISTINCT(" veya "FETCH DISTINCT(" ile başlayan ve ")" ile biten kısmı al
             var m = Regex.Match(queryString, @"\bFETCH(?:\s+DISTINCT|DISTINCT|D)?\s*\(", RegexOptions.IgnoreCase);
@@ -65,44 +88,31 @@ namespace DynamicDbQueryApi.Services
             var columnsPart = queryString.Substring(fetchStart, fetchEnd - fetchStart);
 
             var columns = columnsPart.Split(',').Select(c => c.Trim()).ToList();
-            Console.WriteLine($"Text: {JsonSerializer.Serialize(columns)}");
+            // Console.WriteLine($"Text: {JsonSerializer.Serialize(columns)}");
 
             for (int i = 0; i < columns.Count; i++)
             {
-                var column = columns[i];
                 // split sonra her parçayı trimle
-                if (!string.IsNullOrWhiteSpace(column) && column != "*")
-                {
-                    var parts = column.Split('.');
-                    // Eğer tablo ismi yoksa ekle
-                    if (parts.Length == 1)
-                    {
-                        var qualifiedColumn = $"{table}.{parts[0]}";
-                        columns[i] = qualifiedColumn;
-                    }
-                    // eğer birden fazla . varsa sadece son kısmı al
-                    else if (parts.Length > 1)
-                    {
-                        var qualifiedColumn = $"{parts[parts.Length - 2]}.{parts[parts.Length - 1]}";
-                        columns[i] = qualifiedColumn;
-                    }
-                }
+                columns[i] = AddTablePrefixToColumn(columns[i]);
             }
 
             return columns;
         }
 
-        public string ParseFromTable(string queryString)
+        private string ParseFromTable(string queryString)
         {
             var m = Regex.Match(queryString, @"\bFROM\s*\(?\s*(?<table>[\w\d\._\-]+)\s*\)?", RegexOptions.IgnoreCase);
-            if (!m.Success) return string.Empty;
+            if (!m.Success)
+            {
+                throw new Exception("Could not find FROM clause with table name.");
+            }
 
             var table = m.Groups["table"].Value.Trim();
 
             return table;
         }
 
-        public ForeignKeyPair? GetIncludeKeys(string table, string includeTable)
+        private ForeignKeyPair? GetIncludeKeys(string table, string includeTable)
         {
             var includeSql = GetIncludeQuery(table, includeTable);
 
@@ -130,7 +140,7 @@ namespace DynamicDbQueryApi.Services
             return null;
         }
 
-        public List<IncludeModel> ParseIncludes(string table, string queryString)
+        private List<IncludeModel> ParseIncludes(string table, string queryString)
         {
             var includes = new List<IncludeModel>();
             var m = Regex.Match(queryString, @"\bINCLUDE\s*\(\s*(.*?)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
@@ -237,54 +247,241 @@ namespace DynamicDbQueryApi.Services
             return includes;
         }
 
-        public FilterModel ParseFilters(string queryString)
+        private int FindClosingParenthesis(string str, int openIdx)
         {
-            var filtersStart = queryString.IndexOf("FILTER(") + 7;
-            var filtersEnd = queryString.IndexOf(")", filtersStart);
-            var filtersPart = queryString.Substring(filtersStart, filtersEnd - filtersStart).Trim();
-
-            return new LogicalFilterModel
+            int depth = 0;
+            for (int i = openIdx; i < str.Length; i++)
             {
-                LogicalOperator = "AND",
-                Filters = new List<FilterModel>()
-            };
-
-            // foreach (var column in columns)
-            // {
-            //     if (!string.IsNullOrWhiteSpace(column))
-            //     {
-            //         // Eğer !=, = <, >, <=, >= varsa ondan öncesini al
-            //         var operators = new[] { "==", "!=", ">=", "<=", "=", "<", ">" };
-            //         var op = operators.FirstOrDefault(o => column.Contains(o));
-
-            //         if (op != null)
-            //         {
-            //             // == to = for SQL compatibility
-            //             var normalizedOp = op == "==" ? "=" : op;
-            //             var parts = column.Split(new[] { op }, StringSplitOptions.None);
-            //             if (parts.Length == 2)
-            //             {
-            //                 var filter = new FilterModel
-            //                 {
-            //                     Column = parts[0].Trim(),
-            //                     Operator = op,
-            //                     Value = parts[1].Trim().Trim('\'')
-            //                 };
-            //                 queryModel.Columns.Add(filter.Column);
-            //                 queryModel.Filters.Add(filter);
-            //             }
-            //         }
-            //         else
-            //         {
-            //             queryModel.Columns.Add(column);
-            //         }
-
-            //     }
-            // }
-
+                if (str[i] == '(')
+                {
+                    depth++;
+                }
+                else if (str[i] == ')')
+                {
+                    depth--;
+                    if (depth == 0) return i;
+                }
+            }
+            return -1; // Not found
         }
 
-        public List<string> ParseGroupBy(string queryString)
+        private FilterModel? ParseFilters(string queryString)
+        {
+            var start = Regex.Match(queryString, @"\bFILTER\s*\(", RegexOptions.IgnoreCase);
+            if (!start.Success) return null;
+
+            int openIdx = start.Index + start.Length - 1; // index of '('
+            int bodyStart = openIdx + 1;
+            int closeIdx = FindClosingParenthesis(queryString, openIdx);
+            if (closeIdx == -1) return null; // or throw
+
+            var body = queryString.Substring(bodyStart, closeIdx - bodyStart).Trim();
+            if (string.IsNullOrWhiteSpace(body)) return null;
+            // Console.WriteLine($"Text: {body}");
+
+            var filterModel = BuildFilterModel(body);
+            // Console.WriteLine($"Built FilterModel: {JsonSerializer.Serialize(filterModel)}");
+
+            return filterModel;
+        }
+
+        private FilterModel? BuildFilterModel(string body)
+        {
+            // Console.WriteLine($"Building FilterModel for body: {body}");
+
+            if (IsSingleConditionFilter(body))
+            {
+                var cond = ParseConditionFilter(body);
+                // Console.WriteLine($"Text after parsing single condition filter: {JsonSerializer.Serialize(cond)}");
+                return cond;
+            }
+
+            var exprList = ExpressionSplitter.ExtractTopLevelOperands(ref body, out var replacedBody);
+            Console.WriteLine($"Text after parsing: {replacedBody} with {exprList.Count} expressions");
+
+            var str = ParenthesizeByPrecedence(replacedBody);
+            // Console.WriteLine($"Text after parenthesizing by precedence: {str}");
+            // baştaki ve sondaki parantezleri kaldır
+            if (str.StartsWith("(") && str.EndsWith(")"))
+            {
+                str = str.Substring(1, str.Length - 2).Trim();
+            }
+
+            // strdeki $ ile başlayan yerler exprListteki karşılığı ile değiştirilecek
+            // örn: $0 AND $1 OR $2
+            for (int i = 0; i < exprList.Count; i++)
+            {
+                str = str.Replace($"${i}", exprList[i]);
+            }
+
+            var finalExprList = ExpressionSplitter.ExtractTopLevelOperands(ref str, out var finalReplacedBody);
+
+            Console.WriteLine($"Text after final parsing: {finalReplacedBody} with {finalExprList.Count} expressions");
+
+            // if finalReplacedBody is like $0 AND $1 OR $2
+            var tokens = finalReplacedBody.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            // finalReplacedBody deki $ ile başlayan yerler exprListteki karşılığı ile değiştirilecek
+            for (int i = 0; i < finalExprList.Count; i++)
+            {
+                tokens = tokens.Select(t => t == $"${i}" ? finalExprList[i] : t).ToArray();
+            }
+
+            // print tokens
+            Console.WriteLine($"Tokens: {JsonSerializer.Serialize(tokens)}");
+
+            var filter = new LogicalFilterModel();
+            // tokens[1] should be AND or OR
+            if (tokens.Length == 3 && (tokens[1].Equals("AND", StringComparison.OrdinalIgnoreCase) || tokens[1].Equals("OR", StringComparison.OrdinalIgnoreCase)))
+            {
+                filter.Operator = tokens[1].Equals("AND", StringComparison.OrdinalIgnoreCase) ? LogicalOperator.And : LogicalOperator.Or;
+                
+                filter.Left = BuildFilterModel(tokens[0])!;
+                // Console.WriteLine($"Building filter for: {tokens[0]} - Text after building filter: {JsonSerializer.Serialize(filter.Left)}");
+                
+                filter.Right = BuildFilterModel(tokens[2])!;
+                // Console.WriteLine($"Building filter for: {tokens[2]} - Text after building filter: {JsonSerializer.Serialize(filter.Right)}");
+
+                // Console.WriteLine($"Text after building filter: {JsonSerializer.Serialize(filter)}");
+
+                return filter;
+            }
+            else
+            {
+                throw new Exception($"Could not parse logical filter expression: {str}");
+            }
+        }
+
+        private bool IsSingleConditionFilter(string expr)
+        {
+            var tokens = expr.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var token in tokens)
+            {
+                if (token.Equals("AND", StringComparison.OrdinalIgnoreCase) ||
+                    token.Equals("OR", StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public static string ParenthesizeByPrecedence(string input)
+        {
+            var tokens = input.Split(' ', StringSplitOptions.RemoveEmptyEntries).ToList();
+
+            // 1. Önce AND işlemleri
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].Equals("AND", StringComparison.OrdinalIgnoreCase))
+                {
+                    string left = tokens[i - 1];
+                    string right = tokens[i + 1];
+
+                    tokens[i - 1] = $"({left} AND {right})";
+                    tokens.RemoveAt(i); // AND
+                    tokens.RemoveAt(i); // right
+                    i--; // index kaydır
+                }
+            }
+
+            // Console.WriteLine($"Text after AND processing: {string.Join(" ", tokens)}");
+
+            // 2. Şimdi kalan OR işlemlerini sırayla binary bağla
+            while (tokens.Count > 1)
+            {
+                string left = tokens[0];
+                string op = tokens[1]; // OR
+                string right = tokens[2];
+
+                string combined = $"({left} {op} {right})";
+                tokens[0] = combined;
+                tokens.RemoveAt(1);
+                tokens.RemoveAt(1);
+            }
+
+            return tokens[0];
+        }
+
+
+        private ConditionFilterModel? ParseConditionFilter(string expr)
+        {
+            if (string.IsNullOrWhiteSpace(expr)) return null;
+
+            string Unquote(string v)
+            {
+                v = v.Trim();
+                if (v.Length >= 2 && v[0] == '\'' && v[^1] == '\'')
+                    return v.Substring(1, v.Length - 2).Replace("''", "'");
+                return v;
+            }
+
+            var s = expr.Trim();
+
+            // IS [NOT] NULL
+            var mIs = Regex.Match(
+                s,
+                @"^\s*(?<col>(?:\$\d+|[\w\.\-]+|'[^']+'|""[^""]+""|\[[^\]]+\]))\s+IS\s+(?<not>NOT)?\s+NULL\s*$",
+                RegexOptions.IgnoreCase);
+            if (mIs.Success)
+            {
+                return new ConditionFilterModel
+                {
+                    Column = mIs.Groups["col"].Value,
+                    Operator = mIs.Groups["not"].Success ? ComparisonOperator.IsNotNull : ComparisonOperator.IsNull,
+                    Value = null
+                };
+            }
+
+
+            // genel operatorler (>=, <=, !=, <>, =, >, <, CONTAINS, BEGINSWITH, ENDSWITH, LIKE)
+            var m = Regex.Match(s,
+                @"^\s*(?<col>[\w\.\-]+)\s*(?<op>>=|<=|!=|<>|=|>|<|LIKE|CONTAINS|BEGINSWITH|ENDSWITH)\s*(?<rhs>.+?)\s*$",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            if (!m.Success)
+            {
+                throw new Exception($"Could not parse condition filter expression: {expr}");
+            }
+
+            var col = m.Groups["col"].Value;
+            var op = m.Groups["op"].Value.ToUpperInvariant();
+            var rhsRaw = m.Groups["rhs"].Value.Trim();
+
+            // Sağ taraf tek tırnaklıysa çıkar
+            string rhsValue = rhsRaw;
+            if (rhsRaw.StartsWith("'") && rhsRaw.EndsWith("'"))
+            {
+                rhsValue = Unquote(rhsRaw);
+            }
+
+            ComparisonOperator comp;
+            switch (op)
+            {
+                case "=": comp = ComparisonOperator.Eq; break;
+                case "!=":
+                case "<>": comp = ComparisonOperator.Neq; break;
+                case ">": comp = ComparisonOperator.Gt; break;
+                case "<": comp = ComparisonOperator.Lt; break;
+                case ">=": comp = ComparisonOperator.Gte; break;
+                case "<=": comp = ComparisonOperator.Lte; break;
+                case "CONTAINS": comp = ComparisonOperator.Contains; break;
+                case "BEGINSWITH": comp = ComparisonOperator.BeginsWith; break;
+                case "ENDSWITH": comp = ComparisonOperator.EndsWith; break;
+                case "LIKE": comp = ComparisonOperator.Contains; break; // map LIKE -> Contains (handle in SQL builder)
+                default: return null;
+            }
+
+            var columnWithPrefix = AddTablePrefixToColumn(col);
+
+            return new ConditionFilterModel
+            {
+                Column = columnWithPrefix,
+                Operator = comp,
+                Value = rhsValue
+            };
+        }
+
+        private List<string> ParseGroupBy(string queryString)
         {
             var m = Regex.Match(queryString, @"\bGROUPBY\s*\(\s*(.*?)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             if (!m.Success) return new List<string>();
@@ -293,10 +490,15 @@ namespace DynamicDbQueryApi.Services
 
             var groupByColumns = body.Split(',').Select(c => c.Trim()).Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
 
+            for (int i = 0; i < groupByColumns.Count; i++)
+            {
+                groupByColumns[i] = AddTablePrefixToColumn(groupByColumns[i]);
+            }
+
             return groupByColumns;
         }
 
-        public List<OrderByModel> ParseOrderBy(string queryString)
+        private List<OrderByModel> ParseOrderBy(string queryString)
         {
             var m = Regex.Match(queryString, @"\bORDERBY\s*\(\s*(.*?)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             if (!m.Success) return new List<OrderByModel>();
@@ -313,9 +515,10 @@ namespace DynamicDbQueryApi.Services
                     var parts = column.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length > 0)
                     {
+                        var columnWithPrefix = AddTablePrefixToColumn(parts[0]);
                         var orderByModel = new OrderByModel
                         {
-                            Column = parts[0],
+                            Column = columnWithPrefix,
                             Desc = parts.Length > 1 && parts[1].Equals("DESC", StringComparison.OrdinalIgnoreCase)
                         };
                         orderByColumns.Add(orderByModel);
@@ -326,7 +529,7 @@ namespace DynamicDbQueryApi.Services
             return orderByColumns;
         }
 
-        public int ParseLimit(string queryString)
+        private int ParseLimit(string queryString)
         {
             var m = Regex.Match(queryString, @"\bTAKE\s*\(\s*(\d+)\s*\)", RegexOptions.IgnoreCase);
             if (!m.Success) return 0;
@@ -334,7 +537,7 @@ namespace DynamicDbQueryApi.Services
             return int.TryParse(m.Groups[1].Value, out var limit) ? limit : 0;
         }
 
-        public int ParseOffset(string queryString)
+        private int ParseOffset(string queryString)
         {
             var m = Regex.Match(queryString, @"\bSKIP\s*\(\s*(\d+)\s*\)", RegexOptions.IgnoreCase);
             if (!m.Success) return 0;
@@ -342,7 +545,7 @@ namespace DynamicDbQueryApi.Services
             return int.TryParse(m.Groups[1].Value, out var offset) ? offset : 0;
         }
 
-        public string GetIncludeQuery(string fromTable, string includeTable)
+        private string GetIncludeQuery(string fromTable, string includeTable)
         {
             var type = _dbType.ToLower();
             if (type == "postgresql" || type == "postgres")

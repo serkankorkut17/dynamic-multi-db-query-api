@@ -30,7 +30,7 @@ namespace DynamicDbQueryApi.Controllers
             }
             try
             {
-                var result = await _queryService.QueryAsync(request);
+                var result = await _queryService.MyQueryAsync(request);
                 var test = result.ToList();
                 // return type json
                 return Ok(test);
@@ -43,6 +43,24 @@ namespace DynamicDbQueryApi.Controllers
             // {
             //     return StatusCode(500, $"Internal server error: {ex.Message}");
             // }
+        }
+
+        [HttpPost("sql")]
+        public async Task<IActionResult> SQLQuery([FromBody] QueryRequestDTO request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+            try
+            {
+                var result = await _queryService.SQLQueryAsync(request);
+                return Ok(result);
+            }
+            catch (NotSupportedException ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
 
         [HttpPost("inspect")]

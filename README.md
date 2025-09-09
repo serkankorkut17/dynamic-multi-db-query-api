@@ -7,9 +7,11 @@ FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City
 FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City GROUP Country
 FETCH(Ad, Soyad, City.Name, City.Country.Name) FROM Person INCLUDE City.Country
 
-FETCH(Ad, Soyad, Email) FILTER(Ad BEGINSWITH('...') AND Soyad CONTAINS('...') AND Email ENDSWITH('...')) FROM Person 
+FETCH(Ad, Soyad, Email, grade) FILTER((Ad = 'Serkan' OR Grade > 3) AND (Soyad BEGINSWITH 'Ah' AND Email CONTAINS '@' AND Email ENDSWITH '.com' )) FROM Person 
 
 FETCH(Country, COUNT(*)) FROM Person
+
+order by group by filter bunlarda table ismi ayarı yapılmalı
 
 # POSTGRE
 Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb

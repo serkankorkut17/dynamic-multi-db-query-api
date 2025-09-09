@@ -9,5 +9,6 @@ namespace DynamicDbQueryApi.Interfaces
     public interface IQueryParser
     {
         QueryModel Parse(string queryString);
+        
     }
 }
