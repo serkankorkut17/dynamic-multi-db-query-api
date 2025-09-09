@@ -297,26 +297,56 @@ namespace DynamicDbQueryApi.Services
             }
 
             var exprList = ExpressionSplitter.ExtractTopLevelOperands(ref body, out var replacedBody);
-            Console.WriteLine($"Text after parsing: {replacedBody} with {exprList.Count} expressions");
+            // Console.WriteLine($"Text after parsing: {replacedBody} with {exprList.Count} expressions");
 
-            var str = ParenthesizeByPrecedence(replacedBody);
-            // Console.WriteLine($"Text after parenthesizing by precedence: {str}");
-            // baştaki ve sondaki parantezleri kaldır
-            if (str.StartsWith("(") && str.EndsWith(")"))
+            var finalExprList = exprList;
+            var finalReplacedBody = replacedBody;
+            if (exprList.Count > 2)
             {
-                str = str.Substring(1, str.Length - 2).Trim();
+
+                var str = ParenthesizeByPrecedence(finalReplacedBody);
+                // Console.WriteLine($"Text after parenthesizing by precedence: {str}");
+                // baştaki ve sondaki parantezleri kaldır
+                if (str.StartsWith("(") && str.EndsWith(")"))
+                {
+                    str = str.Substring(1, str.Length - 2).Trim();
+                }
+
+                // strdeki $ ile başlayan yerler exprListteki karşılığı ile değiştirilecek
+                for (int i = 0; i < finalExprList.Count; i++)
+                {
+                    var repl = finalExprList[i].Trim();
+                    if (!IsSingleConditionFilter(repl))
+                    {
+                        // Zaten dıştan tam saran parantez yoksa ekle
+                        if (!(repl.StartsWith("(") && repl.EndsWith(")")))
+                            repl = "(" + repl + ")";
+                    }
+                    Console.WriteLine($"Replacing ${i} with: {repl}");
+                    str = str.Replace($"${i}", repl);
+                }
+                // for (int i = 0; i < exprList.Count; i++)
+                // {
+                //     str = str.Replace($"${i}", exprList[i]);
+                // }
+
+                Console.WriteLine($"Text after replacing exprList in parenthesized string: {str}");
+                var multiExprList = ExpressionSplitter.ExtractTopLevelOperands(ref str, out var multiReplacedBody);
+
+                Console.WriteLine($"Text after final parsing: {multiReplacedBody} with {multiExprList.Count} expressions");
+                Console.WriteLine($"Text after final expressions: {JsonSerializer.Serialize(multiExprList)}");
+                
+
+                finalExprList = multiExprList;
+                finalReplacedBody = multiReplacedBody;
             }
 
-            // strdeki $ ile başlayan yerler exprListteki karşılığı ile değiştirilecek
-            // örn: $0 AND $1 OR $2
-            for (int i = 0; i < exprList.Count; i++)
-            {
-                str = str.Replace($"${i}", exprList[i]);
-            }
-
-            var finalExprList = ExpressionSplitter.ExtractTopLevelOperands(ref str, out var finalReplacedBody);
+            Console.WriteLine($"Body to parse: {body}");
 
             Console.WriteLine($"Text after final parsing: {finalReplacedBody} with {finalExprList.Count} expressions");
+            Console.WriteLine($"Text after final expressions: {JsonSerializer.Serialize(finalExprList)}");
+            
+
 
             // if finalReplacedBody is like $0 AND $1 OR $2
             var tokens = finalReplacedBody.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -335,10 +365,10 @@ namespace DynamicDbQueryApi.Services
             if (tokens.Length == 3 && (tokens[1].Equals("AND", StringComparison.OrdinalIgnoreCase) || tokens[1].Equals("OR", StringComparison.OrdinalIgnoreCase)))
             {
                 filter.Operator = tokens[1].Equals("AND", StringComparison.OrdinalIgnoreCase) ? LogicalOperator.And : LogicalOperator.Or;
-                
+
                 filter.Left = BuildFilterModel(tokens[0])!;
                 // Console.WriteLine($"Building filter for: {tokens[0]} - Text after building filter: {JsonSerializer.Serialize(filter.Left)}");
-                
+
                 filter.Right = BuildFilterModel(tokens[2])!;
                 // Console.WriteLine($"Building filter for: {tokens[2]} - Text after building filter: {JsonSerializer.Serialize(filter.Right)}");
 
@@ -348,7 +378,7 @@ namespace DynamicDbQueryApi.Services
             }
             else
             {
-                throw new Exception($"Could not parse logical filter expression: {str}");
+                throw new Exception($"Could not parse logical filter expression: {body} - Tokens: {JsonSerializer.Serialize(tokens)}");
             }
         }
 
