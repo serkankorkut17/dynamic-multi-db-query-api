@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -285,6 +286,51 @@ namespace DynamicDbQueryApi.Services
             return filterModel;
         }
 
+        public static List<string> ExtractTopLevelOperands(ref string body, out string replacedBody)
+        {
+            var expressions = new List<string>();
+            var sb = new StringBuilder();
+            int depth = 0;
+            int start = -1;
+            int counter = 0;
+
+            for (int i = 0; i < body.Length; i++)
+            {
+                char c = body[i];
+
+                if (c == '(')
+                {
+                    if (depth == 0)
+                    {
+                        start = i + 1; // parantez içi başlıyor
+                    }
+                    depth++;
+                }
+                else if (c == ')')
+                {
+                    depth--;
+                    if (depth == 0 && start >= 0)
+                    {
+                        string inner = body.Substring(start, i - start);
+                        string placeholder = $"${counter++}";
+                        expressions.Add(inner.Trim());
+                        sb.Append(placeholder);
+                        start = -1;
+                    }
+                }
+                else
+                {
+                    if (depth == 0)
+                    {
+                        sb.Append(c);
+                    }
+                }
+            }
+
+            replacedBody = sb.ToString().Trim();
+            return expressions;
+        }
+
         private FilterModel? BuildFilterModel(string body)
         {
             // Console.WriteLine($"Building FilterModel for body: {body}");
@@ -296,8 +342,12 @@ namespace DynamicDbQueryApi.Services
                 return cond;
             }
 
-            var exprList = ExpressionSplitter.ExtractTopLevelOperands(ref body, out var replacedBody);
-            // Console.WriteLine($"Text after parsing: {replacedBody} with {exprList.Count} expressions");
+            // var exprList = ExpressionSplitter.ExtractTopLevelOperands(ref body, out var replacedBody);
+            // var exprList = ExtractTopLevelOperands(ref body, out var replacedBody);
+            var exprList = ExpressionSplitter2.SimplerExtractTopLevelOperands(ref body, out var replacedBody);
+            Console.WriteLine($"Text after parsing: {replacedBody} with {exprList.Count} expressions");
+            Console.WriteLine($"Text after expressions: {JsonSerializer.Serialize(exprList)}");
+
 
             var finalExprList = exprList;
             var finalReplacedBody = replacedBody;
@@ -331,11 +381,14 @@ namespace DynamicDbQueryApi.Services
                 // }
 
                 Console.WriteLine($"Text after replacing exprList in parenthesized string: {str}");
-                var multiExprList = ExpressionSplitter.ExtractTopLevelOperands(ref str, out var multiReplacedBody);
+                // var multiExprList = ExpressionSplitter.ExtractTopLevelOperands(ref str, out var multiReplacedBody);
+                // var multiExprList = ExtractTopLevelOperands(ref str, out var multiReplacedBody);
+                var multiExprList = ExpressionSplitter2.SimplerExtractTopLevelOperands(ref str, out var multiReplacedBody);
+
 
                 Console.WriteLine($"Text after final parsing: {multiReplacedBody} with {multiExprList.Count} expressions");
                 Console.WriteLine($"Text after final expressions: {JsonSerializer.Serialize(multiExprList)}");
-                
+
 
                 finalExprList = multiExprList;
                 finalReplacedBody = multiReplacedBody;
@@ -345,7 +398,7 @@ namespace DynamicDbQueryApi.Services
 
             Console.WriteLine($"Text after final parsing: {finalReplacedBody} with {finalExprList.Count} expressions");
             Console.WriteLine($"Text after final expressions: {JsonSerializer.Serialize(finalExprList)}");
-            
+
 
 
             // if finalReplacedBody is like $0 AND $1 OR $2
