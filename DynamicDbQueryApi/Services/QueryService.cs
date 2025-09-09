@@ -201,29 +201,206 @@ namespace DynamicDbQueryApi.Services
             var connection = await context.GetOpenConnectionAsync();
 
             var type = request.DbType.ToLower();
-            string sql = type switch
+            // 1) Tabloları al
+            string tablesSql = type switch
             {
                 "postgresql" or "postgres" => @"
-                    SELECT table_name
+                    SELECT table_name AS TableName
                     FROM information_schema.tables
                     WHERE table_schema = 'public'
-                    AND table_type = 'BASE TABLE';",
+                    AND table_type = 'BASE TABLE'",
                 "mssql" or "sqlserver" => @"
-                    SELECT TABLE_NAME AS table_name
+                    SELECT TABLE_NAME AS TableName
                     FROM INFORMATION_SCHEMA.TABLES
-                    WHERE TABLE_TYPE = 'BASE TABLE';",
+                    WHERE TABLE_TYPE = 'BASE TABLE'",
                 "mysql" => @"
-                    SELECT TABLE_NAME AS table_name
+                    SELECT TABLE_NAME AS TableName
                     FROM INFORMATION_SCHEMA.TABLES
                     WHERE TABLE_TYPE = 'BASE TABLE'
-                    AND TABLE_SCHEMA = DATABASE();",
+                    AND TABLE_SCHEMA = DATABASE()",
                 "oracle" => @"
-                    SELECT table_name
+                    SELECT table_name AS TableName
                     FROM user_tables",
                 _ => throw new NotSupportedException($"Database type {request.DbType} is not supported for inspection.")
             };
 
-            return await connection.QueryAsync(sql);
+            var tableNames = (await connection.QueryAsync<string>(tablesSql)).ToList();
+
+            // 2) Her tablo için kolonları çek
+            // Ortak dönen yapı: { table: string, columns: [ { name, dataType, isNullable } ] }
+            var result = new List<object>();
+
+            foreach (var table in tableNames)
+            {
+                string columnsSql = type switch
+                {
+                    "postgresql" or "postgres" => @"
+                        SELECT column_name   AS Name,
+                               data_type     AS DataType,
+                               is_nullable   AS IsNullable
+                        FROM information_schema.columns
+                        WHERE table_schema = 'public' AND table_name = @Table", 
+                    "mssql" or "sqlserver" => @"
+                        SELECT COLUMN_NAME   AS Name,
+                               DATA_TYPE     AS DataType,
+                               IS_NULLABLE   AS IsNullable
+                        FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_NAME = @Table", 
+                    "mysql" => @"
+                        SELECT COLUMN_NAME   AS Name,
+                               DATA_TYPE     AS DataType,
+                               IS_NULLABLE   AS IsNullable
+                        FROM INFORMATION_SCHEMA.COLUMNS
+                        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @Table", 
+                    "oracle" => @"
+                        SELECT column_name   AS Name,
+                               data_type     AS DataType,
+                               nullable      AS IsNullable
+                        FROM user_tab_columns
+                        WHERE table_name = :Table", 
+                    _ => throw new NotSupportedException($"Database type {request.DbType} is not supported for inspection.")
+                };
+
+                IEnumerable<dynamic> columns;
+                if (type == "oracle")
+                {
+                    // Oracle'da parametre :Table (büyük harf) tablo isimleri genelde uppercase tutulur
+                    columns = await connection.QueryAsync(columnsSql, new { Table = table.ToUpperInvariant() });
+                }
+                else
+                {
+                    columns = await connection.QueryAsync(columnsSql, new { Table = table });
+                }
+
+                result.Add(new
+                {
+                    table = table,
+                    columns = columns
+                });
+            }
+            // 3) Tablolar arası ilişkiler (Foreign Key) -> relations list
+            string relationsSql = type switch
+            {
+                "postgresql" or "postgres" => @"
+                    SELECT 
+                        tc.constraint_name AS constraint_name,
+                        kcu.table_name     AS fk_table,
+                        kcu.column_name    AS fk_column,
+                        ccu.table_name     AS pk_table,
+                        ccu.column_name    AS pk_column
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                      ON tc.constraint_name = kcu.constraint_name
+                     AND tc.table_schema = kcu.table_schema
+                    JOIN information_schema.constraint_column_usage ccu
+                      ON ccu.constraint_name = tc.constraint_name
+                     AND ccu.table_schema = tc.table_schema
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                      AND tc.table_schema = 'public'", 
+                "mssql" or "sqlserver" => @"
+                    SELECT 
+                        fk.name              AS constraint_name,
+                        tf.name              AS fk_table,
+                        cf.name              AS fk_column,
+                        tp.name              AS pk_table,
+                        cp.name              AS pk_column
+                    FROM sys.foreign_keys fk
+                    INNER JOIN sys.foreign_key_columns fkc ON fk.object_id = fkc.constraint_object_id
+                    INNER JOIN sys.tables tf ON fkc.parent_object_id = tf.object_id
+                    INNER JOIN sys.columns cf ON fkc.parent_object_id = cf.object_id AND fkc.parent_column_id = cf.column_id
+                    INNER JOIN sys.tables tp ON fkc.referenced_object_id = tp.object_id
+                    INNER JOIN sys.columns cp ON fkc.referenced_object_id = cp.object_id AND fkc.referenced_column_id = cp.column_id", 
+                "mysql" => @"
+                    SELECT 
+                        rc.CONSTRAINT_NAME      AS constraint_name,
+                        kcu.TABLE_NAME          AS fk_table,
+                        kcu.COLUMN_NAME         AS fk_column,
+                        kcu.REFERENCED_TABLE_NAME AS pk_table,
+                        kcu.REFERENCED_COLUMN_NAME AS pk_column
+                    FROM information_schema.KEY_COLUMN_USAGE kcu
+                    JOIN information_schema.REFERENTIAL_CONSTRAINTS rc
+                      ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+                     AND kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
+                    WHERE kcu.CONSTRAINT_SCHEMA = DATABASE()
+                      AND kcu.REFERENCED_TABLE_NAME IS NOT NULL", 
+                "oracle" => @"
+                    SELECT 
+                        ac.constraint_name        AS constraint_name,
+                        aco.table_name            AS fk_table,
+                        aco.column_name           AS fk_column,
+                        ac_r.table_name           AS pk_table,
+                        acc.column_name           AS pk_column
+                    FROM user_constraints ac
+                    JOIN user_cons_columns aco ON ac.constraint_name = aco.constraint_name
+                    JOIN user_constraints ac_r ON ac.r_constraint_name = ac_r.constraint_name
+                    JOIN user_cons_columns acc ON ac_r.constraint_name = acc.constraint_name AND acc.position = aco.position
+                    WHERE ac.constraint_type = 'R'", 
+                _ => null!
+            };
+
+            var relationsRaw = string.IsNullOrWhiteSpace(relationsSql)
+                ? new List<dynamic>()
+                : (await connection.QueryAsync(relationsSql)).ToList();
+
+            // Çok kolonlu FK'ler için constraint_name + fk_table + pk_table ile grupla
+            var relations = relationsRaw
+                .GroupBy(r => new { constraint = (string)r.constraint_name, fk = (string)r.fk_table, pk = (string)r.pk_table })
+                .Select(g => new
+                {
+                    constraint = g.Key.constraint,
+                    foreignTable = g.Key.fk,
+                    primaryTable = g.Key.pk,
+                    foreignColumns = g.Select(x => (string)x.fk_column).Distinct().ToList(),
+                    primaryColumns = g.Select(x => (string)x.pk_column).Distinct().ToList()
+                })
+                .OrderBy(x => x.foreignTable)
+                .ThenBy(x => x.constraint)
+                .ToList();
+
+            // İstersen her tabloya inbound/outbound eklemek için hızlı index oluştur
+            var byTable = tableNames.ToDictionary(t => t, t => new { inbound = new List<object>(), outbound = new List<object>() });
+            foreach (var rel in relations)
+            {
+                if (byTable.TryGetValue(rel.foreignTable, out var fkSide))
+                {
+                    fkSide.outbound.Add(rel);
+                }
+                if (byTable.TryGetValue(rel.primaryTable, out var pkSide))
+                {
+                    pkSide.inbound.Add(rel);
+                }
+            }
+
+            // Tablo listesinde kolonlara ek olarak inbound/outbound relation özetleri
+            var enrichedTables = result.Select(t =>
+            {
+                var tableProp = t.GetType().GetProperty("table");
+                var colsProp = t.GetType().GetProperty("columns");
+                var tableName = tableProp?.GetValue(t) as string ?? string.Empty;
+                var colsVal = colsProp?.GetValue(t);
+                if (!byTable.TryGetValue(tableName, out var relInfo))
+                {
+                    relInfo = new { inbound = new List<object>(), outbound = new List<object>() };
+                }
+                return new
+                {
+                    table = tableName,
+                    columns = colsVal,
+                    inboundRelations = relInfo.inbound,
+                    outboundRelations = relInfo.outbound
+                };
+            }).ToList();
+
+            // Geriye tek bir obje döndürüyoruz (interface IEnumerable olduğu için liste sarmalaması)
+            var payload = new List<dynamic>
+            {
+                new {
+                    tables = enrichedTables,
+                    relations = relations
+                }
+            };
+
+            return payload;
         }
     }
 }
