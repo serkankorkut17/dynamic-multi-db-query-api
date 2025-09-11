@@ -1,0 +1,189 @@
+#!/usr/bin/env node
+// Oracle seeder aligned with Postgres schema/data generation
+const oracledb = require('oracledb');
+const { faker } = require('@faker-js/faker');
+const fs = require('fs');
+const path = require('path');
+const dotenvPath = path.join(__dirname, '.env');
+if (fs.existsSync(dotenvPath)) {
+  const lines = fs.readFileSync(dotenvPath, 'utf8').split(/\r?\n/);
+  for (const line of lines) {
+    const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
+    if (m) {
+      let v = m[2];
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+      process.env[m[1]] = v;
+    }
+  }
+}
+function env(n, f) { return process.env[n] ?? f; }
+const config = {
+  user: env('ORACLE_USER', 'system'),
+  password: env('ORACLE_PASSWORD', 'oracle'),
+  connectString: env('ORACLE_CONNECT', 'localhost/XEPDB1'),
+};
+const COUNTS = {
+  SCHOOLS: +env('SEED_COUNTS_SCHOOLS', '2'),
+  TEACHERS_PER_SCHOOL: +env('SEED_COUNTS_TEACHERS_PER_SCHOOL', '5'),
+  CLASSES_PER_SCHOOL: +env('SEED_COUNTS_CLASSES_PER_SCHOOL', '4'),
+  STUDENTS_PER_CLASS: +env('SEED_COUNTS_STUDENTS_PER_CLASS', '20'),
+  COURSES_PER_SCHOOL: +env('SEED_COUNTS_COURSES_PER_SCHOOL', '8'),
+  ENROLLMENTS_PER_STUDENT: +env('SEED_COUNTS_ENROLLMENTS_PER_STUDENT', '3'),
+};
+
+const TR_FIRST_NAMES = [
+  'Ahmet','Mehmet','Ayşe','Fatma','Emre','Elif','Burak','Zeynep','Can','Ece',
+  'Hakan','Gamze','Murat','Seda','Oğuz','Melisa','Yusuf','Rabia','Kerem','Derya',
+  'Deniz','Merve','Ahsen','Cem','Ceren','Onur','Sinem','Berk','Şevval','Umut'
+];
+const TR_LAST_NAMES = [
+  'Yılmaz','Kaya','Demir','Şahin','Çelik','Yıldız','Yıldırım','Aydın','Öztürk','Arslan',
+  'Doğan','Kılıç','Aslan','Korkmaz','Koç','Çetin','Polat','Avcı','Taş','Aksoy',
+  'Kaplan','Bozkurt','Işık','Erdem','Erdoğan','Kurt','Bulut','Güneş','Özdemir','Turan'
+];
+const TR_CITIES = [
+  'İstanbul','Ankara','İzmir','Bursa','Antalya','Konya','Adana','Gaziantep','Kocaeli','Mersin',
+  'Diyarbakır','Kayseri','Eskişehir','Samsun','Trabzon','Malatya','Van','Sakarya','Manisa','Balıkesir'
+];
+const TR_SCHOOL_NAMES = [
+  'Atatürk Anadolu Lisesi','Cumhuriyet İlkokulu','Mevlana Ortaokulu','Fatih Fen Lisesi','Barbaros MTAL',
+  'Hacı Bektaş Veli Anadolu Lisesi','Gazi İlkokulu','Yunus Emre Ortaokulu','Şehitler Lisesi','İnönü Anadolu Lisesi'
+];
+const TR_COURSES = [
+  'Matematik','Fizik','Kimya','Biyoloji','Tarih','Coğrafya','Türk Dili ve Edebiyatı','İngilizce','Almanca',
+  'Din Kültürü','Beden Eğitimi','Müzik','Resim','Bilgisayar Bilimi','Felsefe'
+];
+const CLASS_SECTIONS = ['A','B','C','D','E','F','G'];
+function randChoice(a){ return a[Math.floor(Math.random()*a.length)]; }
+function pickRandom(a, n){ const c=[...a],o=[]; for(let i=0;i<n&&c.length;i++){ const idx=Math.floor(Math.random()*c.length); o.push(c.splice(idx,1)[0]); } return o; }
+function trToAscii(s){
+  return s
+    .replace(/ğ/gi,'g').replace(/ü/gi,'u').replace(/ş/gi,'s')
+    .replace(/ı/g,'i').replace(/İ/g,'i').replace(/ö/gi,'o').replace(/ç/gi,'c')
+    .replace(/[^A-Za-z0-9\.\-_ ]+/g,'')
+    .toLowerCase()
+    .replace(/\s+/g,'.');
+}
+const usedEmails = new Set();
+function makeEmail(first, last, role){
+  let local = `${first}.${last}`;
+  local = trToAscii(local).replace(/[^a-z0-9.]/g, '');
+  const base = local || 'kisi';
+  const domain = role === 'teacher' ? 'okul.k12.tr' : 'ogrenci.k12.tr';
+  let n=1, email;
+  do { const suffix = n===1? '' : '.'+n; email = `${base}${suffix}@${domain}`; n++; } while(usedEmails.has(email));
+  usedEmails.add(email); return email;
+}
+
+async function withConn(fn){ const conn = await oracledb.getConnection(config); try { return await fn(conn); } finally { await conn.close(); } }
+
+async function dropSchema(conn){
+  await conn.execute(`
+    BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE grades'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
+    END;`);
+  await conn.execute(`
+    BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE enrollments'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
+    END;`);
+  await conn.execute(`
+    BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE students'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
+    END;`);
+  await conn.execute(`
+    BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE classes'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
+    END;`);
+  await conn.execute(`
+    BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE teachers'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
+    END;`);
+  await conn.execute(`
+    BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE courses'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
+    END;`);
+  await conn.execute(`
+    BEGIN
+      EXECUTE IMMEDIATE 'DROP TABLE schools'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF;
+    END;`);
+}
+
+async function createSchema(conn){
+  await conn.execute(`CREATE TABLE schools (id NUMBER GENERATED BY DEFAULT ON NULL AS IDENTITY PRIMARY KEY, name VARCHAR2(200) NOT NULL, city VARCHAR2(100) NOT NULL)`);
+  await conn.execute(`CREATE TABLE teachers (id NUMBER GENERATED BY DEFAULT ON NULL AS IDENTITY PRIMARY KEY, school_id NUMBER NOT NULL REFERENCES schools(id) ON DELETE CASCADE, first_name VARCHAR2(100) NOT NULL, last_name VARCHAR2(100) NOT NULL, email VARCHAR2(200) UNIQUE NOT NULL)`);
+  await conn.execute(`CREATE TABLE classes (id NUMBER GENERATED BY DEFAULT ON NULL AS IDENTITY PRIMARY KEY, school_id NUMBER NOT NULL REFERENCES schools(id) ON DELETE CASCADE, name VARCHAR2(200) NOT NULL, grade_level NUMBER NOT NULL)`);
+  await conn.execute(`CREATE TABLE students (id NUMBER GENERATED BY DEFAULT ON NULL AS IDENTITY PRIMARY KEY, class_id NUMBER NULL REFERENCES classes(id) ON DELETE SET NULL, first_name VARCHAR2(100) NOT NULL, last_name VARCHAR2(100) NOT NULL, email VARCHAR2(200) UNIQUE NOT NULL, birth_date DATE NOT NULL)`);
+  await conn.execute(`CREATE TABLE courses (id NUMBER GENERATED BY DEFAULT ON NULL AS IDENTITY PRIMARY KEY, school_id NUMBER NOT NULL REFERENCES schools(id) ON DELETE CASCADE, name VARCHAR2(200) NOT NULL)`);
+  await conn.execute(`CREATE TABLE enrollments (id NUMBER GENERATED BY DEFAULT ON NULL AS IDENTITY PRIMARY KEY, student_id NUMBER NOT NULL REFERENCES students(id) ON DELETE CASCADE, course_id NUMBER NOT NULL REFERENCES courses(id) ON DELETE CASCADE, enrolled_at TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL, CONSTRAINT uq_student_course UNIQUE(student_id, course_id))`);
+  await conn.execute(`CREATE TABLE grades (id NUMBER GENERATED BY DEFAULT ON NULL AS IDENTITY PRIMARY KEY, enrollment_id NUMBER NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE, grade NUMBER NOT NULL CHECK (grade BETWEEN 0 AND 100), graded_at TIMESTAMP DEFAULT SYSTIMESTAMP NOT NULL)`);
+}
+
+async function seedData(conn){
+  await conn.execute('BEGIN NULL; END;'); // ensure session
+  const schoolIds = [];
+  for (let s=0; s<COUNTS.SCHOOLS; s++){
+    const city = randChoice(TR_CITIES);
+    const name = `${city} ${randChoice(TR_SCHOOL_NAMES)}`;
+    const res = await conn.execute(`INSERT INTO schools(name, city) VALUES (:name, :city) RETURNING id INTO :id`, { name, city, id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER } });
+    schoolIds.push(res.outBinds.id[0]);
+  }
+  const allClasses = [], allStudents = [], allCourses = [];
+  for (const schoolId of schoolIds){
+    for (let t=0; t<COUNTS.TEACHERS_PER_SCHOOL; t++){
+      const first = randChoice(TR_FIRST_NAMES), last = randChoice(TR_LAST_NAMES);
+      const email = makeEmail(first,last,'teacher');
+      await conn.execute(`INSERT INTO teachers(school_id, first_name, last_name, email) VALUES (:sid,:f,:l,:e)`, { sid: schoolId, f:first, l:last, e:email });
+    }
+    const thisSchoolClasses = [];
+    for (let c=0; c<COUNTS.CLASSES_PER_SCHOOL; c++){
+      const grade = faker.number.int({ min:1, max:12 });
+      const section = randChoice(CLASS_SECTIONS);
+      const name = `${grade}-${section} Sınıfı`;
+      const res = await conn.execute(`INSERT INTO classes(school_id, name, grade_level) VALUES (:sid,:n,:g) RETURNING id INTO :id`, { sid:schoolId, n:name, g:grade, id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER } });
+      thisSchoolClasses.push(res.outBinds.id[0]);
+    }
+    allClasses.push(...thisSchoolClasses);
+    const thisSchoolCourses = [];
+    const chosenCourses = pickRandom(TR_COURSES, Math.min(COUNTS.COURSES_PER_SCHOOL, TR_COURSES.length));
+    for (const courseName of chosenCourses){
+      const res = await conn.execute(`INSERT INTO courses(school_id, name) VALUES (:sid,:n) RETURNING id INTO :id`, { sid: schoolId, n: courseName, id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER } });
+      thisSchoolCourses.push(res.outBinds.id[0]);
+    }
+    allCourses.push(...thisSchoolCourses);
+    for (const classId of thisSchoolClasses){
+      for (let st=0; st<COUNTS.STUDENTS_PER_CLASS; st++){
+        const first = randChoice(TR_FIRST_NAMES), last = randChoice(TR_LAST_NAMES);
+        const email = makeEmail(first,last,'student');
+        const birth = faker.date.past({ years: faker.number.int({ min:6, max:18 }) });
+        const res = await conn.execute(`INSERT INTO students(class_id, first_name, last_name, email, birth_date) VALUES (:cid,:f,:l,:e,:b) RETURNING id INTO :id`, { cid: classId, f:first, l:last, e:email, b: birth, id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER } });
+        allStudents.push(res.outBinds.id[0]);
+      }
+    }
+  }
+  const allEnrollments = [];
+  for (const studentId of allStudents){
+    const selected = pickRandom(allCourses, Math.min(COUNTS.ENROLLMENTS_PER_STUDENT, allCourses.length));
+    for (const courseId of selected){
+      try{
+        const res = await conn.execute(`INSERT INTO enrollments(student_id, course_id, enrolled_at) VALUES (:s,:c,SYSTIMESTAMP) RETURNING id INTO :id`, { s: studentId, c: courseId, id: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER } });
+        const enrollmentId = res.outBinds.id[0];
+        if (Math.random() < 0.85){
+          await conn.execute(`INSERT INTO grades(enrollment_id, grade, graded_at) VALUES (:e,:g,SYSTIMESTAMP)`, { e: enrollmentId, g: faker.number.int({ min:40, max:100 }) });
+        }
+        allEnrollments.push(enrollmentId);
+      } catch {}
+    }
+  }
+  await conn.commit();
+  console.log('Oracle seeding complete.');
+}
+
+(async () => {
+  try {
+    await withConn(async (conn) => {
+      if (new Set(process.argv.slice(2)).has('--drop')) { console.log('Dropping Oracle schema...'); await dropSchema(conn); }
+      if (new Set(process.argv.slice(2)).has('--create') || process.argv.length <= 2) { console.log('Creating Oracle schema...'); await createSchema(conn); }
+      if (new Set(process.argv.slice(2)).has('--seed') || process.argv.length <= 2) { console.log('Seeding Oracle data...'); await seedData(conn); }
+    });
+  } catch (e) { console.error('Oracle seed error:', e); process.exitCode = 1; }
+})();

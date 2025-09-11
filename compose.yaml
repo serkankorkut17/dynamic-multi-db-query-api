@@ -37,7 +37,20 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
 
+  oracle:
+    image: gvenzl/oracle-free:latest
+    container_name: oracle-db
+    environment:
+      ORACLE_PASSWORD: oracle
+      APP_USER: app
+      APP_USER_PASSWORD: app
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+
 volumes:
   postgres-data:
   mssql-data:
   mysql-data:
+  oracle-data:

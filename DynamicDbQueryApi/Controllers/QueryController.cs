@@ -31,9 +31,7 @@ namespace DynamicDbQueryApi.Controllers
             try
             {
                 var result = await _queryService.MyQueryAsync(request);
-                var test = result.ToList();
-                // return type json
-                return Ok(test);
+                return Ok(result);
             }
             catch (NotSupportedException ex)
             {

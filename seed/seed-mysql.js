@@ -52,6 +52,54 @@ function pickRandom(a, n) {
 	}
 	return o;
 }
+
+// --- Turkish mock datasets & helpers (parity with Postgres seeder) ---
+const TR_FIRST_NAMES = [
+		'Ahmet','Mehmet','Ayşe','Fatma','Emre','Elif','Burak','Zeynep','Can','Ece',
+		'Hakan','Gamze','Murat','Seda','Oğuz','Melisa','Yusuf','Rabia','Kerem','Derya',
+		'Deniz','Merve','Ahsen','Cem','Ceren','Onur','Sinem','Berk','Şevval','Umut'
+];
+const TR_LAST_NAMES = [
+		'Yılmaz','Kaya','Demir','Şahin','Çelik','Yıldız','Yıldırım','Aydın','Öztürk','Arslan',
+		'Doğan','Kılıç','Aslan','Korkmaz','Koç','Çetin','Polat','Avcı','Taş','Aksoy',
+		'Kaplan','Bozkurt','Işık','Erdem','Erdoğan','Kurt','Bulut','Güneş','Özdemir','Turan'
+];
+const TR_CITIES = [
+		'İstanbul','Ankara','İzmir','Bursa','Antalya','Konya','Adana','Gaziantep','Kocaeli','Mersin',
+		'Diyarbakır','Kayseri','Eskişehir','Samsun','Trabzon','Malatya','Van','Sakarya','Manisa','Balıkesir'
+];
+const TR_SCHOOL_NAMES = [
+		'Atatürk Anadolu Lisesi','Cumhuriyet İlkokulu','Mevlana Ortaokulu','Fatih Fen Lisesi','Barbaros MTAL',
+		'Hacı Bektaş Veli Anadolu Lisesi','Gazi İlkokulu','Yunus Emre Ortaokulu','Şehitler Lisesi','İnönü Anadolu Lisesi'
+];
+const TR_COURSES = [
+		'Matematik','Fizik','Kimya','Biyoloji','Tarih','Coğrafya','Türk Dili ve Edebiyatı','İngilizce','Almanca',
+		'Din Kültürü','Beden Eğitimi','Müzik','Resim','Bilgisayar Bilimi','Felsefe'
+];
+const CLASS_SECTIONS = ['A','B','C','D','E','F','G'];
+function randChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function trToAscii(s){
+	return s
+		.replace(/ğ/gi,'g').replace(/ü/gi,'u').replace(/ş/gi,'s')
+		.replace(/ı/g,'i').replace(/İ/g,'i').replace(/ö/gi,'o').replace(/ç/gi,'c')
+		.replace(/[^A-Za-z0-9\.\-_ ]+/g,'')
+		.toLowerCase()
+		.replace(/\s+/g,'.');
+}
+const usedEmails = new Set();
+function makeEmail(first, last, role){
+	let local = `${first}.${last}`;
+	local = trToAscii(local).replace(/[^a-z0-9.]/g, '');
+	const base = local || 'kisi';
+	const domain = role === 'teacher' ? 'okul.k12.tr' : 'ogrenci.k12.tr';
+	let n = 1; let email;
+	do {
+		const suffix = n === 1 ? '' : '.'+n;
+		email = `${base}${suffix}@${domain}`; n++;
+	} while (usedEmails.has(email));
+	usedEmails.add(email);
+	return email;
+}
 async function dropSchema(conn) {
 	await conn.query(
 		`SET FOREIGN_KEY_CHECKS=0; DROP TABLE IF EXISTS grades; DROP TABLE IF EXISTS enrollments; DROP TABLE IF EXISTS students; DROP TABLE IF EXISTS classes; DROP TABLE IF EXISTS teachers; DROP TABLE IF EXISTS courses; DROP TABLE IF EXISTS schools; SET FOREIGN_KEY_CHECKS=1;`
@@ -78,21 +126,20 @@ async function seedData(conn) {
 		const allCourseIds = [],
 			allStudentIds = [];
 		for (const schoolId of schoolIds) {
-			for (let t = 0; t < COUNTS.TEACHERS_PER_SCHOOL; t++) {
-				const first = faker.person.firstName(),
-					last = faker.person.lastName(),
-					email = faker.internet
-						.email({ firstName: first, lastName: last })
-						.toLowerCase();
-				await conn.execute(
-					"INSERT INTO teachers(school_id, first_name, last_name, email) VALUES (?,?,?,?)",
-					[schoolId, first, last, email]
-				);
-			}
+				for (let t = 0; t < COUNTS.TEACHERS_PER_SCHOOL; t++) {
+					const first = randChoice(TR_FIRST_NAMES);
+					const last = randChoice(TR_LAST_NAMES);
+					const email = makeEmail(first, last, 'teacher');
+					await conn.execute(
+						"INSERT INTO teachers(school_id, first_name, last_name, email) VALUES (?,?,?,?)",
+						[schoolId, first, last, email]
+					);
+				}
 			const classIds = [];
 			for (let c = 0; c < COUNTS.CLASSES_PER_SCHOOL; c++) {
-				const name = `${faker.word.noun()} Class`,
-					grade = faker.number.int({ min: 1, max: 12 });
+					const grade = faker.number.int({ min: 1, max: 12 });
+					const section = randChoice(CLASS_SECTIONS);
+					const name = `${grade}-${section} Sınıfı`;
 				const [res] = await conn.execute(
 					"INSERT INTO classes(school_id, name, grade_level) VALUES (?,?,?)",
 					[schoolId, name, grade]
@@ -100,34 +147,20 @@ async function seedData(conn) {
 				classIds.push(res.insertId);
 			}
 			const courseIds = [];
-			for (let c = 0; c < COUNTS.COURSES_PER_SCHOOL; c++) {
-				const name = faker.helpers.arrayElement([
-					"Mathematics",
-					"Physics",
-					"Chemistry",
-					"Biology",
-					"History",
-					"Geography",
-					"Literature",
-					"Art",
-					"Music",
-					"Computer Science",
-					"PE",
-				]);
-				const [res] = await conn.execute(
-					"INSERT INTO courses(school_id, name) VALUES (?,?)",
-					[schoolId, name]
-				);
-				courseIds.push(res.insertId);
-			}
+				const chosenCourses = pickRandom(TR_COURSES, Math.min(COUNTS.COURSES_PER_SCHOOL, TR_COURSES.length));
+				for (const courseName of chosenCourses) {
+					const [res] = await conn.execute(
+						"INSERT INTO courses(school_id, name) VALUES (?,?)",
+						[schoolId, courseName]
+					);
+					courseIds.push(res.insertId);
+				}
 			allCourseIds.push(...courseIds);
 			for (const classId of classIds) {
 				for (let st = 0; st < COUNTS.STUDENTS_PER_CLASS; st++) {
-					const first = faker.person.firstName(),
-						last = faker.person.lastName(),
-						email = faker.internet
-							.email({ firstName: first, lastName: last })
-							.toLowerCase();
+						const first = randChoice(TR_FIRST_NAMES);
+						const last = randChoice(TR_LAST_NAMES);
+						const email = makeEmail(first, last, 'student');
 					const birth = faker.date.past({
 						years: faker.number.int({ min: 6, max: 18 }),
 					});

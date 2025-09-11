@@ -25,7 +25,7 @@ namespace DynamicDbQueryApi.Services
             return await connection.QueryAsync(request.Query);
         }
 
-        public async Task<IEnumerable<dynamic>> MyQueryAsync(QueryRequestDTO request)
+        public async Task<QueryResultDTO> MyQueryAsync(QueryRequestDTO request)
         {
             var context = new DapperContext(request.DbType, request.ConnectionString);
 
@@ -44,12 +44,19 @@ namespace DynamicDbQueryApi.Services
 
             // return new List<dynamic> { model };
 
-            return await connection.QueryAsync(sql);
+            var data = await connection.QueryAsync(sql);
+            data = data.ToList();
+
+            return new QueryResultDTO
+            {
+                Sql = sql,
+                Data = data
+            };
         }
 
         public string ConvertFilterToSql(FilterModel filter)
         {
-            if (filter == null) return "1=1"; // Filter yoksa her zaman true döner
+            if (filter == null) return "1=1";
 
             if (filter is ConditionFilterModel condition)
             {

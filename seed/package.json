@@ -13,12 +13,15 @@
     "seed:mssql": "node seed-mssql.js",
     "reset:mssql": "node seed-mssql.js --drop --create --seed",
     "seed:mysql": "node seed-mysql.js",
-    "reset:mysql": "node seed-mysql.js --drop --create --seed"
+  "reset:mysql": "node seed-mysql.js --drop --create --seed",
+  "seed:oracle": "node seed-oracle.js",
+  "reset:oracle": "node seed-oracle.js --drop --create --seed"
   },
   "dependencies": {
     "@faker-js/faker": "^9.0.0",
     "pg": "^8.11.5",
     "mssql": "^10.0.1",
-    "mysql2": "^3.10.0"
+  "mysql2": "^3.10.0",
+  "oracledb": "^6.5.0"
   }
 }

@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dynamic Query API</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:960px;margin:24px auto;padding:0 16px}
+      label{display:block;margin-top:12px;font-weight:600}
+      input,select,textarea{width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;margin-top:4px}
+      button{margin-top:16px;padding:10px 16px;border:none;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer}
+      pre{background:#0b1020;color:#e5e7eb;padding:12px;border-radius:6px;white-space:pre-wrap}
+      .row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+      .row > div{min-width:0}
+    </style>
+  </head>
+  <body>
+    <h1>Dynamic Query API</h1>
+    <p>Send a request to <code>POST /api/query</code> with a DB type, connection string, and query.</p>
+    <form id="f">
+      <div class="row">
+        <div>
+          <label for="dbType">DB Type</label>
+          <select id="dbType">
+            <option value="postgres">postgres</option>
+            <option value="mssql">mssql</option>
+            <option value="mysql">mysql</option>
+            <option value="sqlite">sqlite</option>
+          </select>
+        </div>
+        <div>
+          <label for="cs">Connection String</label>
+          <input id="cs" placeholder="Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb" />
+        </div>
+      </div>
+
+      <label for="q">Query</label>
+      <textarea id="q" rows="6">FETCH(Ad, Soyad) FROM Dataset</textarea>
+
+      <button type="submit">Send</button>
+    </form>
+
+  <h3>Response</h3>
+  <pre id="out"></pre>
+
+    <script>
+      const form = document.getElementById('f');
+      const out = document.getElementById('out');
+      function exampleCs(db) {
+        switch (db) {
+          case 'postgres':
+            return 'Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb';
+          case 'mssql':
+            return 'Server=localhost,1433;Database=master;User ID=sa;Password=Merhaba123.;Encrypt=True;TrustServerCertificate=True;';
+          case 'mysql':
+            return 'Server=localhost;Port=3306;Database=querydb;User=mysql;Password=mysql;SslMode=None;AllowPublicKeyRetrieval=True;';
+        }
+      }
+      document.getElementById('dbType').addEventListener('change', (e) => {
+        document.getElementById('cs').placeholder = exampleCs(e.target.value);
+      });
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const body = {
+          dbType: document.getElementById('dbType').value,
+          connectionString: document.getElementById('cs').value,
+          query: document.getElementById('q').value
+        };
+        out.textContent = 'Loading...';
+        try {
+          const res = await fetch('/api/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+          });
+          const text = await res.text();
+          try {
+            const obj = JSON.parse(text);
+            if (obj && (obj.sql || obj.Sql)) {
+              const sql = obj.sql || obj.Sql;
+              const data = obj.data ?? obj.Data;
+              const rendered = 'SQL:\n' + sql + '\n\nDATA:\n' + JSON.stringify(data, null, 2);
+              out.textContent = rendered;
+            } else {
+              out.textContent = JSON.stringify(obj, null, 2);
+            }
+          }
+          catch { out.textContent = text; }
+        } catch (err) {
+          out.textContent = String(err);
+        }
+      });
+    </script>
+  </body>
+</html>

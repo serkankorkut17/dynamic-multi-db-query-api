@@ -7,17 +7,15 @@ FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City
 FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City GROUP Country
 FETCH(Ad, Soyad, City.Name, City.Country.Name) FROM Person INCLUDE City.Country
 
-FETCH(Ad, Soyad, Email, grade) FILTER((Ad = 'Serkan' OR Grade > 3) AND (Soyad BEGINSWITH 'Ah' AND Email CONTAINS '@' AND Email ENDSWITH '.com' )) FROM Person 
+FETCH(Country, COUNT(*, grade))FILTER((Ad = 'Serkan' OR Grade > 3) AND (Soyad BEGINSWITH 'Ah' AND Email CONTA
+IFETCH(Country, COUNT(*)) FROM(Person) GROUPBY(Name) ORDERBY(Name ASC) TAKE(10) LIMIT(10)
+NS '@' AND Email ENDSWITH '.com' ))gres;Database=querydb
 
-FETCH(Country, COUNT(*)) FROM Person
+# ########################
+**having
+query parser düzenle
+sql query builder oluşturulabilir
+expression splitter düzenle
 
-order by group by filter bunlarda table ismi ayarı yapılmalı
-
-# POSTGRE
-Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb
-
-# SQL SERVER
-Server=localhost,1433;Database=master;User ID=sa;Password=Merhaba123.;Encrypt=True;TrustServerCertificate=True
-
-# MYSQL
-Server=localhost;Port=3306;Database=querydb;User=mysql;Password=mysql;SslMode=None;AllowPublicKeyRetrieval=True
+**test
+*test multi db
