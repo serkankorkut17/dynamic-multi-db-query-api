@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using MySql.Data.MySqlClient;
 using Npgsql;
+using Oracle.ManagedDataAccess.Client;
 
 namespace DynamicDbQueryApi.Data
 {
@@ -42,6 +43,10 @@ namespace DynamicDbQueryApi.Data
             if (type == "mysql")
             {
                 return new MySqlConnection(_connectionString);
+            }
+            if (type == "oracle")
+            {
+                return new OracleConnection(_connectionString);
             }
             else
             {

@@ -12,6 +12,7 @@ namespace DynamicDbQueryApi.DTOs
         public FilterModel? Filters { get; set; }
         public List<IncludeModel> Includes { get; set; } = new List<IncludeModel>();
         public List<string> GroupBy { get; set; } = new List<string>();
+        public FilterModel? Having { get; set; }
         public List<OrderByModel> OrderBy { get; set; } = new List<OrderByModel>();
         
         public bool Distinct { get; set; } = false;

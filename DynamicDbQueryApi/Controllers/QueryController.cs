@@ -62,7 +62,7 @@ namespace DynamicDbQueryApi.Controllers
         }
 
         [HttpPost("inspect")]
-        public async Task<IActionResult> InspectDatabase([FromBody] QueryRequestDTO request)
+        public async Task<IActionResult> InspectDatabase([FromBody] InspectRequestDTO request)
         {
             if (!ModelState.IsValid)
             {

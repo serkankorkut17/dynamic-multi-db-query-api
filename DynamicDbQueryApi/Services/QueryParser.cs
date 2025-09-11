@@ -13,7 +13,7 @@ using ZstdSharp.Unsafe;
 
 namespace DynamicDbQueryApi.Services
 {
-    public class QueryParser : IQueryParser
+    public class QueryParser
     {
         private readonly IDbConnection _connection;
         private readonly string _dbType;
@@ -67,6 +67,9 @@ namespace DynamicDbQueryApi.Services
 
             // GROUP BY Part
             queryModel.GroupBy = ParseGroupBy(queryString);
+
+            // HAVING Part
+            queryModel.Having = ParseHaving(queryString);
 
             // ORDER BY Part
             queryModel.OrderBy = ParseOrderBy(queryString);
@@ -414,8 +417,6 @@ namespace DynamicDbQueryApi.Services
 
             // ExpressionSplitter kullanarak en dıştaki operandları çıkar ve yerlerine $0, $1, ... koy
             var exprList = ExpressionSplitter2.SimplerExtractTopLevelOperands(ref body, out var replacedBody);
-            Console.WriteLine($"Text after parsing: {replacedBody} with {exprList.Count} expressions");
-            Console.WriteLine($"Text after expressions: {JsonSerializer.Serialize(exprList)}");
 
             var finalExprList = exprList;
             var finalReplacedBody = replacedBody;
@@ -566,10 +567,15 @@ namespace DynamicDbQueryApi.Services
                 };
             }
 
-            // genel operatorler (>=, <=, !=, <>, =, >, <, CONTAINS, BEGINSWITH, ENDSWITH, LIKE)
+            //! örnek: column yerine expression yakala (basit)
             var m = Regex.Match(s,
-                @"^\s*(?<col>[\w\.\-]+)\s*(?<op>>=|<=|!=|<>|=|>|<|LIKE|CONTAINS|BEGINSWITH|ENDSWITH)\s*(?<rhs>.+?)\s*$",
+                @"^\s*(?<col>[\w\.\-\(\)\*\s,']+?)\s*(?<op>>=|<=|!=|<>|=|>|<|LIKE|CONTAINS|BEGINSWITH|ENDSWITH)\s*(?<rhs>.+?)\s*$",
                 RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            // genel operatorler (>=, <=, !=, <>, =, >, <, CONTAINS, BEGINSWITH, ENDSWITH, LIKE)
+            // var m = Regex.Match(s,
+            //     @"^\s*(?<col>[\w\.\-]+)\s*(?<op>>=|<=|!=|<>|=|>|<|LIKE|CONTAINS|BEGINSWITH|ENDSWITH)\s*(?<rhs>.+?)\s*$",
+            //     RegexOptions.IgnoreCase | RegexOptions.Singleline);
             if (!m.Success)
             {
                 throw new Exception($"Could not parse condition filter expression: {expr}");
@@ -600,7 +606,7 @@ namespace DynamicDbQueryApi.Services
                 case "CONTAINS": comp = ComparisonOperator.Contains; break;
                 case "BEGINSWITH": comp = ComparisonOperator.BeginsWith; break;
                 case "ENDSWITH": comp = ComparisonOperator.EndsWith; break;
-                case "LIKE": comp = ComparisonOperator.Contains; break; // map LIKE -> Contains (handle in SQL builder)
+                case "LIKE": comp = ComparisonOperator.Like; break;
                 default: return null;
             }
 
@@ -632,6 +638,28 @@ namespace DynamicDbQueryApi.Services
             }
 
             return groupByColumns;
+        }
+
+        // HAVING(...) kısmını parse etme
+        private FilterModel? ParseHaving(string queryString)
+        {
+            var start = Regex.Match(queryString, @"\bHAVING\s*\(", RegexOptions.IgnoreCase);
+            if (!start.Success) return null;
+
+            // Parantez başlangıç indeksini ve kapanış indeksini bul
+            int openIdx = start.Index + start.Length - 1;
+            int bodyStart = openIdx + 1;
+            int closeIdx = FindClosingParenthesis(queryString, openIdx);
+            if (closeIdx == -1) return null;
+
+            // HAVING(...) içindeki metni al
+            var body = queryString.Substring(bodyStart, closeIdx - bodyStart).Trim();
+            if (string.IsNullOrWhiteSpace(body)) return null;
+
+            // HAVING ifadesini FilterModel yapısına dönüştür
+            var filterModel = BuildFilterModel(body);
+
+            return filterModel;
         }
 
         // ORDERBY(...) kısmını parse etme

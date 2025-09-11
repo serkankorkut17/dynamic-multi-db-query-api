@@ -6,6 +6,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddScoped<IQueryService, QueryService>();
+builder.Services.AddScoped<IQueryParserService, QueryParserService>();
+builder.Services.AddScoped<ISqlBuilderService, SqlBuilderService>();
+builder.Services.AddScoped<IDbSchemaService, DbSchemaService>();
 
 // Serilog
 builder.Host.UseSerilog((context, loggerConfig) =>

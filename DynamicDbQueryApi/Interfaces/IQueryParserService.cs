@@ -6,9 +6,8 @@ using DynamicDbQueryApi.DTOs;
 
 namespace DynamicDbQueryApi.Interfaces
 {
-    public interface IQueryParser
+    public interface IQueryParserService
     {
         QueryModel Parse(string queryString);
-        
     }
 }
