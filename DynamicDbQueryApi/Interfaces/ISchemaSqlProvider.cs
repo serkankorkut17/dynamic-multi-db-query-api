@@ -7,12 +7,12 @@ using DynamicDbQueryApi.DTOs;
 
 namespace DynamicDbQueryApi.Interfaces
 {
-    public interface IDbSchemaService
+    public interface ISchemaSqlProvider
     {
-        Task<ForeignKeyPair?> GetForeignKeyPairAsync(IDbConnection conn, string dbType, string fromTable, string includeTable);
         string GetIncludeQuery(string dbType, string fromTable, string includeTable);
         string GetTablesQuery(string dbType);
         string GetColumnsQuery(string dbType, string tableName);
         string GetRelationshipsQuery(string dbType);
+        string GetColumnDataTypeQuery(string dbType, string? schema, string tableName, string columnName);
     }
 }

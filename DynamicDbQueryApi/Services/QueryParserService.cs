@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Dapper;
 using DynamicDbQueryApi.DTOs;
+using DynamicDbQueryApi.Entities;
 using DynamicDbQueryApi.Interfaces;
 
 namespace DynamicDbQueryApi.Services

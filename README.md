@@ -1,21 +1,26 @@
 # dynamic-multi-db-query-api
+count, sum, avg, min, max, joins, group by, order by, limit, offset, distinct
 
 FETCH(Ad, Soyad) FROM Dataset
-FETCH(Ad='Serkan', Soyad) FROM Dataset
-FETCH(Age>30, Salary<5000) FROM Employee
 FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City
-FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City GROUP Country
-FETCH(Ad, Soyad, City.Name, City.Country.Name) FROM Person INCLUDE City.Country
+FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City GROUPBY (Country)
+FETCH(Ad, Soyad, City.Name, City.Country.Name) FROM Person INCLUDE (City.Country)
 
 FETCH(Country, COUNT(*)) FILTER((Ad = 'Serkan' OR Grade > 3) AND (Soyad BEGINSWITH 'Ah' AND Email CONTAINS '@' AND Email ENDSWITH '.com' ))
 
 FETCH(Country, COUNT(*)) FROM(Person) GROUPBY(Name) ORDERBY(Name ASC) TAKE(10) LIMIT(10)
 
 # ########################
-filterları test et ----- null, not null 
+filterları test et ----- null, not null != null da en son convert edilebilir
 filterlar butun dblerde test et
 
 db output endpointi
+1- queryddeki columnları al table.column
+2- her column için datatype veren kodu yazarak bunu elde et
+3- yoksa tablo oluştur varsa eksikleri alter et nullable olması gerekir tam tersi fazlaysa error belki de
+eğer CREATE TABLE ise hepsi nullable olsun
+ALTER TABLE ADD COLUMN burda fazlalıklar not nullsa nullable yap
+4- tek tek insert yap
 
 expression splitter düzenle
 inspect db düzenle

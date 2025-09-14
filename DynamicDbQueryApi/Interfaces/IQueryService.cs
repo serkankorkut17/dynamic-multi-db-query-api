@@ -11,6 +11,6 @@ namespace DynamicDbQueryApi.Interfaces
     {
         Task<QueryResultDTO> MyQueryAsync(QueryRequestDTO request);
         Task<IEnumerable<dynamic>> SQLQueryAsync(QueryRequestDTO request);
-        Task<IEnumerable<dynamic>> InspectDatabaseAsync(InspectRequestDTO request);
+        Task<InspectResponseDTO> InspectDatabaseAsync(InspectRequestDTO request);
     }
 }

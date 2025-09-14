@@ -4,50 +4,17 @@ using System.Data;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Dapper;
 using DynamicDbQueryApi.DTOs;
 using DynamicDbQueryApi.Interfaces;
 
-namespace DynamicDbQueryApi.Services
+namespace DynamicDbQueryApi.Repositories
 {
-    public class DbSchemaService : IDbSchemaService
+    public class SchemeSqlProvider : ISchemaSqlProvider
     {
-        private readonly ILogger<DbSchemaService> _logger;
-        public DbSchemaService(ILogger<DbSchemaService> logger)
+        private readonly ILogger<SchemeSqlProvider> _logger;
+        public SchemeSqlProvider(ILogger<SchemeSqlProvider> logger)
         {
             _logger = logger;
-        }
-
-        // Belirtilen tablolara ait foreign key çiftini döner
-        public async Task<ForeignKeyPair?> GetForeignKeyPairAsync(IDbConnection connection, string dbType, string fromTable, string includeTable)
-        {
-            var includeSql = GetIncludeQuery(dbType, fromTable, includeTable);
-
-            var includeResult = await connection.QueryFirstOrDefaultAsync(includeSql);
-            _logger.LogInformation("Include Query Result: {Result}", JsonSerializer.Serialize(includeResult as object));
-
-            if (includeResult != null)
-            {
-                var pair = new ForeignKeyPair();
-                IDictionary<string, object>? dict = includeResult as IDictionary<string, object>;
-
-                if (dict != null)
-                {
-                    if (dbType.ToLower() == "oracle")
-                    {
-                        // Oracle kolon isimleri büyük harfli döner
-                        pair.ForeignKey = dict["FK_COLUMN"]?.ToString() ?? "";
-                        pair.ReferencedKey = dict["REFERENCED_COLUMN"]?.ToString() ?? "";
-                    }
-                    else
-                    {
-                        pair.ForeignKey = dict["fk_column"]?.ToString() ?? "";
-                        pair.ReferencedKey = dict["referenced_column"]?.ToString() ?? "";
-                    }
-                }
-                return pair;
-            }
-            return null;
         }
 
         // DB türüne göre foreign key sorgusu oluşturma
@@ -114,7 +81,7 @@ namespace DynamicDbQueryApi.Services
             if (type == "postgresql" || type == "postgres")
             {
                 return @"
-                    SELECT table_name AS TableName
+                    SELECT table_name AS table_name
                     FROM information_schema.tables
                     WHERE table_schema = 'public'
                     AND table_type = 'BASE TABLE'";
@@ -122,14 +89,14 @@ namespace DynamicDbQueryApi.Services
             else if (type == "mssql" || type == "sqlserver")
             {
                 return @"
-                    SELECT TABLE_NAME AS TableName
-                    FROM INFORMATION_SCHEMA.TABLES
+                    SELECT TABLE_NAME 
+                    FROM INFORMATION_SCHEMA.TABLES 
                     WHERE TABLE_TYPE = 'BASE TABLE'";
             }
             else if (type == "mysql")
             {
                 return @"
-                    SELECT TABLE_NAME AS TableName
+                    SELECT TABLE_NAME AS table_name
                     FROM INFORMATION_SCHEMA.TABLES
                     WHERE TABLE_TYPE = 'BASE TABLE'
                     AND TABLE_SCHEMA = DATABASE()";
@@ -137,7 +104,7 @@ namespace DynamicDbQueryApi.Services
             else if (type == "oracle")
             {
                 return @"
-                    SELECT table_name AS TableName
+                    SELECT table_name AS TABLE_NAME
                     FROM user_tables";
             }
             else
@@ -154,36 +121,36 @@ namespace DynamicDbQueryApi.Services
             if (type == "postgresql" || type == "postgres")
             {
                 return $@"
-                        SELECT column_name   AS Name,
-                               data_type     AS DataType,
-                               is_nullable   AS IsNullable
+                        SELECT column_name   AS name,
+                               data_type     AS data_type,
+                               is_nullable   AS is_nullable
                         FROM information_schema.columns
                         WHERE table_schema = 'public' AND table_name = '{tableName}'";
             }
             else if (type == "mssql" || type == "sqlserver")
             {
                 return $@"
-                        SELECT COLUMN_NAME   AS Name,
-                               DATA_TYPE     AS DataType,
-                               IS_NULLABLE   AS IsNullable
+                        SELECT COLUMN_NAME   AS name,
+                               DATA_TYPE     AS data_type,
+                               IS_NULLABLE   AS is_nullable
                         FROM INFORMATION_SCHEMA.COLUMNS
                         WHERE TABLE_NAME = '{tableName}'";
             }
             else if (type == "mysql")
             {
                 return $@"
-                        SELECT COLUMN_NAME   AS Name,
-                               DATA_TYPE     AS DataType,
-                               IS_NULLABLE   AS IsNullable
+                        SELECT COLUMN_NAME   AS name,
+                               DATA_TYPE     AS data_type,
+                               IS_NULLABLE   AS is_nullable
                         FROM INFORMATION_SCHEMA.COLUMNS
                         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{tableName}'";
             }
             else if (type == "oracle")
             {
                 return $@"
-                        SELECT column_name   AS Name,
-                               data_type     AS DataType,
-                               nullable      AS IsNullable
+                        SELECT column_name   AS NAME,
+                               data_type     AS DATA_TYPE,
+                               nullable      AS IS_NULLABLE
                         FROM user_tab_columns
                         WHERE table_name = '{tableName.ToUpper()}'";
             }
@@ -252,11 +219,11 @@ namespace DynamicDbQueryApi.Services
             {
                 return @"
                     SELECT 
-                        ac.constraint_name        AS constraint_name,
-                        aco.table_name            AS fk_table,
-                        aco.column_name           AS fk_column,
-                        ac_r.table_name           AS pk_table,
-                        acc.column_name           AS pk_column
+                        ac.constraint_name        AS CONSTRAINT_NAME,
+                        aco.table_name            AS FK_TABLE,
+                        aco.column_name           AS FK_COLUMN,
+                        ac_r.table_name           AS PK_TABLE,
+                        acc.column_name           AS PK_COLUMN
                     FROM user_constraints ac
                     JOIN user_cons_columns aco ON ac.constraint_name = aco.constraint_name
                     JOIN user_constraints ac_r ON ac.r_constraint_name = ac_r.constraint_name
@@ -266,6 +233,48 @@ namespace DynamicDbQueryApi.Services
             else
             {
                 throw new NotSupportedException($"Database type {dbType} is not supported for inspection.");
+            }
+        }
+
+        // DB türüne göre belirli bir sütunun tip/meta bilgisini sorgulayan SQL oluşturma
+        public string GetColumnDataTypeQuery(string dbType, string? schema, string tableName, string columnName)
+        {
+            var type = dbType.ToLower();
+
+            if (type == "postgresql" || type == "postgres")
+            {
+                schema = schema ?? "public";
+                return $@"
+                    SELECT data_type 
+                    FROM information_schema.columns 
+                    WHERE table_schema = '{schema}' AND table_name = '{tableName}' AND column_name = '{columnName}'";
+            }
+            else if (type == "mssql" || type == "sqlserver")
+            {
+                schema = schema ?? "dbo";
+                return $@"
+                    SELECT data_type 
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_SCHEMA = '{schema}' AND TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}'";
+            }
+            else if (type == "mysql")
+            {
+                return $@"
+                    SELECT DATA_TYPE 
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '{tableName}' AND COLUMN_NAME = '{columnName}'";
+            }
+            else if (type == "oracle")
+            {
+                schema = schema ?? "SYSTEM";
+                return $@"
+                    SELECT data_type 
+                    FROM all_tab_columns 
+                    WHERE owner = '{schema?.ToUpperInvariant()}' AND table_name = '{tableName.ToUpper()}' AND column_name = '{columnName.ToUpper()}'";
+            }
+            else
+            {
+                throw new NotSupportedException($"Database type {dbType} is not supported for column metadata queries.");
             }
         }
     }

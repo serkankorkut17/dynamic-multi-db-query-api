@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using DynamicDbQueryApi.DTOs;
+using DynamicDbQueryApi.Entities;
 
 public static class FilterPrinter
 {

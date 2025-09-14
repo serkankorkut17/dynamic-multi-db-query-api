@@ -2,13 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using DynamicDbQueryApi.DTOs;
-using DynamicDbQueryApi.Entities;
 
 namespace DynamicDbQueryApi.Interfaces
 {
-    public interface IQueryParserService
+    public interface IInsertRepository
     {
-        QueryModel Parse(string queryString);
+        
     }
 }

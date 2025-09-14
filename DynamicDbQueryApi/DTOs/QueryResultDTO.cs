@@ -9,5 +9,6 @@ namespace DynamicDbQueryApi.DTOs
     {
         public string Sql { get; set; } = "";
         public IEnumerable<dynamic> Data { get; set; } = Array.Empty<dynamic>();
+        public bool WrittenToOutputDb { get; set; } = false;
     }
 }
