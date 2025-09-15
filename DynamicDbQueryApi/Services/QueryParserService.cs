@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Dapper;
 using DynamicDbQueryApi.DTOs;
 using DynamicDbQueryApi.Entities;
+using DynamicDbQueryApi.Entities.Query;
 using DynamicDbQueryApi.Interfaces;
 
 namespace DynamicDbQueryApi.Services
@@ -74,13 +75,13 @@ namespace DynamicDbQueryApi.Services
         }
 
         // FETCH(...) kısmını parse etme
-        private List<string> ParseFetchColumns(string queryString, string tableName)
+        private List<QueryColumnModel> ParseFetchColumns(string queryString, string tableName)
         {
             // "FETCH(", "FETCHD(", "FETCHDISTINCT(" veya "FETCH DISTINCT(" ile başlayan ve ")" ile biten kısmı al
             var m = Regex.Match(queryString, @"\bFETCH(?:\s+DISTINCT|DISTINCT|D)?\s*\(", RegexOptions.IgnoreCase);
             if (!m.Success)
             {
-                return new List<string> { "*" };
+                return new List<QueryColumnModel> { new QueryColumnModel { Expression = "*", Alias = null } };
             }
             var fetchStart = m.Index + m.Length;
 
@@ -96,17 +97,35 @@ namespace DynamicDbQueryApi.Services
             // Eğer FETCH() içi boşsa tüm sütunları al
             if (string.IsNullOrWhiteSpace(columnsPart))
             {
-                return new List<string> { "*" };
+                return new List<QueryColumnModel> { new QueryColumnModel { Expression = "*", Alias = null } };
             }
 
             var columns = columnsPart.Split(',').Select(c => c.Trim()).ToList();
 
+            List<QueryColumnModel> columnModels = new List<QueryColumnModel>();
+
             for (int i = 0; i < columns.Count; i++)
             {
-                // Her column için tablo ismi ekle
-                columns[i] = AddTablePrefixToColumn(columns[i], tableName);
+                // Alias için " AS " ile ayır
+                var parts = Regex.Split(columns[i], @"\s+AS\s+", RegexOptions.IgnoreCase);
+                var expression = AddTablePrefixToColumn(parts[0].Trim(), tableName);
+                string alias;
+                if (parts.Length == 2)
+                {
+                    alias = parts[1].Trim();
+                }
+                else
+                {
+                    alias = expression.ToLowerInvariant().Replace('.', '_').Replace('(', '_').Replace(')', '_').Replace('*', 'a').Replace(',', '_').Replace(' ', '_').Replace('-', '_');
+
+                }
+                columnModels.Add(new QueryColumnModel
+                {
+                    Expression = expression,
+                    Alias = alias
+                });
             }
-            return columns;
+            return columnModels;
         }
 
         // INCLUDE(...) kısmını parse etme

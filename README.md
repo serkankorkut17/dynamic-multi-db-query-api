@@ -17,14 +17,7 @@ as vb sorulabilir
 ***filterları test et ----- null, not null != null da en son convert edilebilir
 ***filterlar butun dblerde test et
 
-***entity query model bir folder içinde
-***ilk output kapat veriler nasıl geliyor ona bak her türlü test yap
-public class Column
-{
-    public string Expression { get; set; } // Örn: "City.Name"
-    public string Alias { get; set; }      // Örn: "CityName"
-}
-bunu ekle ve parse düzenle
+* gelirse sadece ona bak
 
 expression splitter düzenle
 

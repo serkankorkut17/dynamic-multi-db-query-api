@@ -3,12 +3,12 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace DynamicDbQueryApi.Entities
+namespace DynamicDbQueryApi.Entities.Query
 {
     public class QueryModel
     {
         public string Table { get; set; } = "";
-        public List<string> Columns { get; set; } = new List<string>();
+        public List<QueryColumnModel> Columns { get; set; } = new List<QueryColumnModel>();
         public FilterModel? Filters { get; set; }
         public List<IncludeModel> Includes { get; set; } = new List<IncludeModel>();
         public List<string> GroupBy { get; set; } = new List<string>();

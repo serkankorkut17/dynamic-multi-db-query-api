@@ -10,6 +10,7 @@ using Dapper;
 using DynamicDbQueryApi.Data;
 using DynamicDbQueryApi.DTOs;
 using DynamicDbQueryApi.Entities;
+using DynamicDbQueryApi.Entities.Query;
 using DynamicDbQueryApi.Interfaces;
 using Humanizer;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
@@ -59,6 +60,9 @@ namespace DynamicDbQueryApi.Services
 
             // İlişkili tablolardaki foreign keyleri bul ve IncludeModel'leri güncelle
             _logger.LogInformation("Initial Model: {Model}", JsonSerializer.Serialize(model));
+            var text = FilterPrinter.Dump(model.Filters);
+            Console.WriteLine("Filters:\n" + text);
+
             foreach (var include in model.Includes)
             {
                 var updatedInclude = await UpdateIncludeModel(connection, dbType, include);
@@ -70,24 +74,25 @@ namespace DynamicDbQueryApi.Services
                     include.IncludeKey = updatedInclude.IncludeKey;
                 }
             }
-            // _logger.LogInformation("Generated Model: {Model}", JsonSerializer.Serialize(model));
+            _logger.LogInformation("Generated Model: {Model}", JsonSerializer.Serialize(model));
 
             var sql = _sqlBuilderService.BuildSqlQuery(dbType, model);
-            // _logger.LogInformation("Generated SQL: {Sql}", sql);
+            _logger.LogInformation("Generated SQL: {Sql}", sql);
 
             var data = await connection.QueryAsync(sql);
-            data = data.ToList();
 
             // Output db bilgilerini ayarla
             if (!string.IsNullOrEmpty(request.OutputDbType) &&
                 !string.IsNullOrEmpty(request.OutputConnectionString) &&
-                !string.IsNullOrEmpty(request.OutputTableName) && false)
+                !string.IsNullOrEmpty(request.OutputTableName))
             {
                 var outputContext = new DapperContext(request.OutputDbType, request.OutputConnectionString);
                 var outputDbType = request.OutputDbType.ToLower();
                 var outputTableName = request.OutputTableName;
                 var outputConnection = await outputContext.GetOpenConnectionAsync();
 
+                // Kolon aliaslarını al
+                Dictionary<string, string> columnAliases = model.Columns.ToDictionary(c => c.Expression, c => c.Alias ?? c.Expression);
                 // Input db'den kolonların data tiplerini al
                 Dictionary<string, string> columnDataTypes = await GetColumnDataTypesAsync(connection, outputDbType, model.Columns);
                 _logger.LogInformation("Column Data Types: {ColumnDataTypes}", JsonSerializer.Serialize(columnDataTypes));
@@ -101,7 +106,8 @@ namespace DynamicDbQueryApi.Services
                 string ensureSql = await IsTableAndColumnsExistAsync(outputConnection,
                     outputDbType,
                     outputTableName,
-                    columnDataTypes);
+                    columnDataTypes,
+                    columnAliases);
 
                 _logger.LogInformation("Ensure Table and Columns SQL: {Sql}", ensureSql);
 
@@ -111,27 +117,43 @@ namespace DynamicDbQueryApi.Services
                     await outputConnection.ExecuteAsync(ensureSql);
                 }
 
-                var targetColumns = string.Join(", ", columnDataTypes.Keys.Select(c => c.Replace(".", "_")).ToList());
-                // son noktadan sonrasını al
-                var originalColumns = columnDataTypes.Keys.Select(c => c.Split('.').Last()).ToList();
+                var targetColumns = columnAliases.Values.ToList();
 
                 var insertSql = $"INSERT INTO {outputTableName} ({string.Join(", ", targetColumns)}) VALUES ({string.Join(", ", targetColumns.Select((c, i) => $"@p{i}"))})";
 
-                // datadaki her bir satırı insert et
+                // Datadaki her bir satırı insert et
                 foreach (IDictionary<string, object> row in data)
                 {
                     var dp = new DynamicParameters();
-                    for (int i = 0; i < originalColumns.Count; i++)
+                    for (int i = 0; i < targetColumns.Count; i++)
                     {
-                        var key = originalColumns[i];
+                        var key = targetColumns[i];
                         row.TryGetValue(key, out var val);
 
-                        dp.Add($"p{i}", val);
+                        // Oracle'da boolean için 1/0 kullan
+                        if (outputDbType == "oracle")
+                        {
+                            if (val is bool b)
+                            {
+                                dp.Add($"p{i}", b ? 1 : 0);
+                            }
+                            else if (val is string s && (s.Equals("true", StringComparison.OrdinalIgnoreCase) || s.Equals("false", StringComparison.OrdinalIgnoreCase)))
+                            {
+                                dp.Add($"p{i}", s.Equals("true", StringComparison.OrdinalIgnoreCase) ? 1 : 0);
+                            }
+                            else
+                            {
+                                dp.Add($"p{i}", val ?? DBNull.Value);
+                            }
+                        }
+                        else
+                        {
+                            dp.Add($"p{i}", val ?? DBNull.Value);
+                        }
                     }
 
                     await outputConnection.ExecuteAsync(insertSql, dp);
                 }
-
             }
 
             return new QueryResultDTO
@@ -233,7 +255,7 @@ namespace DynamicDbQueryApi.Services
         }
 
         // Belirtilen tablo ve kolonlar için hedef veritabanında tabloyu ve eksik kolonları oluşturur
-        public async Task<string> IsTableAndColumnsExistAsync(IDbConnection connection, string dbType, string tableName, Dictionary<string, string> columnDataTypes)
+        public async Task<string> IsTableAndColumnsExistAsync(IDbConnection connection, string dbType, string tableName, Dictionary<string, string> columnDataTypes, Dictionary<string, string> columnAliases)
         {
             // Tablo var mı kontrolü
             bool tableExists = await _queryRepo.TableExistsAsync(connection, dbType, tableName);
@@ -241,7 +263,7 @@ namespace DynamicDbQueryApi.Services
             if (!tableExists)
             {
                 // Eğer tablo yoksa CREATE TABLE ile oluştur
-                return _sqlBuilderService.BuildCreateTableSql(dbType, tableName, columnDataTypes);
+                return _sqlBuilderService.BuildCreateTableSql(tableName, columnDataTypes, columnAliases);
             }
             else
             {
@@ -249,7 +271,7 @@ namespace DynamicDbQueryApi.Services
                 var sqlBuilder = new StringBuilder();
                 foreach (var col in columnDataTypes)
                 {
-                    string colName = col.Key.Replace(".", "_");
+                    string colName = columnAliases[col.Key];
                     string colType = col.Value;
                     bool columnExists = await _queryRepo.ColumnExistsInTableAsync(connection, dbType, tableName, colName);
 
@@ -262,14 +284,15 @@ namespace DynamicDbQueryApi.Services
             }
         }
 
-        public async Task<Dictionary<string, string>> GetColumnDataTypesAsync(IDbConnection connection, string dbType, List<string> columns)
+        public async Task<Dictionary<string, string>> GetColumnDataTypesAsync(IDbConnection connection, string dbType, List<QueryColumnModel> columns)
         {
             // column: datatype için dictionary
             var columnDataTypes = new Dictionary<string, string>();
 
             foreach (var col in columns)
             {
-                var parts = col.Split('.');
+                string colName = col.Expression;
+                var parts = col.Expression.Split('.');
                 if (parts.Length == 2)
                 {
                     var tableName = parts[0];
@@ -279,7 +302,7 @@ namespace DynamicDbQueryApi.Services
 
                     if (dataType != null)
                     {
-                        columnDataTypes[col] = dataType.ToString();
+                        columnDataTypes[colName] = dataType.ToString();
                     }
                     else
                     {
@@ -291,37 +314,37 @@ namespace DynamicDbQueryApi.Services
                 {
                     // COUNT, SUM, AVG, MIN, MAX gibi aggregate fonksiyonlar için
                     var func = parts[0].ToUpper();
-                    if (func == "COUNT")
+                    if (func.Contains("COUNT"))
                     {
                         switch (dbType)
                         {
                             case "postgresql":
                             case "mysql":
-                                columnDataTypes[col] = "INTEGER";
+                                columnDataTypes[colName] = "INTEGER";
                                 break;
                             case "mssql":
-                                columnDataTypes[col] = "INT";
+                                columnDataTypes[colName] = "INT";
                                 break;
                             case "oracle":
-                                columnDataTypes[col] = "NUMBER(10)";
+                                columnDataTypes[colName] = "NUMBER(10)";
                                 break;
                             default:
                                 throw new NotSupportedException($"Unsupported DB type: {dbType}");
                         }
                     }
-                    else if (func == "SUM" || func == "AVG" || func == "MIN" || func == "MAX")
+                    else if (func.Contains("SUM") || func.Contains("AVG") || func.Contains("MIN") || func.Contains("MAX"))
                     {
                         switch (dbType)
                         {
                             case "postgresql":
                             case "mysql":
-                                columnDataTypes[col] = "DECIMAL";
+                                columnDataTypes[colName] = "DECIMAL";
                                 break;
                             case "mssql":
-                                columnDataTypes[col] = "DECIMAL(18,2)";
+                                columnDataTypes[colName] = "DECIMAL(18,2)";
                                 break;
                             case "oracle":
-                                columnDataTypes[col] = "NUMBER(18,2)";
+                                columnDataTypes[colName] = "NUMBER(18,2)";
                                 break;
                             default:
                                 throw new NotSupportedException($"Unsupported DB type: {dbType}");
@@ -329,12 +352,12 @@ namespace DynamicDbQueryApi.Services
                     }
                     else
                     {
-                        throw new Exception($"Could not determine data type for aggregate function {col}");
+                        throw new Exception($"Could not determine data type for aggregate function {colName}");
                     }
                 }
                 else
                 {
-                    throw new Exception($"Invalid column format: {col}");
+                    throw new Exception($"Invalid column format: {colName}");
                 }
             }
             return columnDataTypes;

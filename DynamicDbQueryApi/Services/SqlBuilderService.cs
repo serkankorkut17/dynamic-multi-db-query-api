@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DynamicDbQueryApi.DTOs;
 using DynamicDbQueryApi.Entities;
+using DynamicDbQueryApi.Entities.Query;
 using DynamicDbQueryApi.Interfaces;
 
 namespace DynamicDbQueryApi.Services
@@ -16,7 +17,7 @@ namespace DynamicDbQueryApi.Services
         public string BuildSqlQuery(string dbType, QueryModel model)
         {
             // SELEFCT and FROM Part
-            string columns = model.Columns.Any() ? string.Join(", ", model.Columns) : "*";
+            string columns = model.Columns.Any() ? string.Join(", ", model.Columns.Select(c => string.IsNullOrEmpty(c.Alias) ? c.Expression : $"{c.Expression} AS {c.Alias}")) : "*";
             string table = model.Table;
 
             string sql = "";
@@ -40,9 +41,6 @@ namespace DynamicDbQueryApi.Services
                     sql += $" {include.JoinType.ToUpper()} JOIN {include.IncludeTable} ON {include.Table}.{include.TableKey} = {include.IncludeTable}.{include.IncludeKey}";
                 }
             }
-
-            var text = FilterPrinter.Dump(model.Filters);
-            Console.WriteLine(text);
 
             // FILTERS Part
             if (model.Filters != null)
@@ -191,7 +189,7 @@ namespace DynamicDbQueryApi.Services
         }
 
         // CREATE TABLE SQL sorgusu oluşturma
-        public string BuildCreateTableSql(string dbType, string tableName, Dictionary<string, string> columnDataTypes)
+        public string BuildCreateTableSql(string tableName, Dictionary<string, string> columnDataTypes, Dictionary<string, string> columnAliases)
         {
             var sqlBuilder = new StringBuilder();
 
@@ -199,7 +197,7 @@ namespace DynamicDbQueryApi.Services
             int i = 0;
             foreach (var col in columnDataTypes)
             {
-                string colName = col.Key.Replace(".", "_");
+                string colName = columnAliases[col.Key];
                 string colType = col.Value;
                 sqlBuilder.Append($"    {colName} {colType} NULL");
                 if (i < columnDataTypes.Count - 1)
