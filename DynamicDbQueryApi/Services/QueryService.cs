@@ -24,15 +24,13 @@ namespace DynamicDbQueryApi.Services
         private readonly IQueryParserService _queryParserService;
         private readonly ISqlBuilderService _sqlBuilderService;
         private readonly IQueryRepository _queryRepo;
-        private readonly ISchemaSqlProvider _schemaSqlProvider;
 
-        public QueryService(ILogger<QueryService> logger, IQueryParserService queryParserService, ISqlBuilderService sqlBuilderService, IQueryRepository queryRepo, ISchemaSqlProvider schemaSqlProvider)
+        public QueryService(ILogger<QueryService> logger, IQueryParserService queryParserService, ISqlBuilderService sqlBuilderService, IQueryRepository queryRepo)
         {
             _logger = logger;
             _queryParserService = queryParserService;
             _sqlBuilderService = sqlBuilderService;
             _queryRepo = queryRepo;
-            _schemaSqlProvider = schemaSqlProvider;
         }
 
         // Düz SQL sorgusu çalıştırır
@@ -46,7 +44,6 @@ namespace DynamicDbQueryApi.Services
         }
 
         // Özel query dilini parse edip SQL'e çevirir ve çalıştırır
-        // !!! db save bak
         public async Task<QueryResultDTO> MyQueryAsync(QueryRequestDTO request)
         {
             // _logger.LogInformation("Query: {Query}", request.Query);
@@ -84,14 +81,26 @@ namespace DynamicDbQueryApi.Services
             // Output db bilgilerini ayarla
             if (!string.IsNullOrEmpty(request.OutputDbType) &&
                 !string.IsNullOrEmpty(request.OutputConnectionString) &&
-                !string.IsNullOrEmpty(request.OutputTableName))
+                !string.IsNullOrEmpty(request.OutputTableName) && false)
             {
-                Dictionary<string, string> columnDataTypes = await GetColumnDataTypesAsync(connection, dbType, model.Columns);
-                _logger.LogInformation("Column Data Types: {ColumnDataTypes}", JsonSerializer.Serialize(columnDataTypes));
+                var outputContext = new DapperContext(request.OutputDbType, request.OutputConnectionString);
+                var outputDbType = request.OutputDbType.ToLower();
+                var outputTableName = request.OutputTableName;
+                var outputConnection = await outputContext.GetOpenConnectionAsync();
 
-                string ensureSql = await EnsureTableAndColumnsAsync(connection,
-                    request.OutputDbType.ToLower(),
-                    request.OutputTableName,
+                // Input db'den kolonların data tiplerini al
+                Dictionary<string, string> columnDataTypes = await GetColumnDataTypesAsync(connection, outputDbType, model.Columns);
+                _logger.LogInformation("Column Data Types: {ColumnDataTypes}", JsonSerializer.Serialize(columnDataTypes));
+                // Eğer hedef db tipi farklı ise kolonların data tiplerini dönüştür
+                if (dbType != outputDbType)
+                {
+                    columnDataTypes = ConvertColumnDataTypes(columnDataTypes, outputDbType);
+                    _logger.LogInformation("Converted Column Data Types: {ColumnDataTypes}", JsonSerializer.Serialize(columnDataTypes));
+                }
+
+                string ensureSql = await IsTableAndColumnsExistAsync(outputConnection,
+                    outputDbType,
+                    outputTableName,
                     columnDataTypes);
 
                 _logger.LogInformation("Ensure Table and Columns SQL: {Sql}", ensureSql);
@@ -99,26 +108,28 @@ namespace DynamicDbQueryApi.Services
                 // Eğer tablo yoksa oluştur
                 if (!string.IsNullOrEmpty(ensureSql))
                 {
-                    await connection.ExecuteAsync(ensureSql);
+                    await outputConnection.ExecuteAsync(ensureSql);
                 }
+
+                var targetColumns = string.Join(", ", columnDataTypes.Keys.Select(c => c.Replace(".", "_")).ToList());
+                // son noktadan sonrasını al
+                var originalColumns = columnDataTypes.Keys.Select(c => c.Split('.').Last()).ToList();
+
+                var insertSql = $"INSERT INTO {outputTableName} ({string.Join(", ", targetColumns)}) VALUES ({string.Join(", ", targetColumns.Select((c, i) => $"@p{i}"))})";
 
                 // datadaki her bir satırı insert et
                 foreach (IDictionary<string, object> row in data)
                 {
-                    _logger.LogInformation($"Row: {JsonSerializer.Serialize(row)}");
+                    var dp = new DynamicParameters();
+                    for (int i = 0; i < originalColumns.Count; i++)
+                    {
+                        var key = originalColumns[i];
+                        row.TryGetValue(key, out var val);
 
-                    var insertSql = new StringBuilder();
-                    insertSql.Append($"INSERT INTO {request.OutputTableName} (");
-                    insertSql.Append(string.Join(", ", columnDataTypes.Keys.Select(c => c.Replace(".", "_"))));
+                        dp.Add($"p{i}", val);
+                    }
 
-
-
-                    insertSql.Append(") VALUES (");
-                    insertSql.Append(string.Join(", ", row.Values.Select(v => $"'{v}'")));
-                    insertSql.Append(");");
-
-                    _logger.LogInformation("Insert SQL: {Sql}", insertSql.ToString());
-                    await connection.ExecuteAsync(insertSql.ToString());
+                    await outputConnection.ExecuteAsync(insertSql, dp);
                 }
 
             }
@@ -222,108 +233,33 @@ namespace DynamicDbQueryApi.Services
         }
 
         // Belirtilen tablo ve kolonlar için hedef veritabanında tabloyu ve eksik kolonları oluşturur
-        // !!! kontrol et
-        public async Task<string> EnsureTableAndColumnsAsync(IDbConnection connection, string dbType, string tableName, Dictionary<string, string> columnDataTypes)
+        public async Task<string> IsTableAndColumnsExistAsync(IDbConnection connection, string dbType, string tableName, Dictionary<string, string> columnDataTypes)
         {
             // Tablo var mı kontrolü
-            bool tableExists;
-            var getTableSql = string.Empty;
-
-            if (dbType == "postgresql" || dbType == "postgres")
-            {
-                getTableSql = $"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{tableName}'";
-                tableExists = await connection.ExecuteScalarAsync<int>(getTableSql) > 0;
-            }
-            else if (dbType == "mssql")
-            {
-                getTableSql = $"SELECT COUNT(*) FROM sys.tables WHERE name = '{tableName}'";
-                tableExists = await connection.ExecuteScalarAsync<int>(getTableSql) > 0;
-            }
-            else if (dbType == "mysql")
-            {
-                getTableSql = $"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '{tableName}'";
-                tableExists = await connection.ExecuteScalarAsync<int>(getTableSql) > 0;
-            }
-            else if (dbType == "oracle")
-            {
-                getTableSql = $"SELECT COUNT(*) FROM all_tables WHERE table_name = '{tableName.ToUpperInvariant()}'";
-                tableExists = await connection.ExecuteScalarAsync<int>(getTableSql) > 0;
-            }
-            else
-            {
-                throw new NotSupportedException($"Unsupported DB type: {dbType}");
-            }
-
-            var sqlBuilder = new StringBuilder();
-            _logger.LogInformation("Table Exists: {TableExists}", tableExists);
+            bool tableExists = await _queryRepo.TableExistsAsync(connection, dbType, tableName);
 
             if (!tableExists)
             {
                 // Eğer tablo yoksa CREATE TABLE ile oluştur
-                sqlBuilder.Append($"CREATE TABLE {tableName} (\n");
-                int i = 0;
-                foreach (var col in columnDataTypes)
-                {
-                    string colName = col.Key.Replace(".", "_");
-                    string colType = ConvertDataType(col.Value, dbType);
-                    sqlBuilder.Append($"    {colName} {colType} NULL");
-                    if (i < columnDataTypes.Count - 1)
-                    {
-                        sqlBuilder.Append(",\n");
-                    }
-                    i++;
-                }
-                sqlBuilder.Append("\n);");
+                return _sqlBuilderService.BuildCreateTableSql(dbType, tableName, columnDataTypes);
             }
             else
             {
                 // Eğer tablo varsa eksik kolonları ALTER TABLE ile ekle
+                var sqlBuilder = new StringBuilder();
                 foreach (var col in columnDataTypes)
                 {
                     string colName = col.Key.Replace(".", "_");
-                    bool columnExists;
-                    string colCheckSql = string.Empty;
-                    if (dbType == "postgresql" || dbType == "postgres")
-                    {
-                        colCheckSql = $"SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '{tableName}' AND column_name = '{colName}'";
-                        columnExists = await connection.ExecuteScalarAsync<int>(colCheckSql) > 0;
-                    }
-                    else if (dbType == "mssql")
-                    {
-                        colCheckSql = $"SELECT COUNT(*) FROM sys.columns c JOIN sys.tables t ON c.object_id = t.object_id WHERE t.name = '{tableName}' AND c.name = '{colName}'";
-                        columnExists = await connection.ExecuteScalarAsync<int>(colCheckSql) > 0;
-                    }
-                    else if (dbType == "mysql")
-                    {
-                        colCheckSql = $"SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '{tableName}' AND column_name = '{colName}'";
-                        columnExists = await connection.ExecuteScalarAsync<int>(colCheckSql) > 0;
-                    }
-                    else if (dbType == "oracle")
-                    {
-                        colCheckSql = $"SELECT COUNT(*) FROM all_tab_columns WHERE table_name = '{tableName.ToUpperInvariant()}' AND column_name = '{colName.ToUpperInvariant()}'";
-                        columnExists = await connection.ExecuteScalarAsync<int>(colCheckSql) > 0;
-                    }
-                    else
-                    {
-                        throw new NotSupportedException($"Unsupported DB type: {dbType}");
-                    }
+                    string colType = col.Value;
+                    bool columnExists = await _queryRepo.ColumnExistsInTableAsync(connection, dbType, tableName, colName);
 
                     if (!columnExists)
                     {
-                        if (dbType == "oracle")
-                        {
-                            sqlBuilder.AppendLine($"ALTER TABLE {tableName.ToUpperInvariant()} ADD ({colName.ToUpperInvariant()} {col.Value} NULL);");
-                        }
-                        else
-                        {
-                            sqlBuilder.AppendLine(
-                                $"ALTER TABLE {tableName} ADD {colName} {col.Value} NULL;");
-                        }
+                        sqlBuilder.AppendLine(_sqlBuilderService.BuildAlterTableAddColumnSql(dbType, tableName, colName, colType));
                     }
                 }
+                return sqlBuilder.ToString();
             }
-
-            return sqlBuilder.ToString();
         }
 
         public async Task<Dictionary<string, string>> GetColumnDataTypesAsync(IDbConnection connection, string dbType, List<string> columns)

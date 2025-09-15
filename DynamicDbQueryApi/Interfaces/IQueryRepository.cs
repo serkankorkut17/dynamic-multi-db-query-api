@@ -14,5 +14,7 @@ namespace DynamicDbQueryApi.Interfaces
         Task<string?> GetColumnDataTypeAsync(IDbConnection connection, string dbType, string tableName, string columnName);
         Task<List<TableModel>> GetTablesAndColumnsAsync(IDbConnection connection, string dbType);
         Task<List<RelationshipModel>> GetRelationshipsAsync(IDbConnection connection, string dbType);
+        Task<bool> TableExistsAsync(IDbConnection connection, string dbType, string tableName);
+        Task<bool> ColumnExistsInTableAsync(IDbConnection connection, string dbType, string tableName, string columnName);
     }
 }

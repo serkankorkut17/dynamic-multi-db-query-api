@@ -7,7 +7,7 @@ using DynamicDbQueryApi.DTOs;
 
 namespace DynamicDbQueryApi.Interfaces
 {
-    public interface ISchemaSqlProvider
+    public interface ISqlProvider
     {
         string GetIncludeQuery(string dbType, string fromTable, string includeTable);
         string GetTablesQuery(string dbType);

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DynamicDbQueryApi.DTOs;
 using DynamicDbQueryApi.Entities;
@@ -10,6 +12,7 @@ namespace DynamicDbQueryApi.Services
 {
     public class SqlBuilderService : ISqlBuilderService
     {
+        // QueryModel'den SQL sorgusu oluşturma
         public string BuildSqlQuery(string dbType, QueryModel model)
         {
             // SELEFCT and FROM Part
@@ -92,6 +95,7 @@ namespace DynamicDbQueryApi.Services
             return sql;
         }
 
+        // FilterModel'den SQL WHERE/HAVING koşulu oluşturma
         public string ConvertFilterToSql(FilterModel filter)
         {
             if (filter == null) return "1=1";
@@ -161,6 +165,52 @@ namespace DynamicDbQueryApi.Services
             {
                 throw new NotSupportedException($"Filter type {filter.GetType()} is not supported.");
             }
+        }
+
+        public string BuildInsertSql(string tableName, string column, string value)
+        {
+            var insertSQL = $"INSERT INTO {tableName} ({column}) VALUES (@{column});";
+            return insertSQL;
+        }
+
+
+        // ALTER TABLE ADD COLUMN SQL sorgusu oluşturma
+        public string BuildAlterTableAddColumnSql(string dbType, string tableName, string columnName, string dataType)
+        {
+            string alterSQL;
+            if (dbType == "oracle")
+            {
+                alterSQL = $"ALTER TABLE {tableName.ToUpperInvariant()} ADD ({columnName.ToUpperInvariant()} {dataType.ToUpperInvariant()} NULL);";
+            }
+            else
+            {
+                alterSQL = $"ALTER TABLE {tableName} ADD {columnName} {dataType} NULL;";
+            }
+
+            return alterSQL;
+        }
+
+        // CREATE TABLE SQL sorgusu oluşturma
+        public string BuildCreateTableSql(string dbType, string tableName, Dictionary<string, string> columnDataTypes)
+        {
+            var sqlBuilder = new StringBuilder();
+
+            sqlBuilder.Append($"CREATE TABLE {tableName} (\n");
+            int i = 0;
+            foreach (var col in columnDataTypes)
+            {
+                string colName = col.Key.Replace(".", "_");
+                string colType = col.Value;
+                sqlBuilder.Append($"    {colName} {colType} NULL");
+                if (i < columnDataTypes.Count - 1)
+                {
+                    sqlBuilder.Append(",\n");
+                }
+                i++;
+            }
+            sqlBuilder.Append("\n);");
+
+            return sqlBuilder.ToString();
         }
     }
 }

@@ -14,9 +14,9 @@ namespace DynamicDbQueryApi.Repositories
     public class QueryRepository : IQueryRepository
     {
         private readonly ILogger<QueryRepository> _logger;
-        private readonly ISchemaSqlProvider _sqlProvider;
+        private readonly ISqlProvider _sqlProvider;
 
-        public QueryRepository(ILogger<QueryRepository> logger, ISchemaSqlProvider sqlProvider)
+        public QueryRepository(ILogger<QueryRepository> logger, ISqlProvider sqlProvider)
         {
             _logger = logger;
             _sqlProvider = sqlProvider;
@@ -27,19 +27,19 @@ namespace DynamicDbQueryApi.Repositories
         {
             string? schema = null;
             string? schemaQuery = null;
-            if (dbType.ToLower() == "postgresql" || dbType.ToLower() == "postgres")
+            if (dbType == "postgresql" || dbType == "postgres")
             {
                 // PostgreSQL'de varsayılan şema public
                 schemaQuery = "SELECT current_schema;";
                 schema = await connection.QueryFirstOrDefaultAsync<string>(schemaQuery) ?? "public";
             }
-            else if (dbType.ToLower() == "mssql" || dbType.ToLower() == "sqlserver")
+            else if (dbType == "mssql" || dbType == "sqlserver")
             {
                 // MSSQL'de varsayılan şema dbo
                 schemaQuery = "SELECT SCHEMA_NAME();";
                 schema = await connection.QueryFirstOrDefaultAsync<string>(schemaQuery) ?? "dbo";
             }
-            else if (dbType.ToLower() == "oracle")
+            else if (dbType == "oracle")
             {
                 // Oracle'da varsayılan şema kullanıcı adı ile aynı
                 schemaQuery = "SELECT USER FROM dual";
@@ -54,7 +54,7 @@ namespace DynamicDbQueryApi.Repositories
             IDictionary<string, object>? dict = row as IDictionary<string, object>;
             if (dict != null)
             {
-                if (dbType.ToLower() == "oracle")
+                if (dbType == "oracle")
                 {
                     if (dict.TryGetValue("DATA_TYPE", out var value))
                     {
@@ -92,7 +92,7 @@ namespace DynamicDbQueryApi.Repositories
 
                 if (dict != null)
                 {
-                    if (dbType.ToLower() == "oracle")
+                    if (dbType == "oracle")
                     {
                         // Oracle kolon isimleri büyük harfli döner
                         pair.ForeignKey = dict["FK_COLUMN"]?.ToString() ?? "";
@@ -134,11 +134,11 @@ namespace DynamicDbQueryApi.Repositories
                     if (dict != null)
                     {
                         var columnModel = new ColumnModel();
-                        if (dbType.ToLower() == "oracle")
+                        if (dbType == "oracle")
                         {
                             columnModel.Name = dict["NAME"]?.ToString() ?? "";
                             columnModel.DataType = dict["DATA_TYPE"]?.ToString() ?? "";
-                            columnModel.IsNullable = (dict["NULLABLE"]?.ToString() ?? "N") == "Y";
+                            columnModel.IsNullable = (dict["IS_NULLABLE"]?.ToString() ?? "N") == "Y";
                         }
                         else
                         {
@@ -168,7 +168,7 @@ namespace DynamicDbQueryApi.Repositories
                 if (dict != null)
                 {
                     var rel = new RelationshipModel();
-                    if (dbType.ToLower() == "oracle")
+                    if (dbType == "oracle")
                     {
                         rel.ConstraintName = dict["CONSTRAINT_NAME"]?.ToString() ?? "";
                         rel.FkTable = dict["FK_TABLE"]?.ToString() ?? "";
@@ -187,9 +187,73 @@ namespace DynamicDbQueryApi.Repositories
                     relationships.Add(rel);
                 }
             }
-
             return relationships;
         }
-    }
 
+        public async Task<bool> TableExistsAsync(IDbConnection connection, string dbType, string tableName)
+        {
+            // Tablo var mı kontrolü
+            bool tableExists;
+            var getTableSql = string.Empty;
+
+            if (dbType == "postgresql" || dbType == "postgres")
+            {
+                getTableSql = $"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{tableName}'";
+                tableExists = await connection.ExecuteScalarAsync<int>(getTableSql) > 0;
+            }
+            else if (dbType == "mssql")
+            {
+                getTableSql = $"SELECT COUNT(*) FROM sys.tables WHERE name = '{tableName}'";
+                tableExists = await connection.ExecuteScalarAsync<int>(getTableSql) > 0;
+            }
+            else if (dbType == "mysql")
+            {
+                getTableSql = $"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = '{tableName}'";
+                tableExists = await connection.ExecuteScalarAsync<int>(getTableSql) > 0;
+            }
+            else if (dbType == "oracle")
+            {
+                getTableSql = $"SELECT COUNT(*) FROM all_tables WHERE table_name = '{tableName.ToUpperInvariant()}'";
+                tableExists = await connection.ExecuteScalarAsync<int>(getTableSql) > 0;
+            }
+            else
+            {
+                throw new NotSupportedException($"Unsupported DB type: {dbType}");
+            }
+
+            return tableExists;
+        }
+
+        public async Task<bool> ColumnExistsInTableAsync(IDbConnection connection, string dbType, string tableName, string columnName)
+        {
+            bool columnExists;
+            string colCheckSql = string.Empty;
+            if (dbType == "postgresql" || dbType == "postgres")
+            {
+                colCheckSql = $"SELECT COUNT(*) FROM information_schema.columns WHERE table_name = '{tableName}' AND column_name = '{columnName}'";
+                columnExists = await connection.ExecuteScalarAsync<int>(colCheckSql) > 0;
+            }
+            else if (dbType == "mssql")
+            {
+                colCheckSql = $"SELECT COUNT(*) FROM sys.columns c JOIN sys.tables t ON c.object_id = t.object_id WHERE t.name = '{tableName}' AND c.name = '{columnName}'";
+                columnExists = await connection.ExecuteScalarAsync<int>(colCheckSql) > 0;
+            }
+            else if (dbType == "mysql")
+            {
+                colCheckSql = $"SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = '{tableName}' AND column_name = '{columnName}'";
+                columnExists = await connection.ExecuteScalarAsync<int>(colCheckSql) > 0;
+            }
+            else if (dbType == "oracle")
+            {
+                colCheckSql = $"SELECT COUNT(*) FROM all_tab_columns WHERE table_name = '{tableName.ToUpperInvariant()}' AND column_name = '{columnName.ToUpperInvariant()}'";
+                columnExists = await connection.ExecuteScalarAsync<int>(colCheckSql) > 0;
+            }
+            else
+            {
+                throw new NotSupportedException($"Unsupported DB type: {dbType}");
+            }
+
+            return columnExists;
+        }
+    }
 }

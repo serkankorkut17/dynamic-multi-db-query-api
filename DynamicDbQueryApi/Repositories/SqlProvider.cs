@@ -9,10 +9,10 @@ using DynamicDbQueryApi.Interfaces;
 
 namespace DynamicDbQueryApi.Repositories
 {
-    public class SchemeSqlProvider : ISchemaSqlProvider
+    public class SqlProvider : ISqlProvider
     {
-        private readonly ILogger<SchemeSqlProvider> _logger;
-        public SchemeSqlProvider(ILogger<SchemeSqlProvider> logger)
+        private readonly ILogger<SqlProvider> _logger;
+        public SqlProvider(ILogger<SqlProvider> logger)
         {
             _logger = logger;
         }
@@ -70,7 +70,6 @@ namespace DynamicDbQueryApi.Repositories
             {
                 throw new NotSupportedException($"Database type is not supported for INCLUDE queries.");
             }
-
         }
 
         // DB türüne göre tablo isimlerini alma sorgusu oluşturma

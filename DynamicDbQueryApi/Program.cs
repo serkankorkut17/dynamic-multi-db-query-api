@@ -10,7 +10,7 @@ builder.Services.AddScoped<IQueryService, QueryService>();
 builder.Services.AddScoped<IQueryParserService, QueryParserService>();
 builder.Services.AddScoped<ISqlBuilderService, SqlBuilderService>();
 // builder.Services.AddScoped<IDbSchemaService, DbSchemaService>();
-builder.Services.AddScoped<ISchemaSqlProvider, SchemeSqlProvider>();
+builder.Services.AddScoped<ISqlProvider, SqlProvider>();
 builder.Services.AddScoped<IQueryRepository, QueryRepository>();
 
 // Serilog
