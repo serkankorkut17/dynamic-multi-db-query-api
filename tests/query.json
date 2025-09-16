@@ -1,0 +1,36 @@
+{
+	"databases": [
+		{
+			"dbType": "postgres",
+			"connectionString": "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb"
+		},
+		{
+			"dbType": "mssql",
+			"connectionString": "Server=localhost,1433;Database=master;User ID=sa;Password=Merhaba123.;Encrypt=True;TrustServerCertificate=True"
+		},
+		{
+			"dbType": "mysql",
+			"connectionString": "Server=localhost;Port=3306;Database=querydb;User=mysql;Password=mysql;SslMode=None;AllowPublicKeyRetrieval=True"
+		},
+		{
+			"dbType": "oracle",
+			"connectionString": "User Id=system;Password=oracle;Data Source=localhost/FREEPDB1;"
+		}
+	],
+	"queries": [
+		{
+			"dsl": "FETCH(first_name, COUNT(*)) FILTER(first_name CONTAINS 'm') FROM students GROUPBY(first_name) HAVING (COUNT(*) >= 25)",
+			"postgres": "SELECT students.first_name, COUNT(*) FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+			"mssql": "SELECT students.first_name, COUNT(*) FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+			"mysql": "SELECT students.first_name, COUNT(*) FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+			"oracle": "SELECT students.first_name, COUNT(*) FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25"
+		},
+		{
+			"dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
+			"postgres": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+			"mysql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+			"mssql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+			"oracle": "SELECT s.first_name, COUNT(*) cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC"
+		}
+	]
+}

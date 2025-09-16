@@ -97,6 +97,9 @@ function makeEmail(first, last, role){
 	usedEmails.add(email);
 	return email;
 }
+function randBool(p=0.5){ return Math.random() < p; }
+function randArrayChoices(src, maxCount=3){ const n=Math.max(1, Math.min(maxCount, Math.floor(Math.random()*maxCount)+1)); const copy=[...src]; const out=[]; for(let i=0;i<n && copy.length;i++){ const idx=Math.floor(Math.random()*copy.length); out.push(copy.splice(idx,1)[0]); } return out; }
+const TAG_POOL = ['mentor','club','stem','arts','senior','junior','lead','advisor','coach','exchange'];
 async function dropSchema(pool) {
 	await pool
 		.request()
@@ -108,23 +111,33 @@ async function createSchema(pool) {
 	await pool
 		.request()
 		.batch(
-			`IF OBJECT_ID('dbo.schools','U') IS NULL CREATE TABLE dbo.schools(
+			`-- Extended MSSQL schema with richer data types
+			IF OBJECT_ID('dbo.schools','U') IS NULL CREATE TABLE dbo.schools(
 				id INT IDENTITY(1,1) PRIMARY KEY,
 				name NVARCHAR(200) NOT NULL,
-				city NVARCHAR(100) NOT NULL
+				city NVARCHAR(100) NOT NULL,
+				is_public BIT NOT NULL DEFAULT 1,
+				established_year INT NULL,
+				metadata NVARCHAR(MAX) NULL, -- store JSON text
+				created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
 			);
 			IF OBJECT_ID('dbo.teachers','U') IS NULL CREATE TABLE dbo.teachers(
 				id INT IDENTITY(1,1) PRIMARY KEY,
 				school_id INT NOT NULL FOREIGN KEY REFERENCES dbo.schools(id) ON DELETE CASCADE,
 				first_name NVARCHAR(100) NOT NULL,
 				last_name NVARCHAR(100) NOT NULL,
-				email NVARCHAR(200) NOT NULL UNIQUE
+				email NVARCHAR(200) NOT NULL UNIQUE,
+				is_active BIT NOT NULL DEFAULT 1,
+				salary DECIMAL(10,2) NULL,
+				hire_date DATE NULL,
+				tags NVARCHAR(MAX) NULL -- JSON array textual
 			);
 			IF OBJECT_ID('dbo.classes','U') IS NULL CREATE TABLE dbo.classes(
 				id INT IDENTITY(1,1) PRIMARY KEY,
 				school_id INT NOT NULL FOREIGN KEY REFERENCES dbo.schools(id) ON DELETE CASCADE,
 				name NVARCHAR(200) NOT NULL,
-				grade_level INT NOT NULL
+				grade_level INT NOT NULL,
+				created_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
 			);
 			IF OBJECT_ID('dbo.students','U') IS NULL CREATE TABLE dbo.students(
 				id INT IDENTITY(1,1) PRIMARY KEY,
@@ -132,25 +145,33 @@ async function createSchema(pool) {
 				first_name NVARCHAR(100) NOT NULL,
 				last_name NVARCHAR(100) NOT NULL,
 				email NVARCHAR(200) NOT NULL UNIQUE,
-				birth_date DATE NOT NULL
+				birth_date DATE NOT NULL,
+				gpa DECIMAL(4,2) NULL,
+				is_active BIT NOT NULL DEFAULT 1,
+				preferences NVARCHAR(MAX) NULL -- JSON text
 			);
 			IF OBJECT_ID('dbo.courses','U') IS NULL CREATE TABLE dbo.courses(
 				id INT IDENTITY(1,1) PRIMARY KEY,
 				school_id INT NOT NULL FOREIGN KEY REFERENCES dbo.schools(id) ON DELETE CASCADE,
-				name NVARCHAR(200) NOT NULL
+				name NVARCHAR(200) NOT NULL,
+				credit_hours SMALLINT NULL,
+				is_elective BIT NULL
 			);
 			IF OBJECT_ID('dbo.enrollments','U') IS NULL CREATE TABLE dbo.enrollments(
 				id INT IDENTITY(1,1) PRIMARY KEY,
 				student_id INT NOT NULL FOREIGN KEY REFERENCES dbo.students(id) ON DELETE CASCADE,
 				course_id INT NOT NULL FOREIGN KEY REFERENCES dbo.courses(id) ON DELETE CASCADE,
 				enrolled_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+				progress_percent REAL NULL,
+				is_passed BIT NULL,
 				CONSTRAINT UQ_student_course UNIQUE(student_id, course_id)
 			);
 			IF OBJECT_ID('dbo.grades','U') IS NULL CREATE TABLE dbo.grades(
 				id INT IDENTITY(1,1) PRIMARY KEY,
 				enrollment_id INT NOT NULL FOREIGN KEY REFERENCES dbo.enrollments(id) ON DELETE CASCADE,
 				grade INT NOT NULL CHECK (grade BETWEEN 0 AND 100),
-				graded_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+				graded_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+				passed BIT NULL
 			);`
 		);
 }
@@ -162,8 +183,10 @@ async function seedData(pool) {
 		for (let s = 0; s < COUNTS.SCHOOLS; s++) {
 			const city = randChoice(TR_CITIES);
 			const name = `${city} ${randChoice(TR_SCHOOL_NAMES)}`;
+			const established = 1950 + Math.floor(Math.random()*70);
+			const metadata = JSON.stringify({ zone: randChoice(['A','B','C']), capacity: 300+Math.floor(Math.random()*700), focus: randChoice(['science','language','mixed','sports']) });
 			const res = await new sql.Request(tr)
-				.query`INSERT INTO dbo.schools(name, city) OUTPUT INSERTED.id VALUES (${name}, ${city})`;
+				.query`INSERT INTO dbo.schools(name, city, established_year, metadata, is_public) OUTPUT INSERTED.id VALUES (${name}, ${city}, ${established}, ${metadata}, ${randBool(0.6) ? 1:0})`;
 			schoolIds.push(res.recordset[0].id);
 		}
 		const allCourseIds = [],
@@ -173,8 +196,11 @@ async function seedData(pool) {
 				const first = randChoice(TR_FIRST_NAMES);
 				const last = randChoice(TR_LAST_NAMES);
 				const email = makeEmail(first, last, 'teacher');
+				const salary = +(40000 + Math.random()*30000).toFixed(2);
+				const hireDate = faker.date.past({ years: faker.number.int({ min:1, max:15 }) });
+				const tags = JSON.stringify(randArrayChoices(TAG_POOL,3));
 				await new sql.Request(tr)
-					.query`INSERT INTO dbo.teachers(school_id, first_name, last_name, email) VALUES (${schoolId}, ${first}, ${last}, ${email})`;
+					.query`INSERT INTO dbo.teachers(school_id, first_name, last_name, email, salary, hire_date, tags, is_active) VALUES (${schoolId}, ${first}, ${last}, ${email}, ${salary}, ${hireDate}, ${tags}, ${randBool(0.9)?1:0})`;
 			}
 			const classIds = [];
 			for (let c = 0; c < COUNTS.CLASSES_PER_SCHOOL; c++) {
@@ -188,8 +214,10 @@ async function seedData(pool) {
 			const courseIds = [];
 			const chosenCourses = pickRandom(TR_COURSES, Math.min(COUNTS.COURSES_PER_SCHOOL, TR_COURSES.length));
 			for (const courseName of chosenCourses) {
+				const creditHours = faker.number.int({ min:1, max:6 });
+				const isElective = randBool(0.4)?1:0;
 				const res = await new sql.Request(tr)
-					.query`INSERT INTO dbo.courses(school_id, name) OUTPUT INSERTED.id VALUES (${schoolId}, ${courseName})`;
+					.query`INSERT INTO dbo.courses(school_id, name, credit_hours, is_elective) OUTPUT INSERTED.id VALUES (${schoolId}, ${courseName}, ${creditHours}, ${isElective})`;
 				courseIds.push(res.recordset[0].id);
 			}
 			allCourseIds.push(...courseIds);
@@ -198,38 +226,35 @@ async function seedData(pool) {
 					const first = randChoice(TR_FIRST_NAMES);
 					const last = randChoice(TR_LAST_NAMES);
 					const email = makeEmail(first, last, 'student');
-					const birth = faker.date.past({
-						years: faker.number.int({ min: 6, max: 18 }),
-					});
+					const birth = faker.date.past({ years: faker.number.int({ min: 6, max: 18 }) });
+					const gpa = +( (2 + Math.random()*2).toFixed(2) );
+					const preferences = JSON.stringify({ clubs: randArrayChoices(['music','robotics','coding','drama','math','football','chess'],2), needs_support: randBool(0.15) });
+					const active = randBool(0.95)?1:0;
 					const res = await new sql.Request(tr)
-						.query`INSERT INTO dbo.students(class_id, first_name, last_name, email, birth_date) OUTPUT INSERTED.id VALUES (${classId}, ${first}, ${last}, ${email}, ${birth})`;
+						.query`INSERT INTO dbo.students(class_id, first_name, last_name, email, birth_date, gpa, preferences, is_active) OUTPUT INSERTED.id VALUES (${classId}, ${first}, ${last}, ${email}, ${birth}, ${gpa}, ${preferences}, ${active})`;
 					allStudentIds.push(res.recordset[0].id);
 				}
 			}
 		}
 		for (const studentId of allStudentIds) {
-			const selected = pickRandom(
-				allCourseIds,
-				Math.min(COUNTS.ENROLLMENTS_PER_STUDENT, allCourseIds.length)
-			);
+			const selected = pickRandom(allCourseIds, Math.min(COUNTS.ENROLLMENTS_PER_STUDENT, allCourseIds.length));
 			for (const courseId of selected) {
 				try {
+					const progress = Math.random() < 0.9 ? +(Math.random()*100).toFixed(1) : null;
+					const isPassed = progress !== null && progress >= 60 ? 1:0;
 					const enr = await tr.request()
-						.query`INSERT INTO dbo.enrollments(student_id, course_id, enrolled_at) OUTPUT INSERTED.id VALUES (${studentId}, ${courseId}, ${new Date()})`;
+						.query`INSERT INTO dbo.enrollments(student_id, course_id, enrolled_at, progress_percent, is_passed) OUTPUT INSERTED.id VALUES (${studentId}, ${courseId}, ${new Date()}, ${progress}, ${progress===null? null : isPassed})`;
 					const enrollmentId = enr.recordset[0].id;
 					if (Math.random() < 0.85) {
+						const gradeVal = faker.number.int({ min: 40, max: 100 });
 						await tr.request()
-							.query`INSERT INTO dbo.grades(enrollment_id, grade, graded_at) VALUES (${enrollmentId}, ${faker.number.int(
-							{ min: 40, max: 100 }
-						)}, ${new Date()})`;
+							.query`INSERT INTO dbo.grades(enrollment_id, grade, graded_at, passed) VALUES (${enrollmentId}, ${gradeVal}, ${new Date()}, ${gradeVal >= 50 ? 1:0})`;
 					}
-				} catch {
-					/* ignore dup */
-				}
+				} catch { /* ignore dup */ }
 			}
 		}
 		await tr.commit();
-		console.log("MSSQL seeding complete.");
+		console.log("MSSQL seeding complete (extended schema).");
 	} catch (e) {
 		await tr.rollback();
 		throw e;

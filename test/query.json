@@ -1,8 +1,0 @@
-{
-	"queries": [
-		{
-			"dsl": "FETCH(first_name, COUNT(*)) FILTER(first_name CONTAINS 'm') FROM students GROUPBY(first_name) HAVING (COUNT(*) >= 25)",
-			"query": "SELECT students.first_name, COUNT(*) FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25"
-		}
-	]
-}

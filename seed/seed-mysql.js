@@ -100,6 +100,8 @@ function makeEmail(first, last, role){
 	usedEmails.add(email);
 	return email;
 }
+function randBool(p=0.5){ return Math.random() < p; }
+function randArrayChoices(src, maxCount=3){ const n=Math.max(1, Math.min(maxCount, Math.floor(Math.random()*maxCount)+1)); const copy=[...src]; const out=[]; for(let i=0;i<n && copy.length;i++){ const idx=Math.floor(Math.random()*copy.length); out.push(copy.splice(idx,1)[0]); } return out; }
 async function dropSchema(conn) {
 	await conn.query(
 		`SET FOREIGN_KEY_CHECKS=0; DROP TABLE IF EXISTS grades; DROP TABLE IF EXISTS enrollments; DROP TABLE IF EXISTS students; DROP TABLE IF EXISTS classes; DROP TABLE IF EXISTS teachers; DROP TABLE IF EXISTS courses; DROP TABLE IF EXISTS schools; SET FOREIGN_KEY_CHECKS=1;`
@@ -107,7 +109,75 @@ async function dropSchema(conn) {
 }
 async function createSchema(conn) {
 	await conn.query(
-		`CREATE TABLE IF NOT EXISTS schools(id INT AUTO_INCREMENT PRIMARY KEY,name VARCHAR(200) NOT NULL,city VARCHAR(100) NOT NULL) ENGINE=InnoDB; CREATE TABLE IF NOT EXISTS teachers(id INT AUTO_INCREMENT PRIMARY KEY,school_id INT NOT NULL,first_name VARCHAR(100) NOT NULL,last_name VARCHAR(100) NOT NULL,email VARCHAR(200) NOT NULL UNIQUE,FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE) ENGINE=InnoDB; CREATE TABLE IF NOT EXISTS classes(id INT AUTO_INCREMENT PRIMARY KEY,school_id INT NOT NULL,name VARCHAR(200) NOT NULL,grade_level INT NOT NULL,FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE) ENGINE=InnoDB; CREATE TABLE IF NOT EXISTS students(id INT AUTO_INCREMENT PRIMARY KEY,class_id INT NULL,first_name VARCHAR(100) NOT NULL,last_name VARCHAR(100) NOT NULL,email VARCHAR(200) NOT NULL UNIQUE,birth_date DATE NOT NULL,FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL) ENGINE=InnoDB; CREATE TABLE IF NOT EXISTS courses(id INT AUTO_INCREMENT PRIMARY KEY,school_id INT NOT NULL,name VARCHAR(200) NOT NULL,FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE) ENGINE=InnoDB; CREATE TABLE IF NOT EXISTS enrollments(id INT AUTO_INCREMENT PRIMARY KEY,student_id INT NOT NULL,course_id INT NOT NULL,enrolled_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,UNIQUE KEY uq_student_course (student_id, course_id),FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE) ENGINE=InnoDB; CREATE TABLE IF NOT EXISTS grades(id INT AUTO_INCREMENT PRIMARY KEY,enrollment_id INT NOT NULL,grade INT NOT NULL,graded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE) ENGINE=InnoDB;`
+		`-- Extended MySQL schema
+		CREATE TABLE IF NOT EXISTS schools(
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			name VARCHAR(200) NOT NULL,
+			city VARCHAR(100) NOT NULL,
+			is_public TINYINT(1) NOT NULL DEFAULT 1,
+			established_year INT NULL,
+			metadata JSON NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		) ENGINE=InnoDB;
+		CREATE TABLE IF NOT EXISTS teachers(
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			school_id INT NOT NULL,
+			first_name VARCHAR(100) NOT NULL,
+			last_name VARCHAR(100) NOT NULL,
+			email VARCHAR(200) NOT NULL UNIQUE,
+			is_active TINYINT(1) NOT NULL DEFAULT 1,
+			salary DECIMAL(10,2) NULL,
+			hire_date DATE NULL,
+			tags JSON NULL,
+			FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE
+		) ENGINE=InnoDB;
+		CREATE TABLE IF NOT EXISTS classes(
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			school_id INT NOT NULL,
+			name VARCHAR(200) NOT NULL,
+			grade_level INT NOT NULL,
+			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE
+		) ENGINE=InnoDB;
+		CREATE TABLE IF NOT EXISTS students(
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			class_id INT NULL,
+			first_name VARCHAR(100) NOT NULL,
+			last_name VARCHAR(100) NOT NULL,
+			email VARCHAR(200) NOT NULL UNIQUE,
+			birth_date DATE NOT NULL,
+			gpa DECIMAL(4,2) NULL,
+			is_active TINYINT(1) NOT NULL DEFAULT 1,
+			preferences JSON NULL,
+			FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE SET NULL
+		) ENGINE=InnoDB;
+		CREATE TABLE IF NOT EXISTS courses(
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			school_id INT NOT NULL,
+			name VARCHAR(200) NOT NULL,
+			credit_hours SMALLINT NULL,
+			is_elective TINYINT(1) NULL,
+			FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE
+		) ENGINE=InnoDB;
+		CREATE TABLE IF NOT EXISTS enrollments(
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			student_id INT NOT NULL,
+			course_id INT NOT NULL,
+			enrolled_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			progress_percent FLOAT NULL,
+			is_passed TINYINT(1) NULL,
+			UNIQUE KEY uq_student_course (student_id, course_id),
+			FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
+			FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+		) ENGINE=InnoDB;
+		CREATE TABLE IF NOT EXISTS grades(
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			enrollment_id INT NOT NULL,
+			grade INT NOT NULL,
+			graded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			passed TINYINT(1) NULL,
+			FOREIGN KEY (enrollment_id) REFERENCES enrollments(id) ON DELETE CASCADE
+		) ENGINE=InnoDB;`
 	);
 }
 async function seedData(conn) {
@@ -115,11 +185,13 @@ async function seedData(conn) {
 	try {
 		const schoolIds = [];
 		for (let s = 0; s < COUNTS.SCHOOLS; s++) {
-			const name = `${faker.company.name()} School`,
-				city = faker.location.city();
+			const city = randChoice(TR_CITIES);
+			const name = `${city} ${randChoice(TR_SCHOOL_NAMES)}`;
+			const established = 1950 + Math.floor(Math.random()*70);
+			const metadata = { zone: randChoice(['A','B','C']), capacity: 300+Math.floor(Math.random()*700), focus: randChoice(['science','language','mixed','sports']) };
 			const [res] = await conn.execute(
-				"INSERT INTO schools(name, city) VALUES (?,?)",
-				[name, city]
+				"INSERT INTO schools(name, city, established_year, metadata, is_public) VALUES (?,?,?,?,?)",
+				[name, city, established, JSON.stringify(metadata), randBool(0.6)?1:0]
 			);
 			schoolIds.push(res.insertId);
 		}
@@ -130,9 +202,12 @@ async function seedData(conn) {
 					const first = randChoice(TR_FIRST_NAMES);
 					const last = randChoice(TR_LAST_NAMES);
 					const email = makeEmail(first, last, 'teacher');
+					const salary = (40000 + Math.random()*30000).toFixed(2);
+					const hireDate = faker.date.past({ years: faker.number.int({ min:1, max:15 }) });
+					const tags = randArrayChoices(['mentor','club','stem','arts','senior','junior','lead','advisor','coach','exchange'],3);
 					await conn.execute(
-						"INSERT INTO teachers(school_id, first_name, last_name, email) VALUES (?,?,?,?)",
-						[schoolId, first, last, email]
+						"INSERT INTO teachers(school_id, first_name, last_name, email, salary, hire_date, tags, is_active) VALUES (?,?,?,?,?,?,?,?)",
+						[schoolId, first, last, email, salary, hireDate, JSON.stringify(tags), randBool(0.9)?1:0]
 					);
 				}
 			const classIds = [];
@@ -149,49 +224,48 @@ async function seedData(conn) {
 			const courseIds = [];
 				const chosenCourses = pickRandom(TR_COURSES, Math.min(COUNTS.COURSES_PER_SCHOOL, TR_COURSES.length));
 				for (const courseName of chosenCourses) {
+					const creditHours = faker.number.int({ min:1, max:6 });
+					const isElective = randBool(0.4)?1:0;
 					const [res] = await conn.execute(
-						"INSERT INTO courses(school_id, name) VALUES (?,?)",
-						[schoolId, courseName]
+						"INSERT INTO courses(school_id, name, credit_hours, is_elective) VALUES (?,?,?,?)",
+						[schoolId, courseName, creditHours, isElective]
 					);
 					courseIds.push(res.insertId);
 				}
 			allCourseIds.push(...courseIds);
 			for (const classId of classIds) {
 				for (let st = 0; st < COUNTS.STUDENTS_PER_CLASS; st++) {
-						const first = randChoice(TR_FIRST_NAMES);
-						const last = randChoice(TR_LAST_NAMES);
-						const email = makeEmail(first, last, 'student');
-					const birth = faker.date.past({
-						years: faker.number.int({ min: 6, max: 18 }),
-					});
+					const first = randChoice(TR_FIRST_NAMES);
+					const last = randChoice(TR_LAST_NAMES);
+					const email = makeEmail(first, last, 'student');
+					const birth = faker.date.past({ years: faker.number.int({ min: 6, max: 18 }) });
+					const gpa = (2 + Math.random()*2).toFixed(2);
+					const preferences = { clubs: randArrayChoices(['music','robotics','coding','drama','math','football','chess'],2), needs_support: randBool(0.15) };
 					const [res] = await conn.execute(
-						"INSERT INTO students(class_id, first_name, last_name, email, birth_date) VALUES (?,?,?,?,?)",
-						[classId, first, last, email, birth]
+						"INSERT INTO students(class_id, first_name, last_name, email, birth_date, gpa, preferences, is_active) VALUES (?,?,?,?,?,?,?,?)",
+						[classId, first, last, email, birth, gpa, JSON.stringify(preferences), randBool(0.95)?1:0]
 					);
 					allStudentIds.push(res.insertId);
 				}
 			}
 		}
 		for (const studentId of allStudentIds) {
-			const selected = pickRandom(
-				allCourseIds,
-				Math.min(COUNTS.ENROLLMENTS_PER_STUDENT, allCourseIds.length)
-			);
+			const selected = pickRandom(allCourseIds, Math.min(COUNTS.ENROLLMENTS_PER_STUDENT, allCourseIds.length));
 			for (const courseId of selected) {
 				try {
+					const enrolledAt = new Date();
+					const progress = Math.random() < 0.9 ? +(Math.random()*100).toFixed(1) : null;
+					const isPassed = progress !== null && progress >= 60 ? 1:0;
 					const [enr] = await conn.execute(
-						"INSERT INTO enrollments(student_id, course_id, enrolled_at) VALUES (?,?,?)",
-						[studentId, courseId, new Date()]
+						"INSERT INTO enrollments(student_id, course_id, enrolled_at, progress_percent, is_passed) VALUES (?,?,?,?,?)",
+						[studentId, courseId, enrolledAt, progress, progress===null? null : isPassed]
 					);
 					const enrollmentId = enr.insertId;
 					if (Math.random() < 0.85) {
+						const gradeVal = faker.number.int({ min: 40, max: 100 });
 						await conn.execute(
-							"INSERT INTO grades(enrollment_id, grade, graded_at) VALUES (?,?,?)",
-							[
-								enrollmentId,
-								faker.number.int({ min: 40, max: 100 }),
-								new Date(),
-							]
+							"INSERT INTO grades(enrollment_id, grade, graded_at, passed) VALUES (?,?,?,?)",
+							[enrollmentId, gradeVal, new Date(), gradeVal >= 50 ? 1:0]
 						);
 					}
 				} catch {}

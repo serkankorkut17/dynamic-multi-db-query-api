@@ -1,6 +1,11 @@
 # dynamic-multi-db-query-api
 count, sum, avg, min, max, joins, group by, order by, limit, offset, distinct
 
+eklenecek:
+LENGTH(col) - LEN(col)
+SUBSTRING(col, start, len) - SUBSTR(col, start, len)
+CONCAT(col1, col2)
+
 FETCH(Ad, Soyad) FROM Dataset
 FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City
 FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City GROUPBY (Country)
@@ -8,7 +13,7 @@ FETCH(Ad, Soyad, City.Name, City.Country.Name) FROM Person INCLUDE (City.Country
 
 FETCH(Country, COUNT(*)) FILTER((Ad = 'Serkan' OR Grade > 3) AND (Soyad BEGINSWITH 'Ah' AND Email CONTAINS '@' AND Email ENDSWITH '.com' ))
 
-FETCH(Country, COUNT(*)) FROM(Person) GROUPBY(Name) ORDERBY(Name ASC) TAKE(10) LIMIT(10)
+FETCH(Country, COUNT(*) AS count) FROM(Person) GROUPBY(Name) HAVING(count(*) > 2) ORDERBY(Name ASC) TAKE(10) LIMIT(10)
 
 queryleri at uygun mudur diye sor
 as vb sorulabilir 

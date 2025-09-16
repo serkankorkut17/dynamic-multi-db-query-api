@@ -1,0 +1,174 @@
+[
+	{
+		"id": "agg_having_firstname_m",
+		"description": "Count students by first_name containing 'm' (case-insensitive), only buckets >= 20",
+		"dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
+		"postgres": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+		"mysql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+		"mssql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+		"oracle": "SELECT s.first_name, COUNT(*) cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC"
+	},
+	{
+		"id": "join_students_courses_progress",
+		"description": "Average progress per course (only courses with > 30 enrollments)",
+		"dsl": "FETCH(c.name, AVG(e.progress_percent) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (course) GROUPBY(c.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
+		"postgres": "SELECT c.name, ROUND(AVG(e.progress_percent)::numeric,2) avg_progress, COUNT(*) enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+		"mysql": "SELECT c.name, ROUND(AVG(e.progress_percent),2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+		"mssql": "SELECT c.name, ROUND(AVG(CAST(e.progress_percent AS FLOAT)),2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+		"oracle": "SELECT c.name, ROUND(AVG(e.progress_percent),2) avg_progress, COUNT(*) enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC"
+	},
+	{
+		"id": "json_zone_school_counts",
+		"description": "Schools per metadata.zone (JSON) with > 1 school",
+		"dsl": "FETCH(metadata.zone, COUNT(*) AS school_count) FROM schools GROUPBY(metadata.zone) HAVING(COUNT(*) > 1) ORDERBY(school_count DESC)",
+		"postgres": "SELECT (metadata->>'zone') AS zone, COUNT(*) AS school_count FROM schools GROUP BY zone HAVING COUNT(*) > 1 ORDER BY school_count DESC",
+		"mysql": "SELECT JSON_UNQUOTE(JSON_EXTRACT(metadata,'$.zone')) AS zone, COUNT(*) AS school_count FROM schools GROUP BY zone HAVING COUNT(*) > 1 ORDER BY school_count DESC",
+		"mssql": "SELECT JSON_VALUE(metadata,'$.zone') AS zone, COUNT(*) AS school_count FROM schools GROUP BY JSON_VALUE(metadata,'$.zone') HAVING COUNT(*) > 1 ORDER BY school_count DESC",
+		"oracle": "SELECT JSON_VALUE(metadata,'$.zone') AS zone, COUNT(*) AS school_count FROM schools GROUP BY JSON_VALUE(metadata,'$.zone') HAVING COUNT(*) > 1 ORDER BY school_count DESC"
+	},
+	{
+		"id": "recent_enrollments_30d",
+		"description": "Enrollments in last 30 days per school",
+		"dsl": "FETCH(sc.name, COUNT(e.id) AS recent_enrolls) FROM enrollments INCLUDE (student.class.school) FILTER(enrolled_at >= NOW() - INTERVAL '30 days') GROUPBY(sc.name) ORDERBY(recent_enrolls DESC)",
+		"postgres": "SELECT sc.name, COUNT(e.id) AS recent_enrolls FROM enrollments e JOIN students st ON st.id = e.student_id JOIN classes cl ON cl.id = st.class_id JOIN schools sc ON sc.id = cl.school_id WHERE e.enrolled_at >= NOW() - INTERVAL '30 days' GROUP BY sc.name ORDER BY recent_enrolls DESC",
+		"mysql": "SELECT sc.name, COUNT(e.id) AS recent_enrolls FROM enrollments e JOIN students st ON st.id = e.student_id JOIN classes cl ON cl.id = st.class_id JOIN schools sc ON sc.id = cl.school_id WHERE e.enrolled_at >= (NOW() - INTERVAL 30 DAY) GROUP BY sc.name ORDER BY recent_enrolls DESC",
+		"mssql": "SELECT sc.name, COUNT(e.id) AS recent_enrolls FROM enrollments e JOIN students st ON st.id = e.student_id JOIN classes cl ON cl.id = st.class_id JOIN schools sc ON sc.id = cl.school_id WHERE e.enrolled_at >= DATEADD(DAY, -30, SYSDATETIME()) GROUP BY sc.name ORDER BY recent_enrolls DESC",
+		"oracle": "SELECT sc.name, COUNT(e.id) recent_enrolls FROM enrollments e JOIN students st ON st.id = e.student_id JOIN classes cl ON cl.id = st.class_id JOIN schools sc ON sc.id = cl.school_id WHERE e.enrolled_at >= (SYSTIMESTAMP - INTERVAL '30' DAY) GROUP BY sc.name ORDER BY recent_enrolls DESC"
+	},
+	{
+		"id": "top5_schools_by_students",
+		"description": "Top 5 schools by total students (different pagination syntax)",
+		"dsl": "FETCH(sc.name, COUNT(st.id) AS student_count) FROM schools INCLUDE (classes.students) GROUPBY(sc.name) ORDERBY(student_count DESC) TAKE(5)",
+		"postgres": "SELECT sc.name, COUNT(st.id) AS student_count FROM schools sc LEFT JOIN classes cl ON cl.school_id = sc.id LEFT JOIN students st ON st.class_id = cl.id GROUP BY sc.name ORDER BY student_count DESC LIMIT 5",
+		"mysql": "SELECT sc.name, COUNT(st.id) AS student_count FROM schools sc LEFT JOIN classes cl ON cl.school_id = sc.id LEFT JOIN students st ON st.class_id = cl.id GROUP BY sc.name ORDER BY student_count DESC LIMIT 5",
+		"mssql": "SELECT TOP 5 sc.name, COUNT(st.id) AS student_count FROM schools sc LEFT JOIN classes cl ON cl.school_id = sc.id LEFT JOIN students st ON st.class_id = cl.id GROUP BY sc.name ORDER BY student_count DESC",
+		"oracle": "SELECT name, student_count FROM (SELECT sc.name AS name, COUNT(st.id) AS student_count, ROW_NUMBER() OVER (ORDER BY COUNT(st.id) DESC) rn FROM schools sc LEFT JOIN classes cl ON cl.school_id = sc.id LEFT JOIN students st ON st.class_id = cl.id GROUP BY sc.name) WHERE rn <= 5"
+	},
+	{
+		"id": "pagination_students",
+		"description": "Page 2 (size 10) active students ordered by last_name, first_name",
+		"dsl": "FETCH(id, first_name, last_name) FROM students FILTER(is_active = TRUE) ORDERBY(last_name ASC, first_name ASC) LIMIT(10) OFFSET(10)",
+		"postgres": "SELECT id, first_name, last_name FROM students WHERE is_active = TRUE ORDER BY last_name, first_name LIMIT 10 OFFSET 10",
+		"mysql": "SELECT id, first_name, last_name FROM students WHERE is_active = 1 ORDER BY last_name, first_name LIMIT 10 OFFSET 10",
+		"mssql": "SELECT id, first_name, last_name FROM students WHERE is_active = 1 ORDER BY last_name, first_name OFFSET 10 ROWS FETCH NEXT 10 ROWS ONLY",
+		"oracle": "SELECT id, first_name, last_name FROM students WHERE is_active = 1 ORDER BY last_name, first_name OFFSET 10 ROWS FETCH NEXT 10 ROWS ONLY"
+	},
+	{
+		"id": "gpa_above_avg_per_class",
+		"description": "Students whose GPA is above their class average (self aggregate)",
+		"dsl": "FETCH(st.id, st.first_name, st.last_name, st.gpa) FROM students AS st INCLUDE(class) FILTER(st.gpa IS NOT NULL AND st.gpa > AVG(class.students.gpa) OVER class) ORDERBY(st.gpa DESC)",
+		"postgres": "SELECT st.id, st.first_name, st.last_name, st.gpa FROM students st JOIN (SELECT class_id, AVG(gpa) avg_gpa FROM students WHERE gpa IS NOT NULL GROUP BY class_id) a ON a.class_id = st.class_id WHERE st.gpa IS NOT NULL AND st.gpa > a.avg_gpa ORDER BY st.gpa DESC",
+		"mysql": "SELECT st.id, st.first_name, st.last_name, st.gpa FROM students st JOIN (SELECT class_id, AVG(gpa) avg_gpa FROM students WHERE gpa IS NOT NULL GROUP BY class_id) a ON a.class_id = st.class_id WHERE st.gpa IS NOT NULL AND st.gpa > a.avg_gpa ORDER BY st.gpa DESC",
+		"mssql": "SELECT st.id, st.first_name, st.last_name, st.gpa FROM students st JOIN (SELECT class_id, AVG(gpa) avg_gpa FROM students WHERE gpa IS NOT NULL GROUP BY class_id) a ON a.class_id = st.class_id WHERE st.gpa IS NOT NULL AND st.gpa > a.avg_gpa ORDER BY st.gpa DESC",
+		"oracle": "SELECT st.id, st.first_name, st.last_name, st.gpa FROM students st JOIN (SELECT class_id, AVG(gpa) avg_gpa FROM students WHERE gpa IS NOT NULL GROUP BY class_id) a ON a.class_id = st.class_id WHERE st.gpa IS NOT NULL AND st.gpa > a.avg_gpa ORDER BY st.gpa DESC"
+	},
+	{
+		"id": "teacher_load",
+		"description": "Teachers with number of distinct classes (via school) and courses at that school",
+		"dsl": "FETCH(t.id, t.first_name, t.last_name, COUNT(DISTINCT cl.id) AS class_count, COUNT(DISTINCT co.id) AS course_count) FROM teachers AS t INCLUDE(school.classes AS cl, school.courses AS co) GROUPBY(t.id, t.first_name, t.last_name) ORDERBY(class_count DESC, course_count DESC)",
+		"postgres": "SELECT t.id, t.first_name, t.last_name, COUNT(DISTINCT cl.id) AS class_count, COUNT(DISTINCT co.id) AS course_count FROM teachers t LEFT JOIN schools sc ON sc.id = t.school_id LEFT JOIN classes cl ON cl.school_id = sc.id LEFT JOIN courses co ON co.school_id = sc.id GROUP BY t.id, t.first_name, t.last_name ORDER BY class_count DESC, course_count DESC",
+		"mysql": "SELECT t.id, t.first_name, t.last_name, COUNT(DISTINCT cl.id) AS class_count, COUNT(DISTINCT co.id) AS course_count FROM teachers t LEFT JOIN schools sc ON sc.id = t.school_id LEFT JOIN classes cl ON cl.school_id = sc.id LEFT JOIN courses co ON co.school_id = sc.id GROUP BY t.id, t.first_name, t.last_name ORDER BY class_count DESC, course_count DESC",
+		"mssql": "SELECT t.id, t.first_name, t.last_name, COUNT(DISTINCT cl.id) AS class_count, COUNT(DISTINCT co.id) AS course_count FROM teachers t LEFT JOIN schools sc ON sc.id = t.school_id LEFT JOIN classes cl ON cl.school_id = sc.id LEFT JOIN courses co ON co.school_id = sc.id GROUP BY t.id, t.first_name, t.last_name ORDER BY class_count DESC, course_count DESC",
+		"oracle": "SELECT t.id, t.first_name, t.last_name, COUNT(DISTINCT cl.id) class_count, COUNT(DISTINCT co.id) course_count FROM teachers t LEFT JOIN schools sc ON sc.id = t.school_id LEFT JOIN classes cl ON cl.school_id = sc.id LEFT JOIN courses co ON co.school_id = sc.id GROUP BY t.id, t.first_name, t.last_name ORDER BY class_count DESC, course_count DESC"
+	},
+	{
+		"id": "courses_enrollment_ratio",
+		"description": "Enrollment count and pass ratio per course (progress > 50 as passed proxy if no grade table join)",
+		"dsl": "FETCH(c.name, COUNT(e.id) AS enrollments, (100 * AVG(CASE WHEN e.progress_percent >= 50 THEN 1 ELSE 0 END)) AS pass_pct) FROM courses INCLUDE(enrollments) GROUPBY(c.name) ORDERBY(pass_pct DESC)",
+		"postgres": "SELECT c.name, COUNT(e.id) enrollments, ROUND(100.0 * AVG(CASE WHEN e.progress_percent >= 50 THEN 1 ELSE 0 END)::numeric,1) pass_pct FROM courses c LEFT JOIN enrollments e ON e.course_id = c.id GROUP BY c.name ORDER BY pass_pct DESC",
+		"mysql": "SELECT c.name, COUNT(e.id) AS enrollments, ROUND(100.0 * AVG(CASE WHEN e.progress_percent >= 50 THEN 1 ELSE 0 END),1) AS pass_pct FROM courses c LEFT JOIN enrollments e ON e.course_id = c.id GROUP BY c.name ORDER BY pass_pct DESC",
+		"mssql": "SELECT c.name, COUNT(e.id) AS enrollments, ROUND(100.0 * AVG(CASE WHEN e.progress_percent >= 50 THEN 1 ELSE 0 END),1) AS pass_pct FROM courses c LEFT JOIN enrollments e ON e.course_id = c.id GROUP BY c.name ORDER BY pass_pct DESC",
+		"oracle": "SELECT c.name, COUNT(e.id) enrollments, ROUND(100 * AVG(CASE WHEN e.progress_percent >= 50 THEN 1 ELSE 0 END),1) pass_pct FROM courses c LEFT JOIN enrollments e ON e.course_id = c.id GROUP BY c.name ORDER BY pass_pct DESC"
+	},
+	{
+		"id": "capacity_vs_students_zone",
+		"description": "Compare total metadata.capacity (sum) vs actual student count per zone",
+		"dsl": "FETCH(metadata.zone, SUM(metadata.capacity) AS planned_capacity, COUNT(st.id) AS student_count) FROM schools INCLUDE(classes.students AS st) GROUPBY(metadata.zone) ORDERBY(student_count DESC)",
+		"postgres": "SELECT (metadata->>'zone') AS zone, SUM((metadata->>'capacity')::int) AS planned_capacity, COUNT(st.id) AS student_count FROM schools sc LEFT JOIN classes cl ON cl.school_id = sc.id LEFT JOIN students st ON st.class_id = cl.id GROUP BY zone ORDER BY student_count DESC",
+		"mysql": "SELECT JSON_UNQUOTE(JSON_EXTRACT(sc.metadata,'$.zone')) AS zone, SUM(JSON_EXTRACT(sc.metadata,'$.capacity')) AS planned_capacity, COUNT(st.id) AS student_count FROM schools sc LEFT JOIN classes cl ON cl.school_id = sc.id LEFT JOIN students st ON st.class_id = cl.id GROUP BY zone ORDER BY student_count DESC",
+		"mssql": "SELECT JSON_VALUE(sc.metadata,'$.zone') AS zone, SUM(TRY_CAST(JSON_VALUE(sc.metadata,'$.capacity') AS INT)) AS planned_capacity, COUNT(st.id) AS student_count FROM schools sc LEFT JOIN classes cl ON cl.school_id = sc.id LEFT JOIN students st ON st.class_id = cl.id GROUP BY JSON_VALUE(sc.metadata,'$.zone') ORDER BY student_count DESC",
+		"oracle": "SELECT JSON_VALUE(sc.metadata,'$.zone') AS zone, SUM(TO_NUMBER(JSON_VALUE(sc.metadata,'$.capacity'))) AS planned_capacity, COUNT(st.id) AS student_count FROM schools sc LEFT JOIN classes cl ON cl.school_id = sc.id LEFT JOIN students st ON st.class_id = cl.id GROUP BY JSON_VALUE(sc.metadata,'$.zone') ORDER BY student_count DESC"
+	}
+	,
+	{
+		"id": "students_active_email_pattern",
+		"description": "Active students whose email ends with .tr and contains @",
+		"dsl": "FETCH(id, first_name, last_name, email) FROM students FILTER(is_active = TRUE AND email CONTAINS '@' AND email ENDSWITH '.tr') ORDERBY(last_name ASC, first_name ASC) LIMIT(20)",
+		"postgres": "SELECT id, first_name, last_name, email FROM students WHERE is_active = TRUE AND email LIKE '%@%' AND email LIKE '%.tr' ORDER BY last_name, first_name LIMIT 20",
+		"mysql": "SELECT id, first_name, last_name, email FROM students WHERE is_active = 1 AND email LIKE '%@%' AND email LIKE '%.tr' ORDER BY last_name, first_name LIMIT 20",
+		"mssql": "SELECT TOP 20 id, first_name, last_name, email FROM students WHERE is_active = 1 AND email LIKE '%@%' AND email LIKE '%.tr' ORDER BY last_name, first_name",
+		"oracle": "SELECT id, first_name, last_name, email FROM students WHERE is_active = 1 AND email LIKE '%@%' AND email LIKE '%.tr' ORDER BY last_name, first_name FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "classes_student_count_ge_25",
+		"description": "Classes with at least 25 students",
+		"dsl": "FETCH(cl.id, cl.name, COUNT(st.id) AS student_count) FROM classes AS cl INCLUDE(students AS st) GROUPBY(cl.id, cl.name) HAVING(COUNT(st.id) >= 25) ORDERBY(student_count DESC)",
+		"postgres": "SELECT cl.id, cl.name, COUNT(st.id) AS student_count FROM classes cl LEFT JOIN students st ON st.class_id = cl.id GROUP BY cl.id, cl.name HAVING COUNT(st.id) >= 25 ORDER BY student_count DESC",
+		"mysql": "SELECT cl.id, cl.name, COUNT(st.id) AS student_count FROM classes cl LEFT JOIN students st ON st.class_id = cl.id GROUP BY cl.id, cl.name HAVING COUNT(st.id) >= 25 ORDER BY student_count DESC",
+		"mssql": "SELECT cl.id, cl.name, COUNT(st.id) AS student_count FROM classes cl LEFT JOIN students st ON st.class_id = cl.id GROUP BY cl.id, cl.name HAVING COUNT(st.id) >= 25 ORDER BY student_count DESC",
+		"oracle": "SELECT cl.id, cl.name, COUNT(st.id) student_count FROM classes cl LEFT JOIN students st ON st.class_id = cl.id GROUP BY cl.id, cl.name HAVING COUNT(st.id) >= 25 ORDER BY student_count DESC"
+	},
+	{
+		"id": "courses_elective_distribution",
+		"description": "Count courses grouped by is_elective flag",
+		"dsl": "FETCH(is_elective, COUNT(*) AS course_count) FROM courses GROUPBY(is_elective) ORDERBY(course_count DESC)",
+		"postgres": "SELECT is_elective, COUNT(*) AS course_count FROM courses GROUP BY is_elective ORDER BY course_count DESC",
+		"mysql": "SELECT is_elective, COUNT(*) AS course_count FROM courses GROUP BY is_elective ORDER BY course_count DESC",
+		"mssql": "SELECT is_elective, COUNT(*) AS course_count FROM courses GROUP BY is_elective ORDER BY course_count DESC",
+		"oracle": "SELECT is_elective, COUNT(*) course_count FROM courses GROUP BY is_elective ORDER BY course_count DESC"
+	},
+	{
+		"id": "schools_public_private_split",
+		"description": "Public vs private school counts",
+		"dsl": "FETCH(is_public, COUNT(*) AS school_count) FROM schools GROUPBY(is_public) ORDERBY(school_count DESC)",
+		"postgres": "SELECT is_public, COUNT(*) AS school_count FROM schools GROUP BY is_public ORDER BY school_count DESC",
+		"mysql": "SELECT is_public, COUNT(*) AS school_count FROM schools GROUP BY is_public ORDER BY school_count DESC",
+		"mssql": "SELECT is_public, COUNT(*) AS school_count FROM schools GROUP BY is_public ORDER BY school_count DESC",
+		"oracle": "SELECT is_public, COUNT(*) school_count FROM schools GROUP BY is_public ORDER BY school_count DESC"
+	},
+	{
+		"id": "teacher_salary_stats",
+		"description": "Aggregate salary stats per school (AVG, MIN, MAX)",
+		"dsl": "FETCH(school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary) FROM teachers GROUPBY(school_id) HAVING(COUNT(*) > 2) ORDERBY(avg_salary DESC)",
+		"postgres": "SELECT school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary FROM teachers GROUP BY school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+		"mysql": "SELECT school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary FROM teachers GROUP BY school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+		"mssql": "SELECT school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary FROM teachers GROUP BY school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+		"oracle": "SELECT school_id, AVG(salary) avg_salary, MIN(salary) min_salary, MAX(salary) max_salary FROM teachers GROUP BY school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC"
+	},
+	{
+		"id": "students_gpa_high_active",
+		"description": "Active students with GPA >= 3.5 (top 15)",
+		"dsl": "FETCH(id, first_name, last_name, gpa) FROM students FILTER(is_active = TRUE AND gpa >= 3.5) ORDERBY(gpa DESC) LIMIT(15)",
+		"postgres": "SELECT id, first_name, last_name, gpa FROM students WHERE is_active = TRUE AND gpa >= 3.5 ORDER BY gpa DESC LIMIT 15",
+		"mysql": "SELECT id, first_name, last_name, gpa FROM students WHERE is_active = 1 AND gpa >= 3.5 ORDER BY gpa DESC LIMIT 15",
+		"mssql": "SELECT TOP 15 id, first_name, last_name, gpa FROM students WHERE is_active = 1 AND gpa >= 3.5 ORDER BY gpa DESC",
+		"oracle": "SELECT id, first_name, last_name, gpa FROM students WHERE is_active = 1 AND gpa >= 3.5 ORDER BY gpa DESC FETCH FIRST 15 ROWS ONLY"
+	},
+	{
+		"id": "students_null_email",
+		"description": "Students with NULL email (data quality check)",
+		"dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email IS NULL) LIMIT(20)",
+		"postgres": "SELECT id, first_name, last_name FROM students WHERE email IS NULL LIMIT 20",
+		"mysql": "SELECT id, first_name, last_name FROM students WHERE email IS NULL LIMIT 20",
+		"mssql": "SELECT TOP 20 id, first_name, last_name FROM students WHERE email IS NULL",
+		"oracle": "SELECT id, first_name, last_name FROM students WHERE email IS NULL FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "enrollments_progress_band_mid",
+		"description": "Enrollments with progress between 40 and 60 inclusive",
+		"dsl": "FETCH(id, student_id, course_id, progress_percent) FROM enrollments FILTER(progress_percent >= 40 AND progress_percent <= 60) ORDERBY(progress_percent ASC) LIMIT(30)",
+		"postgres": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent >= 40 AND progress_percent <= 60 ORDER BY progress_percent ASC LIMIT 30",
+		"mysql": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent >= 40 AND progress_percent <= 60 ORDER BY progress_percent ASC LIMIT 30",
+		"mssql": "SELECT TOP 30 id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent >= 40 AND progress_percent <= 60 ORDER BY progress_percent ASC",
+		"oracle": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent >= 40 AND progress_percent <= 60 ORDER BY progress_percent ASC FETCH FIRST 30 ROWS ONLY"
+	},
+	{
+		"id": "students_order_pagination_alt",
+		"description": "Alternate pagination: first 10 after skipping 5 by name",
+		"dsl": "FETCH(id, first_name, last_name) FROM students ORDERBY(first_name ASC) LIMIT(10) OFFSET(5)",
+		"postgres": "SELECT id, first_name, last_name FROM students ORDER BY first_name LIMIT 10 OFFSET 5",
+		"mysql": "SELECT id, first_name, last_name FROM students ORDER BY first_name LIMIT 10 OFFSET 5",
+		"mssql": "SELECT id, first_name, last_name FROM students ORDER BY first_name OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY",
+		"oracle": "SELECT id, first_name, last_name FROM students ORDER BY first_name OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY"
+	}
+]

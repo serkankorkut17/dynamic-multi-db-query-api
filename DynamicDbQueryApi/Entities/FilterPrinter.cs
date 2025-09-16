@@ -87,8 +87,9 @@ public static class FilterPrinter
         if (v.IndexOfAny(new char[] { ' ', '\t', '\n', '\r', '\'' }) >= 0)
         {
             // escape single quote for readability
-            var esc = v.Replace("'", "''");
-            return $"'{esc}'";
+            // var esc = v.Replace("'", "''");
+            var esc = v;
+            return $"{esc}";
         }
         return v;
     }

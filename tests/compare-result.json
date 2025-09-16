@@ -1,0 +1,102 @@
+[
+  {
+    "dbType": "postgres",
+    "results": [
+      {
+        "dsl": "FETCH(first_name, COUNT(*)) FILTER(first_name CONTAINS 'm') FROM students GROUPBY(first_name) HAVING (COUNT(*) >= 25)",
+        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+        "same": true,
+        "isEmpty": false,
+        "Example": [
+          {
+            "students_first_name": "Fatma",
+            "count_a_": 25
+          },
+          {
+            "students_first_name": "Kerem",
+            "count_a_": 30
+          }
+        ]
+      },
+      {
+        "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
+        "error": "Invalid JSON response: Npgsql.PostgresException (0x80004005): 42601: syntax error at or near \"ASC\"\n\nPOSITION: 208\n   at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, B"
+      }
+    ]
+  },
+  {
+    "dbType": "mssql",
+    "results": [
+      {
+        "dsl": "FETCH(first_name, COUNT(*)) FILTER(first_name CONTAINS 'm') FROM students GROUPBY(first_name) HAVING (COUNT(*) >= 25)",
+        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+        "same": true,
+        "isEmpty": false,
+        "Example": [
+          {
+            "students_first_name": "Ahmet",
+            "count_a_": 31
+          },
+          {
+            "students_first_name": "Emre",
+            "count_a_": 26
+          }
+        ]
+      },
+      {
+        "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
+        "error": "Invalid JSON response: Microsoft.Data.SqlClient.SqlException (0x80131904): Incorrect syntax near '*'.\n   at Microsoft.Data.SqlClient.SqlCommand.<>c.<ExecuteDbDataReaderAsync>b__195_0(Task`1 result)\n   at System.Threading.Ta"
+      }
+    ]
+  },
+  {
+    "dbType": "mysql",
+    "results": [
+      {
+        "dsl": "FETCH(first_name, COUNT(*)) FILTER(first_name CONTAINS 'm') FROM students GROUPBY(first_name) HAVING (COUNT(*) >= 25)",
+        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+        "same": true,
+        "isEmpty": false,
+        "Example": [
+          {
+            "students_first_name": "Cem",
+            "count_a_": 31
+          },
+          {
+            "students_first_name": "Ahmet",
+            "count_a_": 29
+          }
+        ]
+      },
+      {
+        "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
+        "error": "Invalid JSON response: MySql.Data.MySqlClient.MySqlException (0x80004005): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '* ASC' at lin"
+      }
+    ]
+  },
+  {
+    "dbType": "oracle",
+    "results": [
+      {
+        "dsl": "FETCH(first_name, COUNT(*)) FILTER(first_name CONTAINS 'm') FROM students GROUPBY(first_name) HAVING (COUNT(*) >= 25)",
+        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+        "same": true,
+        "isEmpty": false,
+        "Example": [
+          {
+            "STUDENTS_FIRST_NAME": "Ahmet",
+            "COUNT_A_": 27
+          },
+          {
+            "STUDENTS_FIRST_NAME": "Mehmet",
+            "COUNT_A_": 34
+          }
+        ]
+      },
+      {
+        "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
+        "error": "Invalid JSON response: Oracle.ManagedDataAccess.Client.OracleException (0x80004005): ORA-00936: missing expression\nhttps://docs.oracle.com/error-help/db/ora-00936/\n   at Oracle.ManagedDataAccess.Client.OracleCommand.<>c.<Ex"
+      }
+    ]
+  }
+]

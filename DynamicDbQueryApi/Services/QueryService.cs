@@ -60,8 +60,11 @@ namespace DynamicDbQueryApi.Services
 
             // İlişkili tablolardaki foreign keyleri bul ve IncludeModel'leri güncelle
             _logger.LogInformation("Initial Model: {Model}", JsonSerializer.Serialize(model));
-            var text = FilterPrinter.Dump(model.Filters);
-            Console.WriteLine("Filters:\n" + text);
+            var filtersText = FilterPrinter.Dump(model.Filters);
+            Console.WriteLine("Filters:\n" + filtersText);
+
+            var havingText = FilterPrinter.Dump(model.Having);
+            Console.WriteLine("Having:\n" + havingText);
 
             foreach (var include in model.Includes)
             {
@@ -76,6 +79,13 @@ namespace DynamicDbQueryApi.Services
             }
             _logger.LogInformation("Generated Model: {Model}", JsonSerializer.Serialize(model));
 
+            return new QueryResultDTO
+            {
+                Sql = "",
+                Data = new List<dynamic>(),
+                WrittenToOutputDb = false
+            };
+
             var sql = _sqlBuilderService.BuildSqlQuery(dbType, model);
             _logger.LogInformation("Generated SQL: {Sql}", sql);
 
@@ -84,7 +94,7 @@ namespace DynamicDbQueryApi.Services
             // Output db bilgilerini ayarla
             if (!string.IsNullOrEmpty(request.OutputDbType) &&
                 !string.IsNullOrEmpty(request.OutputConnectionString) &&
-                !string.IsNullOrEmpty(request.OutputTableName))
+                !string.IsNullOrEmpty(request.OutputTableName) && false)
             {
                 var outputContext = new DapperContext(request.OutputDbType, request.OutputConnectionString);
                 var outputDbType = request.OutputDbType.ToLower();
@@ -93,9 +103,11 @@ namespace DynamicDbQueryApi.Services
 
                 // Kolon aliaslarını al
                 Dictionary<string, string> columnAliases = model.Columns.ToDictionary(c => c.Expression, c => c.Alias ?? c.Expression);
+
                 // Input db'den kolonların data tiplerini al
                 Dictionary<string, string> columnDataTypes = await GetColumnDataTypesAsync(connection, outputDbType, model.Columns);
                 _logger.LogInformation("Column Data Types: {ColumnDataTypes}", JsonSerializer.Serialize(columnDataTypes));
+
                 // Eğer hedef db tipi farklı ise kolonların data tiplerini dönüştür
                 if (dbType != outputDbType)
                 {
