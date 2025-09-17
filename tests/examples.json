@@ -1,4 +1,13 @@
 [
+  {
+		"id": "recent_enrollments_30d",
+		"description": "Enrollments in last 30 days per school",
+		"dsl": "FETCH(sc.name, COUNT(e.id) AS recent_enrolls) FROM enrollments INCLUDE (student.class.school) FILTER(enrolled_at >= NOW() - INTERVAL '30 days') GROUPBY(sc.name) ORDERBY(recent_enrolls DESC)",
+		"postgres": "SELECT sc.name, COUNT(e.id) AS recent_enrolls FROM enrollments e JOIN students st ON st.id = e.student_id JOIN classes cl ON cl.id = st.class_id JOIN schools sc ON sc.id = cl.school_id WHERE e.enrolled_at >= NOW() - INTERVAL '30 days' GROUP BY sc.name ORDER BY recent_enrolls DESC",
+		"mysql": "SELECT sc.name, COUNT(e.id) AS recent_enrolls FROM enrollments e JOIN students st ON st.id = e.student_id JOIN classes cl ON cl.id = st.class_id JOIN schools sc ON sc.id = cl.school_id WHERE e.enrolled_at >= (NOW() - INTERVAL 30 DAY) GROUP BY sc.name ORDER BY recent_enrolls DESC",
+		"mssql": "SELECT sc.name, COUNT(e.id) AS recent_enrolls FROM enrollments e JOIN students st ON st.id = e.student_id JOIN classes cl ON cl.id = st.class_id JOIN schools sc ON sc.id = cl.school_id WHERE e.enrolled_at >= DATEADD(DAY, -30, SYSDATETIME()) GROUP BY sc.name ORDER BY recent_enrolls DESC",
+		"oracle": "SELECT sc.name, COUNT(e.id) recent_enrolls FROM enrollments e JOIN students st ON st.id = e.student_id JOIN classes cl ON cl.id = st.class_id JOIN schools sc ON sc.id = cl.school_id WHERE e.enrolled_at >= (SYSTIMESTAMP - INTERVAL '30' DAY) GROUP BY sc.name ORDER BY recent_enrolls DESC"
+	},
 	{
 		"id": "agg_having_firstname_m",
 		"description": "Count students by first_name containing 'm' (case-insensitive), only buckets >= 20",
@@ -20,20 +29,11 @@
 	{
 		"id": "json_zone_school_counts",
 		"description": "Schools per metadata.zone (JSON) with > 1 school",
-		"dsl": "FETCH(metadata.zone, COUNT(*) AS school_count) FROM schools GROUPBY(metadata.zone) HAVING(COUNT(*) > 1) ORDERBY(school_count DESC)",
+		"dsl": "FETCH(metadata, COUNT(*) AS school_count) FROM schools GROUPBY(metadata) HAVING(COUNT(*) > 1) ORDERBY(school_count DESC)",
 		"postgres": "SELECT (metadata->>'zone') AS zone, COUNT(*) AS school_count FROM schools GROUP BY zone HAVING COUNT(*) > 1 ORDER BY school_count DESC",
 		"mysql": "SELECT JSON_UNQUOTE(JSON_EXTRACT(metadata,'$.zone')) AS zone, COUNT(*) AS school_count FROM schools GROUP BY zone HAVING COUNT(*) > 1 ORDER BY school_count DESC",
 		"mssql": "SELECT JSON_VALUE(metadata,'$.zone') AS zone, COUNT(*) AS school_count FROM schools GROUP BY JSON_VALUE(metadata,'$.zone') HAVING COUNT(*) > 1 ORDER BY school_count DESC",
 		"oracle": "SELECT JSON_VALUE(metadata,'$.zone') AS zone, COUNT(*) AS school_count FROM schools GROUP BY JSON_VALUE(metadata,'$.zone') HAVING COUNT(*) > 1 ORDER BY school_count DESC"
-	},
-	{
-		"id": "recent_enrollments_30d",
-		"description": "Enrollments in last 30 days per school",
-		"dsl": "FETCH(sc.name, COUNT(e.id) AS recent_enrolls) FROM enrollments INCLUDE (student.class.school) FILTER(enrolled_at >= NOW() - INTERVAL '30 days') GROUPBY(sc.name) ORDERBY(recent_enrolls DESC)",
-		"postgres": "SELECT sc.name, COUNT(e.id) AS recent_enrolls FROM enrollments e JOIN students st ON st.id = e.student_id JOIN classes cl ON cl.id = st.class_id JOIN schools sc ON sc.id = cl.school_id WHERE e.enrolled_at >= NOW() - INTERVAL '30 days' GROUP BY sc.name ORDER BY recent_enrolls DESC",
-		"mysql": "SELECT sc.name, COUNT(e.id) AS recent_enrolls FROM enrollments e JOIN students st ON st.id = e.student_id JOIN classes cl ON cl.id = st.class_id JOIN schools sc ON sc.id = cl.school_id WHERE e.enrolled_at >= (NOW() - INTERVAL 30 DAY) GROUP BY sc.name ORDER BY recent_enrolls DESC",
-		"mssql": "SELECT sc.name, COUNT(e.id) AS recent_enrolls FROM enrollments e JOIN students st ON st.id = e.student_id JOIN classes cl ON cl.id = st.class_id JOIN schools sc ON sc.id = cl.school_id WHERE e.enrolled_at >= DATEADD(DAY, -30, SYSDATETIME()) GROUP BY sc.name ORDER BY recent_enrolls DESC",
-		"oracle": "SELECT sc.name, COUNT(e.id) recent_enrolls FROM enrollments e JOIN students st ON st.id = e.student_id JOIN classes cl ON cl.id = st.class_id JOIN schools sc ON sc.id = cl.school_id WHERE e.enrolled_at >= (SYSTIMESTAMP - INTERVAL '30' DAY) GROUP BY sc.name ORDER BY recent_enrolls DESC"
 	},
 	{
 		"id": "top5_schools_by_students",

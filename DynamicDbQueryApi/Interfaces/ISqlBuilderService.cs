@@ -11,7 +11,7 @@ namespace DynamicDbQueryApi.Interfaces
     public interface ISqlBuilderService
     {
         string BuildSqlQuery(string dbType, QueryModel model);
-        string ConvertFilterToSql(FilterModel filter);
+        string ConvertFilterToSql(string dbType, FilterModel filter);
         string BuildCreateTableSql(string tableName, Dictionary<string, string> columnDataTypes, Dictionary<string, string> columnAliases);
         string BuildAlterTableAddColumnSql(string dbType, string tableName, string columnName, string dataType);
     }

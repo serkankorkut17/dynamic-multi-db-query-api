@@ -19,6 +19,7 @@
 	],
 	"queries": [
 		{
+			"id": 1,
 			"dsl": "FETCH(first_name, COUNT(*)) FILTER(first_name CONTAINS 'm') FROM students GROUPBY(first_name) HAVING (COUNT(*) >= 25)",
 			"postgres": "SELECT students.first_name, COUNT(*) FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
 			"mssql": "SELECT students.first_name, COUNT(*) FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
@@ -26,11 +27,76 @@
 			"oracle": "SELECT students.first_name, COUNT(*) FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25"
 		},
 		{
+			"id": 2,
 			"dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
 			"postgres": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
 			"mysql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
 			"mssql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
 			"oracle": "SELECT s.first_name, COUNT(*) cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC"
+		},
+		{
+			"id": 3,
+			"dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
+			"postgres": "SELECT c.name, ROUND(AVG(e.progress_percent)::numeric,2) avg_progress, COUNT(*) enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+			"mysql": "SELECT c.name, ROUND(AVG(e.progress_percent),2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+			"mssql": "SELECT c.name, ROUND(AVG(CAST(e.progress_percent AS FLOAT)),2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+			"oracle": "SELECT c.name, ROUND(AVG(e.progress_percent),2) avg_progress, COUNT(*) enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC"
+		},
+		{
+			"id": 4,
+			"dsl": "FETCH(id, student_id, course_id, progress_percent) FROM enrollments FILTER(progress_percent >= 40 AND progress_percent <= 60) ORDERBY(progress_percent ASC) LIMIT(30)",
+			"postgres": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent >= 40 AND progress_percent <= 60 ORDER BY progress_percent ASC LIMIT 30",
+			"mysql": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent >= 40 AND progress_percent <= 60 ORDER BY progress_percent ASC LIMIT 30",
+			"mssql": "SELECT TOP 30 id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent >= 40 AND progress_percent <= 60 ORDER BY progress_percent ASC",
+			"oracle": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent >= 40 AND progress_percent <= 60 ORDER BY progress_percent ASC FETCH FIRST 30 ROWS ONLY"
+		},
+		{
+			"id": 5,
+			"dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email != NULL) ORDERBY(id ASC) LIMIT(20)",
+			"postgres": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC LIMIT 20",
+			"mysql": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC LIMIT 20",
+			"mssql": "SELECT TOP 20 id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC",
+			"oracle": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 6,
+			"dsl": "FETCH(id, first_name, last_name, gpa) FROM students FILTER(is_active = TRUE AND gpa >= 3.5) ORDERBY(gpa DESC) LIMIT(15)",
+			"postgres": "SELECT id, first_name, last_name, gpa FROM students WHERE is_active = TRUE AND gpa >= 3.5 ORDER BY gpa DESC LIMIT 15",
+			"mysql": "SELECT id, first_name, last_name, gpa FROM students WHERE is_active = 1 AND gpa >= 3.5 ORDER BY gpa DESC LIMIT 15",
+			"mssql": "SELECT TOP 15 id, first_name, last_name, gpa FROM students WHERE is_active = 1 AND gpa >= 3.5 ORDER BY gpa DESC",
+			"oracle": "SELECT id, first_name, last_name, gpa FROM students WHERE is_active = 1 AND gpa >= 3.5 ORDER BY gpa DESC FETCH FIRST 15 ROWS ONLY"
+		},
+		{
+			"id": 7,
+			"dsl": "FETCH(school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary) FROM teachers GROUPBY(school_id) HAVING(COUNT(*) > 2) ORDERBY(avg_salary DESC)",
+			"postgres": "SELECT school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary FROM teachers GROUP BY school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+			"mysql": "SELECT school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary FROM teachers GROUP BY school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+			"mssql": "SELECT school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary FROM teachers GROUP BY school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+			"oracle": "SELECT school_id, AVG(salary) avg_salary, MIN(salary) min_salary, MAX(salary) max_salary FROM teachers GROUP BY school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC"
+		},
+		{
+			"id": 8,
+			"dsl": "FETCH(id, name, COUNT(students.id) AS student_count) FROM classes INCLUDE(students) GROUPBY(id, name) HAVING(COUNT(students.id) >= 20) ORDERBY(student_count DESC)",
+			"postgres": "SELECT cl.id, cl.name, COUNT(st.id) AS student_count FROM classes cl LEFT JOIN students st ON st.class_id = cl.id GROUP BY cl.id, cl.name HAVING COUNT(st.id) >= 20 ORDER BY student_count DESC",
+			"mysql": "SELECT cl.id, cl.name, COUNT(st.id) AS student_count FROM classes cl LEFT JOIN students st ON st.class_id = cl.id GROUP BY cl.id, cl.name HAVING COUNT(st.id) >= 20 ORDER BY student_count DESC",
+			"mssql": "SELECT cl.id, cl.name, COUNT(st.id) AS student_count FROM classes cl LEFT JOIN students st ON st.class_id = cl.id GROUP BY cl.id, cl.name HAVING COUNT(st.id) >= 20 ORDER BY student_count DESC",
+			"oracle": "SELECT cl.id, cl.name, COUNT(st.id) student_count FROM classes cl LEFT JOIN students st ON st.class_id = cl.id GROUP BY cl.id, cl.name HAVING COUNT(st.id) >= 20 ORDER BY student_count DESC"
+		},
+		{
+			"id": 9,
+			"dsl": "FETCH(id, first_name, last_name, email) FROM students FILTER(is_active = TRUE AND email CONTAINS '@' AND email ENDSWITH '.tr') ORDERBY(last_name ASC, first_name ASC) LIMIT(20)",
+			"postgres": "SELECT id, first_name, last_name, email FROM students WHERE is_active = TRUE AND email LIKE '%@%' AND email LIKE '%.tr' ORDER BY last_name, first_name LIMIT 20",
+			"mysql": "SELECT id, first_name, last_name, email FROM students WHERE is_active = 1 AND email LIKE '%@%' AND email LIKE '%.tr' ORDER BY last_name, first_name LIMIT 20",
+			"mssql": "SELECT TOP 20 id, first_name, last_name, email FROM students WHERE is_active = 1 AND email LIKE '%@%' AND email LIKE '%.tr' ORDER BY last_name, first_name",
+			"oracle": "SELECT id, first_name, last_name, email FROM students WHERE is_active = 1 AND email LIKE '%@%' AND email LIKE '%.tr' ORDER BY last_name, first_name FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 10,
+			"dsl": "FETCH(id, student_id, course_id, progress_percent) FROM enrollments FILTER(progress_percent < 20 OR progress_percent > 80) ORDERBY(progress_percent DESC) LIMIT(25)",
+			"postgres": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent < 20 OR progress_percent > 80 ORDER BY progress_percent DESC LIMIT 25",
+			"mysql": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent < 20 OR progress_percent > 80 ORDER BY progress_percent DESC LIMIT 25",
+			"mssql": "SELECT TOP 25 id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent < 20 OR progress_percent > 80 ORDER BY progress_percent DESC",
+			"oracle": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent < 20 OR progress_percent > 80 ORDER BY progress_percent DESC FETCH FIRST 25 ROWS ONLY"
 		}
 	]
 }

@@ -59,11 +59,11 @@ async function run() {
 	const cfg = loadConfig();
 	const results = [];
 	let hasDiff = false;
-	let isEmpty = false;
 
 	for (const db of cfg.databases) {
     const dbResults = [];
 		let dbType = db.dbType;
+    let isEmpty = false;
 		let connectionString = db.connectionString;
 		console.log(`\nTesting database: ${dbType}`);
 		for (const q of cfg.queries) {
@@ -108,16 +108,21 @@ async function run() {
 				const same = JSON.stringify(dslValues) === JSON.stringify(sqlValues);
 				if (!same) hasDiff = true;
 
+        // first 5 normDsl
+        dsl5 = normDsl.slice(0, 5);
+        sql5 = normSql.slice(0, 5);
+
 				// if (!same) hasDiff = true;
 				dbResults.push({
 					dsl: q.dsl,
-					sql: q.query,
+					sql: q[dbType],
 					convertedSql,
 					same,
 					isEmpty,
-					Example: same ? normDsl : { dsl: normDsl, sql: normSql },
+					Example: same ? {Result: dsl5} : { dsl: dsl5, sql: sql5 },
 				});
-				console.log(`Query DSL vs SQL -> ${same ? "OK" : "DIFF"}`);
+        let queryNo = cfg.queries.indexOf(q) + 1;
+				console.log(`Query #${queryNo} DSL vs SQL -> ${same ? "OK" : "DIFF"}`);
 				if (isEmpty) {
 					console.warn("  Warning: One of the results is empty!");
 				}

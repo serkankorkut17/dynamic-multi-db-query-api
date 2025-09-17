@@ -79,15 +79,16 @@ namespace DynamicDbQueryApi.Services
             }
             _logger.LogInformation("Generated Model: {Model}", JsonSerializer.Serialize(model));
 
-            return new QueryResultDTO
-            {
-                Sql = "",
-                Data = new List<dynamic>(),
-                WrittenToOutputDb = false
-            };
 
             var sql = _sqlBuilderService.BuildSqlQuery(dbType, model);
             _logger.LogInformation("Generated SQL: {Sql}", sql);
+
+            // return new QueryResultDTO
+            // {
+            //     Sql = sql,
+            //     Data = new List<dynamic>(),
+            //     WrittenToOutputDb = false
+            // };
 
             var data = await connection.QueryAsync(sql);
 
@@ -165,9 +166,12 @@ namespace DynamicDbQueryApi.Services
                     }
 
                     await outputConnection.ExecuteAsync(insertSql, dp);
+                    outputConnection.Close();
                 }
             }
 
+            // bağlantıyı kapat
+            connection.Close();
             return new QueryResultDTO
             {
                 Sql = sql,

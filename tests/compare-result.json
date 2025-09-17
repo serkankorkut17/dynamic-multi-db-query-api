@@ -4,23 +4,284 @@
     "results": [
       {
         "dsl": "FETCH(first_name, COUNT(*)) FILTER(first_name CONTAINS 'm') FROM students GROUPBY(first_name) HAVING (COUNT(*) >= 25)",
-        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+        "sql": "SELECT students.first_name, COUNT(*) FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
         "same": true,
         "isEmpty": false,
-        "Example": [
-          {
-            "students_first_name": "Fatma",
-            "count_a_": 25
-          },
-          {
-            "students_first_name": "Kerem",
-            "count_a_": 30
-          }
-        ]
+        "Example": {
+          "Result": [
+            {
+              "students_first_name": "Fatma",
+              "count_a_": 25
+            },
+            {
+              "students_first_name": "Kerem",
+              "count_a_": 30
+            }
+          ]
+        }
       },
       {
         "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
-        "error": "Invalid JSON response: Npgsql.PostgresException (0x80004005): 42601: syntax error at or near \"ASC\"\n\nPOSITION: 208\n   at Npgsql.Internal.NpgsqlConnector.ReadMessageLong(Boolean async, DataRowLoadingMode dataRowLoadingMode, B"
+        "sql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE LOWER(first_name) LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 20 ORDER BY COUNT(*) DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "students_first_name": "Kerem",
+              "count_a_": 30
+            },
+            {
+              "students_first_name": "Fatma",
+              "count_a_": 25
+            },
+            {
+              "students_first_name": "Emre",
+              "count_a_": 21
+            },
+            {
+              "students_first_name": "Merve",
+              "count_a_": 21
+            },
+            {
+              "students_first_name": "Umut",
+              "count_a_": 20
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
+        "sql": "SELECT c.name, ROUND(AVG(e.progress_percent)::numeric,2) avg_progress, COUNT(*) enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+        "convertedSql": "SELECT courses.name AS courses_name, ROUND(AVG(enrollments.progress_percent)::numeric, 2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments LEFT JOIN courses ON enrollments.course_id = courses.id GROUP BY courses.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "courses_name": "Biyoloji",
+              "avg_progress": 55.12,
+              "enrolls": 101
+            },
+            {
+              "courses_name": "Bilgisayar Bilimi",
+              "avg_progress": 53.04,
+              "enrolls": 123
+            },
+            {
+              "courses_name": "Müzik",
+              "avg_progress": 52.9,
+              "enrolls": 144
+            },
+            {
+              "courses_name": "Din Kültürü",
+              "avg_progress": 51.75,
+              "enrolls": 150
+            },
+            {
+              "courses_name": "Coğrafya",
+              "avg_progress": 50.85,
+              "enrolls": 187
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, student_id, course_id, progress_percent) FROM enrollments FILTER(progress_percent >= 40 AND progress_percent <= 60) ORDERBY(progress_percent ASC) LIMIT(30)",
+        "sql": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent >= 40 AND progress_percent <= 60 ORDER BY progress_percent ASC LIMIT 30",
+        "convertedSql": "SELECT enrollments.id AS enrollments_id, enrollments.student_id AS enrollments_student_id, enrollments.course_id AS enrollments_course_id, enrollments.progress_percent AS enrollments_progress_percent FROM enrollments WHERE (progress_percent >= 40 AND progress_percent <= 60) ORDER BY enrollments.progress_percent ASC LIMIT 30 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "enrollments_id": 1109,
+              "enrollments_student_id": 278,
+              "enrollments_course_id": 20,
+              "enrollments_progress_percent": 40
+            },
+            {
+              "enrollments_id": 1039,
+              "enrollments_student_id": 260,
+              "enrollments_course_id": 17,
+              "enrollments_progress_percent": 40
+            },
+            {
+              "enrollments_id": 1132,
+              "enrollments_student_id": 283,
+              "enrollments_course_id": 41,
+              "enrollments_progress_percent": 40.1
+            },
+            {
+              "enrollments_id": 1348,
+              "enrollments_student_id": 337,
+              "enrollments_course_id": 34,
+              "enrollments_progress_percent": 40.1
+            },
+            {
+              "enrollments_id": 1965,
+              "enrollments_student_id": 492,
+              "enrollments_course_id": 20,
+              "enrollments_progress_percent": 40.2
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email != NULL) ORDERBY(id ASC) LIMIT(20)",
+        "sql": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC LIMIT 20",
+        "convertedSql": "SELECT students.id AS students_id, students.first_name AS students_first_name, students.last_name AS students_last_name FROM students WHERE email IS NOT NULL ORDER BY students.id ASC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "students_id": 1,
+              "students_first_name": "Hakan",
+              "students_last_name": "Avcı"
+            },
+            {
+              "students_id": 2,
+              "students_first_name": "Seda",
+              "students_last_name": "Özdemir"
+            },
+            {
+              "students_id": 3,
+              "students_first_name": "Hakan",
+              "students_last_name": "Bozkurt"
+            },
+            {
+              "students_id": 4,
+              "students_first_name": "Şevval",
+              "students_last_name": "Avcı"
+            },
+            {
+              "students_id": 5,
+              "students_first_name": "Umut",
+              "students_last_name": "Çelik"
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, first_name, last_name, gpa) FROM students FILTER(is_active = TRUE AND gpa >= 3.5) ORDERBY(gpa DESC) LIMIT(15)",
+        "sql": "SELECT id, first_name, last_name, gpa FROM students WHERE is_active = TRUE AND gpa >= 3.5 ORDER BY gpa DESC LIMIT 15",
+        "convertedSql": "SELECT students.id AS students_id, students.first_name AS students_first_name, students.last_name AS students_last_name, students.gpa AS students_gpa FROM students WHERE (is_active = TRUE AND gpa >= 3.5) ORDER BY students.gpa DESC LIMIT 15 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "students_id": 375,
+              "students_first_name": "Fatma",
+              "students_last_name": "Işık",
+              "students_gpa": 4
+            },
+            {
+              "students_id": 186,
+              "students_first_name": "Fatma",
+              "students_last_name": "Turan",
+              "students_gpa": 3.99
+            },
+            {
+              "students_id": 533,
+              "students_first_name": "Ece",
+              "students_last_name": "Kaya",
+              "students_gpa": 3.99
+            },
+            {
+              "students_id": 206,
+              "students_first_name": "Mehmet",
+              "students_last_name": "Demir",
+              "students_gpa": 3.98
+            },
+            {
+              "students_id": 510,
+              "students_first_name": "Murat",
+              "students_last_name": "Yıldırım",
+              "students_gpa": 3.98
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary) FROM teachers GROUPBY(school_id) HAVING(COUNT(*) > 2) ORDERBY(avg_salary DESC)",
+        "sql": "SELECT school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary FROM teachers GROUP BY school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+        "convertedSql": "SELECT teachers.school_id AS teachers_school_id, AVG(teachers.salary) AS avg_salary, MIN(teachers.salary) AS min_salary, MAX(teachers.salary) AS max_salary FROM teachers GROUP BY teachers.school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "teachers_school_id": 4,
+              "avg_salary": 59895.575,
+              "min_salary": 41957.93,
+              "max_salary": 69429.73
+            },
+            {
+              "teachers_school_id": 5,
+              "avg_salary": 54607.42375,
+              "min_salary": 42135.23,
+              "max_salary": 69337.12
+            },
+            {
+              "teachers_school_id": 2,
+              "avg_salary": 50597.155,
+              "min_salary": 40300.21,
+              "max_salary": 60082.03
+            },
+            {
+              "teachers_school_id": 1,
+              "avg_salary": 50337.19875,
+              "min_salary": 40088.43,
+              "max_salary": 61580.36
+            },
+            {
+              "teachers_school_id": 3,
+              "avg_salary": 49572.31625,
+              "min_salary": 41656.65,
+              "max_salary": 56480.27
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, name, COUNT(students.id) AS student_count) FROM classes INCLUDE(students) GROUPBY(id, name) HAVING(COUNT(students.id) >= 20) ORDERBY(student_count DESC)",
+        "sql": "SELECT cl.id, cl.name, COUNT(st.id) AS student_count FROM classes cl LEFT JOIN students st ON st.class_id = cl.id GROUP BY cl.id, cl.name HAVING COUNT(st.id) >= 20 ORDER BY student_count DESC",
+        "convertedSql": "SELECT classes.id AS classes_id, classes.name AS classes_name, COUNT(students.id) AS student_count FROM classes LEFT JOIN students ON classes.id = students.class_id GROUP BY classes.id, classes.name HAVING COUNT(students.id) >= 20 ORDER BY student_count DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "classes_id": 22,
+              "classes_name": "5-B Sınıfı",
+              "student_count": 20
+            },
+            {
+              "classes_id": 19,
+              "classes_name": "9-A Sınıfı",
+              "student_count": 20
+            },
+            {
+              "classes_id": 10,
+              "classes_name": "10-F Sınıfı",
+              "student_count": 20
+            },
+            {
+              "classes_id": 13,
+              "classes_name": "6-G Sınıfı",
+              "student_count": 20
+            },
+            {
+              "classes_id": 2,
+              "classes_name": "7-E Sınıfı",
+              "student_count": 20
+            }
+          ]
+        }
       }
     ]
   },
@@ -29,23 +290,284 @@
     "results": [
       {
         "dsl": "FETCH(first_name, COUNT(*)) FILTER(first_name CONTAINS 'm') FROM students GROUPBY(first_name) HAVING (COUNT(*) >= 25)",
-        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+        "sql": "SELECT students.first_name, COUNT(*) FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
         "same": true,
         "isEmpty": false,
-        "Example": [
-          {
-            "students_first_name": "Ahmet",
-            "count_a_": 31
-          },
-          {
-            "students_first_name": "Emre",
-            "count_a_": 26
-          }
-        ]
+        "Example": {
+          "Result": [
+            {
+              "students_first_name": "Ahmet",
+              "count_a_": 31
+            },
+            {
+              "students_first_name": "Emre",
+              "count_a_": 26
+            }
+          ]
+        }
       },
       {
         "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
-        "error": "Invalid JSON response: Microsoft.Data.SqlClient.SqlException (0x80131904): Incorrect syntax near '*'.\n   at Microsoft.Data.SqlClient.SqlCommand.<>c.<ExecuteDbDataReaderAsync>b__195_0(Task`1 result)\n   at System.Threading.Ta"
+        "sql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE LOWER(first_name) LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 20 ORDER BY COUNT(*) DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "students_first_name": "Ahmet",
+              "count_a_": 31
+            },
+            {
+              "students_first_name": "Emre",
+              "count_a_": 26
+            },
+            {
+              "students_first_name": "Mehmet",
+              "count_a_": 24
+            },
+            {
+              "students_first_name": "Fatma",
+              "count_a_": 23
+            },
+            {
+              "students_first_name": "Sinem",
+              "count_a_": 23
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
+        "sql": "SELECT c.name, ROUND(AVG(CAST(e.progress_percent AS FLOAT)),2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+        "convertedSql": "SELECT courses.name AS courses_name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments LEFT JOIN courses ON enrollments.course_id = courses.id GROUP BY courses.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "courses_name": "Felsefe",
+              "avg_progress": 54.97,
+              "enrolls": 92
+            },
+            {
+              "courses_name": "Kimya",
+              "avg_progress": 54.54,
+              "enrolls": 94
+            },
+            {
+              "courses_name": "Almanca",
+              "avg_progress": 54,
+              "enrolls": 175
+            },
+            {
+              "courses_name": "Din Kültürü",
+              "avg_progress": 52.08,
+              "enrolls": 253
+            },
+            {
+              "courses_name": "Tarih",
+              "avg_progress": 51.98,
+              "enrolls": 133
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, student_id, course_id, progress_percent) FROM enrollments FILTER(progress_percent >= 40 AND progress_percent <= 60) ORDERBY(progress_percent ASC) LIMIT(30)",
+        "sql": "SELECT TOP 30 id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent >= 40 AND progress_percent <= 60 ORDER BY progress_percent ASC",
+        "convertedSql": "SELECT enrollments.id AS enrollments_id, enrollments.student_id AS enrollments_student_id, enrollments.course_id AS enrollments_course_id, enrollments.progress_percent AS enrollments_progress_percent FROM enrollments WHERE (progress_percent >= 40 AND progress_percent <= 60) ORDER BY enrollments.progress_percent ASC OFFSET 0 ROWS FETCH NEXT 30 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "enrollments_id": 275,
+              "enrollments_student_id": 69,
+              "enrollments_course_id": 16,
+              "enrollments_progress_percent": 40
+            },
+            {
+              "enrollments_id": 494,
+              "enrollments_student_id": 124,
+              "enrollments_course_id": 15,
+              "enrollments_progress_percent": 40
+            },
+            {
+              "enrollments_id": 1196,
+              "enrollments_student_id": 299,
+              "enrollments_course_id": 1,
+              "enrollments_progress_percent": 40
+            },
+            {
+              "enrollments_id": 1738,
+              "enrollments_student_id": 435,
+              "enrollments_course_id": 46,
+              "enrollments_progress_percent": 40
+            },
+            {
+              "enrollments_id": 1025,
+              "enrollments_student_id": 257,
+              "enrollments_course_id": 42,
+              "enrollments_progress_percent": 40.1
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email != NULL) ORDERBY(id ASC) LIMIT(20)",
+        "sql": "SELECT TOP 20 id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC",
+        "convertedSql": "SELECT students.id AS students_id, students.first_name AS students_first_name, students.last_name AS students_last_name FROM students WHERE email IS NOT NULL ORDER BY students.id ASC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "students_id": 1,
+              "students_first_name": "Merve",
+              "students_last_name": "Demir"
+            },
+            {
+              "students_id": 2,
+              "students_first_name": "Kerem",
+              "students_last_name": "Doğan"
+            },
+            {
+              "students_id": 3,
+              "students_first_name": "Can",
+              "students_last_name": "Aydın"
+            },
+            {
+              "students_id": 4,
+              "students_first_name": "Mehmet",
+              "students_last_name": "Işık"
+            },
+            {
+              "students_id": 5,
+              "students_first_name": "Yusuf",
+              "students_last_name": "Güneş"
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, first_name, last_name, gpa) FROM students FILTER(is_active = TRUE AND gpa >= 3.5) ORDERBY(gpa DESC) LIMIT(15)",
+        "sql": "SELECT TOP 15 id, first_name, last_name, gpa FROM students WHERE is_active = 1 AND gpa >= 3.5 ORDER BY gpa DESC",
+        "convertedSql": "SELECT students.id AS students_id, students.first_name AS students_first_name, students.last_name AS students_last_name, students.gpa AS students_gpa FROM students WHERE (is_active = 1 AND gpa >= 3.5) ORDER BY students.gpa DESC OFFSET 0 ROWS FETCH NEXT 15 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "students_id": 98,
+              "students_first_name": "Ece",
+              "students_last_name": "Koç",
+              "students_gpa": 3.99
+            },
+            {
+              "students_id": 106,
+              "students_first_name": "Deniz",
+              "students_last_name": "Yılmaz",
+              "students_gpa": 3.99
+            },
+            {
+              "students_id": 266,
+              "students_first_name": "Emre",
+              "students_last_name": "Avcı",
+              "students_gpa": 3.99
+            },
+            {
+              "students_id": 295,
+              "students_first_name": "Gamze",
+              "students_last_name": "Demir",
+              "students_gpa": 3.99
+            },
+            {
+              "students_id": 424,
+              "students_first_name": "Hakan",
+              "students_last_name": "Aydın",
+              "students_gpa": 3.99
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary) FROM teachers GROUPBY(school_id) HAVING(COUNT(*) > 2) ORDERBY(avg_salary DESC)",
+        "sql": "SELECT school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary FROM teachers GROUP BY school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+        "convertedSql": "SELECT teachers.school_id AS teachers_school_id, AVG(teachers.salary) AS avg_salary, MIN(teachers.salary) AS min_salary, MAX(teachers.salary) AS max_salary FROM teachers GROUP BY teachers.school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "teachers_school_id": 5,
+              "avg_salary": 56145.91875,
+              "min_salary": 45310.23,
+              "max_salary": 66481.36
+            },
+            {
+              "teachers_school_id": 4,
+              "avg_salary": 54827.165,
+              "min_salary": 40421.69,
+              "max_salary": 66736.17
+            },
+            {
+              "teachers_school_id": 2,
+              "avg_salary": 54768.53875,
+              "min_salary": 41633.18,
+              "max_salary": 69924.92
+            },
+            {
+              "teachers_school_id": 1,
+              "avg_salary": 53707.13,
+              "min_salary": 40880.23,
+              "max_salary": 67051.59
+            },
+            {
+              "teachers_school_id": 3,
+              "avg_salary": 51540.485,
+              "min_salary": 40847.05,
+              "max_salary": 62354.43
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, name, COUNT(students.id) AS student_count) FROM classes INCLUDE(students) GROUPBY(id, name) HAVING(COUNT(students.id) >= 20) ORDERBY(student_count DESC)",
+        "sql": "SELECT cl.id, cl.name, COUNT(st.id) AS student_count FROM classes cl LEFT JOIN students st ON st.class_id = cl.id GROUP BY cl.id, cl.name HAVING COUNT(st.id) >= 20 ORDER BY student_count DESC",
+        "convertedSql": "SELECT classes.id AS classes_id, classes.name AS classes_name, COUNT(students.id) AS student_count FROM classes LEFT JOIN students ON classes.id = students.class_id GROUP BY classes.id, classes.name HAVING COUNT(students.id) >= 20 ORDER BY student_count DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "classes_id": 1,
+              "classes_name": "4-G Sınıfı",
+              "student_count": 20
+            },
+            {
+              "classes_id": 2,
+              "classes_name": "4-D Sınıfı",
+              "student_count": 20
+            },
+            {
+              "classes_id": 3,
+              "classes_name": "1-G Sınıfı",
+              "student_count": 20
+            },
+            {
+              "classes_id": 4,
+              "classes_name": "4-E Sınıfı",
+              "student_count": 20
+            },
+            {
+              "classes_id": 5,
+              "classes_name": "12-G Sınıfı",
+              "student_count": 20
+            }
+          ]
+        }
       }
     ]
   },
@@ -54,23 +576,284 @@
     "results": [
       {
         "dsl": "FETCH(first_name, COUNT(*)) FILTER(first_name CONTAINS 'm') FROM students GROUPBY(first_name) HAVING (COUNT(*) >= 25)",
-        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+        "sql": "SELECT students.first_name, COUNT(*) FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
         "same": true,
         "isEmpty": false,
-        "Example": [
-          {
-            "students_first_name": "Cem",
-            "count_a_": 31
-          },
-          {
-            "students_first_name": "Ahmet",
-            "count_a_": 29
-          }
-        ]
+        "Example": {
+          "Result": [
+            {
+              "students_first_name": "Cem",
+              "count_a_": 31
+            },
+            {
+              "students_first_name": "Ahmet",
+              "count_a_": 29
+            }
+          ]
+        }
       },
       {
         "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
-        "error": "Invalid JSON response: MySql.Data.MySqlClient.MySqlException (0x80004005): You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near '* ASC' at lin"
+        "sql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE LOWER(first_name) LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 20 ORDER BY COUNT(*) DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "students_first_name": "Cem",
+              "count_a_": 31
+            },
+            {
+              "students_first_name": "Ahmet",
+              "count_a_": 29
+            },
+            {
+              "students_first_name": "Umut",
+              "count_a_": 23
+            },
+            {
+              "students_first_name": "Mehmet",
+              "count_a_": 22
+            },
+            {
+              "students_first_name": "Sinem",
+              "count_a_": 21
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
+        "sql": "SELECT c.name, ROUND(AVG(e.progress_percent),2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+        "convertedSql": "SELECT courses.name AS courses_name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments LEFT JOIN courses ON enrollments.course_id = courses.id GROUP BY courses.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "courses_name": "Türk Dili ve Edebiyatı",
+              "avg_progress": 53.37,
+              "enrolls": 98
+            },
+            {
+              "courses_name": "Almanca",
+              "avg_progress": 53.24,
+              "enrolls": 136
+            },
+            {
+              "courses_name": "Kimya",
+              "avg_progress": 52.32,
+              "enrolls": 213
+            },
+            {
+              "courses_name": "Din Kültürü",
+              "avg_progress": 52,
+              "enrolls": 141
+            },
+            {
+              "courses_name": "Müzik",
+              "avg_progress": 51.44,
+              "enrolls": 122
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, student_id, course_id, progress_percent) FROM enrollments FILTER(progress_percent >= 40 AND progress_percent <= 60) ORDERBY(progress_percent ASC) LIMIT(30)",
+        "sql": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent >= 40 AND progress_percent <= 60 ORDER BY progress_percent ASC LIMIT 30",
+        "convertedSql": "SELECT enrollments.id AS enrollments_id, enrollments.student_id AS enrollments_student_id, enrollments.course_id AS enrollments_course_id, enrollments.progress_percent AS enrollments_progress_percent FROM enrollments WHERE (progress_percent >= 40 AND progress_percent <= 60) ORDER BY enrollments.progress_percent ASC LIMIT 30 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "enrollments_id": 1950,
+              "enrollments_student_id": 488,
+              "enrollments_course_id": 2,
+              "enrollments_progress_percent": 40.1
+            },
+            {
+              "enrollments_id": 123,
+              "enrollments_student_id": 31,
+              "enrollments_course_id": 40,
+              "enrollments_progress_percent": 40.2
+            },
+            {
+              "enrollments_id": 1826,
+              "enrollments_student_id": 457,
+              "enrollments_course_id": 36,
+              "enrollments_progress_percent": 40.4
+            },
+            {
+              "enrollments_id": 1441,
+              "enrollments_student_id": 361,
+              "enrollments_course_id": 1,
+              "enrollments_progress_percent": 40.4
+            },
+            {
+              "enrollments_id": 1458,
+              "enrollments_student_id": 365,
+              "enrollments_course_id": 41,
+              "enrollments_progress_percent": 40.4
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email != NULL) ORDERBY(id ASC) LIMIT(20)",
+        "sql": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC LIMIT 20",
+        "convertedSql": "SELECT students.id AS students_id, students.first_name AS students_first_name, students.last_name AS students_last_name FROM students WHERE email IS NOT NULL ORDER BY students.id ASC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "students_id": 1,
+              "students_first_name": "Emre",
+              "students_last_name": "Doğan"
+            },
+            {
+              "students_id": 2,
+              "students_first_name": "Mehmet",
+              "students_last_name": "Erdem"
+            },
+            {
+              "students_id": 3,
+              "students_first_name": "Deniz",
+              "students_last_name": "Koç"
+            },
+            {
+              "students_id": 4,
+              "students_first_name": "Zeynep",
+              "students_last_name": "Bulut"
+            },
+            {
+              "students_id": 5,
+              "students_first_name": "Can",
+              "students_last_name": "Erdoğan"
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, first_name, last_name, gpa) FROM students FILTER(is_active = TRUE AND gpa >= 3.5) ORDERBY(gpa DESC) LIMIT(15)",
+        "sql": "SELECT id, first_name, last_name, gpa FROM students WHERE is_active = 1 AND gpa >= 3.5 ORDER BY gpa DESC LIMIT 15",
+        "convertedSql": "SELECT students.id AS students_id, students.first_name AS students_first_name, students.last_name AS students_last_name, students.gpa AS students_gpa FROM students WHERE (is_active = 1 AND gpa >= 3.5) ORDER BY students.gpa DESC LIMIT 15 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "students_id": 101,
+              "students_first_name": "Can",
+              "students_last_name": "Kurt",
+              "students_gpa": 4
+            },
+            {
+              "students_id": 593,
+              "students_first_name": "Ayşe",
+              "students_last_name": "Aslan",
+              "students_gpa": 4
+            },
+            {
+              "students_id": 206,
+              "students_first_name": "Seda",
+              "students_last_name": "Aydın",
+              "students_gpa": 3.99
+            },
+            {
+              "students_id": 504,
+              "students_first_name": "Emre",
+              "students_last_name": "Çelik",
+              "students_gpa": 3.99
+            },
+            {
+              "students_id": 521,
+              "students_first_name": "Murat",
+              "students_last_name": "Kaplan",
+              "students_gpa": 3.98
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary) FROM teachers GROUPBY(school_id) HAVING(COUNT(*) > 2) ORDERBY(avg_salary DESC)",
+        "sql": "SELECT school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary FROM teachers GROUP BY school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+        "convertedSql": "SELECT teachers.school_id AS teachers_school_id, AVG(teachers.salary) AS avg_salary, MIN(teachers.salary) AS min_salary, MAX(teachers.salary) AS max_salary FROM teachers GROUP BY teachers.school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "teachers_school_id": 3,
+              "avg_salary": 57959.71375,
+              "min_salary": 43752.11,
+              "max_salary": 68883.39
+            },
+            {
+              "teachers_school_id": 1,
+              "avg_salary": 57883.03625,
+              "min_salary": 41761.14,
+              "max_salary": 67020.37
+            },
+            {
+              "teachers_school_id": 5,
+              "avg_salary": 57563.22,
+              "min_salary": 40866.18,
+              "max_salary": 68644.08
+            },
+            {
+              "teachers_school_id": 4,
+              "avg_salary": 56668.60875,
+              "min_salary": 41830.15,
+              "max_salary": 69764.11
+            },
+            {
+              "teachers_school_id": 2,
+              "avg_salary": 54129.98125,
+              "min_salary": 43679.7,
+              "max_salary": 62284.03
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, name, COUNT(students.id) AS student_count) FROM classes INCLUDE(students) GROUPBY(id, name) HAVING(COUNT(students.id) >= 20) ORDERBY(student_count DESC)",
+        "sql": "SELECT cl.id, cl.name, COUNT(st.id) AS student_count FROM classes cl LEFT JOIN students st ON st.class_id = cl.id GROUP BY cl.id, cl.name HAVING COUNT(st.id) >= 20 ORDER BY student_count DESC",
+        "convertedSql": "SELECT classes.id AS classes_id, classes.name AS classes_name, COUNT(students.id) AS student_count FROM classes LEFT JOIN students ON classes.id = students.class_id GROUP BY classes.id, classes.name HAVING COUNT(students.id) >= 20 ORDER BY student_count DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "classes_id": 16,
+              "classes_name": "1-A Sınıfı",
+              "student_count": 20
+            },
+            {
+              "classes_id": 30,
+              "classes_name": "8-F Sınıfı",
+              "student_count": 20
+            },
+            {
+              "classes_id": 29,
+              "classes_name": "6-C Sınıfı",
+              "student_count": 20
+            },
+            {
+              "classes_id": 28,
+              "classes_name": "11-G Sınıfı",
+              "student_count": 20
+            },
+            {
+              "classes_id": 27,
+              "classes_name": "9-D Sınıfı",
+              "student_count": 20
+            }
+          ]
+        }
       }
     ]
   },
@@ -79,23 +862,284 @@
     "results": [
       {
         "dsl": "FETCH(first_name, COUNT(*)) FILTER(first_name CONTAINS 'm') FROM students GROUPBY(first_name) HAVING (COUNT(*) >= 25)",
-        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+        "sql": "SELECT students.first_name, COUNT(*) FROM students WHERE students.first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
+        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE first_name LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 25",
         "same": true,
         "isEmpty": false,
-        "Example": [
-          {
-            "STUDENTS_FIRST_NAME": "Ahmet",
-            "COUNT_A_": 27
-          },
-          {
-            "STUDENTS_FIRST_NAME": "Mehmet",
-            "COUNT_A_": 34
-          }
-        ]
+        "Example": {
+          "Result": [
+            {
+              "STUDENTS_FIRST_NAME": "Ahmet",
+              "COUNT_A_": 27
+            },
+            {
+              "STUDENTS_FIRST_NAME": "Mehmet",
+              "COUNT_A_": 34
+            }
+          ]
+        }
       },
       {
         "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
-        "error": "Invalid JSON response: Oracle.ManagedDataAccess.Client.OracleException (0x80004005): ORA-00936: missing expression\nhttps://docs.oracle.com/error-help/db/ora-00936/\n   at Oracle.ManagedDataAccess.Client.OracleCommand.<>c.<Ex"
+        "sql": "SELECT s.first_name, COUNT(*) cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+        "convertedSql": "SELECT students.first_name AS students_first_name, COUNT(*) AS count_a_ FROM students WHERE LOWER(first_name) LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 20 ORDER BY COUNT(*) DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "STUDENTS_FIRST_NAME": "Mehmet",
+              "COUNT_A_": 34
+            },
+            {
+              "STUDENTS_FIRST_NAME": "Ahmet",
+              "COUNT_A_": 27
+            },
+            {
+              "STUDENTS_FIRST_NAME": "Merve",
+              "COUNT_A_": 26
+            },
+            {
+              "STUDENTS_FIRST_NAME": "Cem",
+              "COUNT_A_": 24
+            },
+            {
+              "STUDENTS_FIRST_NAME": "Melisa",
+              "COUNT_A_": 23
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
+        "sql": "SELECT c.name, ROUND(AVG(e.progress_percent),2) avg_progress, COUNT(*) enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+        "convertedSql": "SELECT courses.name AS courses_name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments LEFT JOIN courses ON enrollments.COURSE_ID = courses.ID GROUP BY courses.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "COURSES_NAME": "Din Kültürü",
+              "AVG_PROGRESS": 52.87,
+              "ENROLLS": 229
+            },
+            {
+              "COURSES_NAME": "Almanca",
+              "AVG_PROGRESS": 52.56,
+              "ENROLLS": 190
+            },
+            {
+              "COURSES_NAME": "Beden Eğitimi",
+              "AVG_PROGRESS": 51.88,
+              "ENROLLS": 94
+            },
+            {
+              "COURSES_NAME": "Tarih",
+              "AVG_PROGRESS": 51.19,
+              "ENROLLS": 232
+            },
+            {
+              "COURSES_NAME": "Kimya",
+              "AVG_PROGRESS": 50.96,
+              "ENROLLS": 136
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, student_id, course_id, progress_percent) FROM enrollments FILTER(progress_percent >= 40 AND progress_percent <= 60) ORDERBY(progress_percent ASC) LIMIT(30)",
+        "sql": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent >= 40 AND progress_percent <= 60 ORDER BY progress_percent ASC FETCH FIRST 30 ROWS ONLY",
+        "convertedSql": "SELECT enrollments.id AS enrollments_id, enrollments.student_id AS enrollments_student_id, enrollments.course_id AS enrollments_course_id, enrollments.progress_percent AS enrollments_progress_percent FROM enrollments WHERE (progress_percent >= 40 AND progress_percent <= 60) ORDER BY enrollments.progress_percent ASC OFFSET 0 ROWS FETCH NEXT 30 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "ENROLLMENTS_ID": 210,
+              "ENROLLMENTS_STUDENT_ID": 53,
+              "ENROLLMENTS_COURSE_ID": 19,
+              "ENROLLMENTS_PROGRESS_PERCENT": 40
+            },
+            {
+              "ENROLLMENTS_ID": 1980,
+              "ENROLLMENTS_STUDENT_ID": 495,
+              "ENROLLMENTS_COURSE_ID": 23,
+              "ENROLLMENTS_PROGRESS_PERCENT": 40.1
+            },
+            {
+              "ENROLLMENTS_ID": 2390,
+              "ENROLLMENTS_STUDENT_ID": 598,
+              "ENROLLMENTS_COURSE_ID": 49,
+              "ENROLLMENTS_PROGRESS_PERCENT": 40.1
+            },
+            {
+              "ENROLLMENTS_ID": 2286,
+              "ENROLLMENTS_STUDENT_ID": 572,
+              "ENROLLMENTS_COURSE_ID": 46,
+              "ENROLLMENTS_PROGRESS_PERCENT": 40.1
+            },
+            {
+              "ENROLLMENTS_ID": 94,
+              "ENROLLMENTS_STUDENT_ID": 24,
+              "ENROLLMENTS_COURSE_ID": 36,
+              "ENROLLMENTS_PROGRESS_PERCENT": 40.2
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email != NULL) ORDERBY(id ASC) LIMIT(20)",
+        "sql": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC FETCH FIRST 20 ROWS ONLY",
+        "convertedSql": "SELECT students.id AS students_id, students.first_name AS students_first_name, students.last_name AS students_last_name FROM students WHERE email IS NOT NULL ORDER BY students.id ASC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "STUDENTS_ID": 1,
+              "STUDENTS_FIRST_NAME": "Burak",
+              "STUDENTS_LAST_NAME": "Erdem"
+            },
+            {
+              "STUDENTS_ID": 2,
+              "STUDENTS_FIRST_NAME": "Elif",
+              "STUDENTS_LAST_NAME": "Kurt"
+            },
+            {
+              "STUDENTS_ID": 3,
+              "STUDENTS_FIRST_NAME": "Rabia",
+              "STUDENTS_LAST_NAME": "Şahin"
+            },
+            {
+              "STUDENTS_ID": 4,
+              "STUDENTS_FIRST_NAME": "Oğuz",
+              "STUDENTS_LAST_NAME": "Şahin"
+            },
+            {
+              "STUDENTS_ID": 5,
+              "STUDENTS_FIRST_NAME": "Elif",
+              "STUDENTS_LAST_NAME": "Bozkurt"
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, first_name, last_name, gpa) FROM students FILTER(is_active = TRUE AND gpa >= 3.5) ORDERBY(gpa DESC) LIMIT(15)",
+        "sql": "SELECT id, first_name, last_name, gpa FROM students WHERE is_active = 1 AND gpa >= 3.5 ORDER BY gpa DESC FETCH FIRST 15 ROWS ONLY",
+        "convertedSql": "SELECT students.id AS students_id, students.first_name AS students_first_name, students.last_name AS students_last_name, students.gpa AS students_gpa FROM students WHERE (is_active = 1 AND gpa >= 3.5) ORDER BY students.gpa DESC OFFSET 0 ROWS FETCH NEXT 15 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "STUDENTS_ID": 282,
+              "STUDENTS_FIRST_NAME": "Sinem",
+              "STUDENTS_LAST_NAME": "Güneş",
+              "STUDENTS_GPA": 3.99
+            },
+            {
+              "STUDENTS_ID": 311,
+              "STUDENTS_FIRST_NAME": "Ahsen",
+              "STUDENTS_LAST_NAME": "Öztürk",
+              "STUDENTS_GPA": 3.98
+            },
+            {
+              "STUDENTS_ID": 5,
+              "STUDENTS_FIRST_NAME": "Elif",
+              "STUDENTS_LAST_NAME": "Bozkurt",
+              "STUDENTS_GPA": 3.97
+            },
+            {
+              "STUDENTS_ID": 559,
+              "STUDENTS_FIRST_NAME": "Kerem",
+              "STUDENTS_LAST_NAME": "Çelik",
+              "STUDENTS_GPA": 3.97
+            },
+            {
+              "STUDENTS_ID": 322,
+              "STUDENTS_FIRST_NAME": "Fatma",
+              "STUDENTS_LAST_NAME": "Kurt",
+              "STUDENTS_GPA": 3.97
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary) FROM teachers GROUPBY(school_id) HAVING(COUNT(*) > 2) ORDERBY(avg_salary DESC)",
+        "sql": "SELECT school_id, AVG(salary) avg_salary, MIN(salary) min_salary, MAX(salary) max_salary FROM teachers GROUP BY school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+        "convertedSql": "SELECT teachers.school_id AS teachers_school_id, AVG(teachers.salary) AS avg_salary, MIN(teachers.salary) AS min_salary, MAX(teachers.salary) AS max_salary FROM teachers GROUP BY teachers.school_id HAVING COUNT(*) > 2 ORDER BY avg_salary DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "TEACHERS_SCHOOL_ID": 1,
+              "AVG_SALARY": 55337.48375,
+              "MIN_SALARY": 40036.1,
+              "MAX_SALARY": 69483.33
+            },
+            {
+              "TEACHERS_SCHOOL_ID": 5,
+              "AVG_SALARY": 54843.72375,
+              "MIN_SALARY": 40741.32,
+              "MAX_SALARY": 66587.2
+            },
+            {
+              "TEACHERS_SCHOOL_ID": 2,
+              "AVG_SALARY": 52955.2475,
+              "MIN_SALARY": 40282.64,
+              "MAX_SALARY": 64447.85
+            },
+            {
+              "TEACHERS_SCHOOL_ID": 3,
+              "AVG_SALARY": 52317.12625,
+              "MIN_SALARY": 43575.6,
+              "MAX_SALARY": 68413.78
+            },
+            {
+              "TEACHERS_SCHOOL_ID": 4,
+              "AVG_SALARY": 49505.49875,
+              "MIN_SALARY": 42191.35,
+              "MAX_SALARY": 60652.31
+            }
+          ]
+        }
+      },
+      {
+        "dsl": "FETCH(id, name, COUNT(students.id) AS student_count) FROM classes INCLUDE(students) GROUPBY(id, name) HAVING(COUNT(students.id) >= 20) ORDERBY(student_count DESC)",
+        "sql": "SELECT cl.id, cl.name, COUNT(st.id) student_count FROM classes cl LEFT JOIN students st ON st.class_id = cl.id GROUP BY cl.id, cl.name HAVING COUNT(st.id) >= 20 ORDER BY student_count DESC",
+        "convertedSql": "SELECT classes.id AS classes_id, classes.name AS classes_name, COUNT(students.id) AS student_count FROM classes LEFT JOIN students ON classes.ID = students.CLASS_ID GROUP BY classes.id, classes.name HAVING COUNT(students.id) >= 20 ORDER BY student_count DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "CLASSES_ID": 1,
+              "CLASSES_NAME": "12-B Sınıfı",
+              "STUDENT_COUNT": 20
+            },
+            {
+              "CLASSES_ID": 30,
+              "CLASSES_NAME": "11-A Sınıfı",
+              "STUDENT_COUNT": 20
+            },
+            {
+              "CLASSES_ID": 3,
+              "CLASSES_NAME": "3-B Sınıfı",
+              "STUDENT_COUNT": 20
+            },
+            {
+              "CLASSES_ID": 4,
+              "CLASSES_NAME": "7-F Sınıfı",
+              "STUDENT_COUNT": 20
+            },
+            {
+              "CLASSES_ID": 5,
+              "CLASSES_NAME": "3-C Sınıfı",
+              "STUDENT_COUNT": 20
+            }
+          ]
+        }
       }
     ]
   }

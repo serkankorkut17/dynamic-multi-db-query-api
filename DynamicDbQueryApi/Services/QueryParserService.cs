@@ -101,7 +101,10 @@ namespace DynamicDbQueryApi.Services
                 return new List<QueryColumnModel> { new QueryColumnModel { Expression = "*", Alias = null } };
             }
 
-            var columns = columnsPart.Split(',').Select(c => c.Trim()).ToList();
+            List<string> columns = SplitByCommas(columnsPart);
+
+            Console.WriteLine($"Text fetch columns: {string.Join(" - ", columns)}");
+
 
             List<QueryColumnModel> columnModels = new List<QueryColumnModel>();
 
@@ -332,24 +335,75 @@ namespace DynamicDbQueryApi.Services
             return balance == 0;
         }
 
+        private (string function, string inner)? ExtractFunction(string s)
+        {
+            var start = Regex.Match(s, @"^(?<func>[A-Za-z_][A-Za-z0-9_]*)\s*\(", RegexOptions.IgnoreCase);
+            if (start.Success)
+            {
+                // Parantez başlangıç indeksini ve kapanış indeksini bul
+                int openIdx = start.Index + start.Length - 1;
+                int bodyStart = openIdx + 1;
+                int closeIdx = FindClosingParenthesis(s, openIdx);
+                if (closeIdx == -1) throw new Exception("Could not find closing parenthesis for function in column.");
+
+                var body = s.Substring(bodyStart, closeIdx - bodyStart).Trim();
+
+                var funcName = start.Groups["func"].Value.ToUpperInvariant();
+                // Fonksiyonu parse et
+                return (funcName, body);
+            }
+            return null;
+        }
+
         private string ParseFunction(string functionString, string inner, string tableName, List<string>? aliasList = null)
         {
+            // Eğer inner boşsa hata fırlat
+            if (string.IsNullOrWhiteSpace(inner))
+            {
+                throw new Exception($"Function {functionString} requires parameters.");
+            }
+            Console.WriteLine($"Parse function extraction: {inner}");
+
+            // Eğer fonksiyonun içinde başka bir fonksiyon varsa önce onu parse et
+            // var innerFunc = ExtractFunction(inner);
+            // if (innerFunc != null)
+            // {
+            //     var (innerFuncName, innerFuncBody) = innerFunc.Value;
+
+            //     inner = ParseFunction(innerFuncName, innerFuncBody, tableName, aliasList);
+            // }
+
+            var innerParams = SplitByCommas(inner);
+            Console.WriteLine($"Parse function inner params: {string.Join(" - ", innerParams)}");
+
+            if (innerParams.Count != 0)
+            {
+                for (int i = 0; i < innerParams.Count; i++)
+                {
+                    if (!int.TryParse(innerParams[i], out _))
+                    {
+                        innerParams[i] = AddTablePrefixToColumn(innerParams[i], tableName, aliasList);
+                    }
+                }
+            }
+
+            Console.WriteLine($"Function inner params after table prefix: {string.Join(" - ", innerParams)}");
+
 
             // Aggregate fonksiyonlarını yakala (COUNT, SUM, AVG, MIN, MAX)
             var aggregateFuncs = new[] { "COUNT", "SUM", "AVG", "MIN", "MAX" };
             if (aggregateFuncs.Contains(functionString))
             {
-                var innerParts = inner.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(p => p.Trim()).ToList();
-
-                if (innerParts.Count == 1)
+                if (innerParams.Count == 1)
                 {
                     // eğer sayı ise tablo ismi ekleme
-                    if (int.TryParse(innerParts[0], out _))
-                    {
-                        return $"{functionString}({innerParts[0]})";
-                    }
-                    var col = AddTablePrefixToColumn(inner, tableName, aliasList);
-                    return $"{functionString}({col})";
+                    // if (int.TryParse(innerParams[0], out _))
+                    // {
+                    //     return $"{functionString}({innerParams[0]})";
+                    // }
+                    // var col = AddTablePrefixToColumn(innerParams[0], tableName, aliasList);
+                    // return $"{functionString}({col})";
+                    return $"{functionString}({innerParams[0]})";
                 }
                 else
                 {
@@ -358,80 +412,53 @@ namespace DynamicDbQueryApi.Services
             }
 
             // Sayısal fonksiyonları yakala (ABS, CEIL, FLOOR, ROUND, SQRT, POWER, MOD, EXP, LOG, LOG10)
-            var numericFuncs = new[] { "ABS", "CEIL", "CEILING", "FLOOR", "ROUND", "SQRT", "POWER", "MOD", "EXP", "LOG", "LOG10" };
+            var numericFuncs = new[] { "ABS", "CEIL", "CEILING", "FLOOR", "ROUND", "SQRT", "POWER", "MOD", "EXP", "LOG", "LN", "LOG10" };
+            // LOG(x, base), LOG(x))
 
             // Tek parametreli numeric fonksiyonları kontrol et
-            if (numericFuncs.Contains(functionString) && !inner.Contains(","))
+            if (numericFuncs.Contains(functionString))
             {
-                // eğer sayı ise tablo ismi ekleme
-                if (double.TryParse(inner, out _))
+                if (innerParams.Count == 1)
                 {
-                    return $"{functionString}({inner})";
+                    return $"{functionString}({innerParams[0]})";
                 }
-                var col = AddTablePrefixToColumn(inner, tableName, aliasList);
-                return $"{functionString}({col})";
-            }
-            // İki parametreli numeric fonksiyonları kontrol et (POWER, MOD, ROUND, LOG)
-            if (numericFuncs.Contains(functionString) && inner.Contains(","))
-            {
-                var innerParts = inner.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(p => p.Trim()).ToList();
-
-                if (innerParts.Count == 2)
+                else if (innerParams.Count == 2)
                 {
-                    var col1 = innerParts[0];
-                    if (!double.TryParse(innerParts[0], out _))
-                    {
-                        col1 = AddTablePrefixToColumn(innerParts[0], tableName, aliasList);
-                    }
-                    var col2 = innerParts[1];
-                    if (!double.TryParse(innerParts[1], out _))
-                    {
-                        col2 = AddTablePrefixToColumn(innerParts[1], tableName, aliasList);
-                    }
-                    return $"{functionString}({col1}, {col2})";
+                    return $"{functionString}({innerParams[0]}, {innerParams[1]})";
                 }
                 else
                 {
-                    throw new Exception($"Invalid usage of numeric function {functionString} with multiple parameters.");
+                    throw new Exception($"Invalid usage of numeric function {functionString} with incorrect number of parameters.");
                 }
             }
+
 
             // Metin fonksiyonlarını yakala (LENGTH, LEN, SUBSTRING, SUBSTR, CONCAT, LOWER, UPPER, TRIM, LTRIM, RTRIM, INDEXOF, REPLACE, REVERSE)
             var stringFuncs = new[] { "LENGTH", "LEN", "SUBSTRING", "SUBSTR", "CONCAT", "LOWER", "UPPER", "TRIM", "LTRIM", "RTRIM", "INDEXOF", "REPLACE", "REVERSE" };
             if (stringFuncs.Contains(functionString))
             {
-                var innerParts = inner.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(p => p.Trim()).ToList();
-
                 if (functionString == "LENGTH" || functionString == "LEN")
                 {
                     string function = "LENGTH";
-                    if (innerParts.Count != 1)
+                    if (innerParams.Count != 1)
                     {
                         throw new Exception($"Invalid usage of string function {functionString} with multiple parameters.");
                     }
                     // Eğer string ise tablo ismi ekleme
-                    if (innerParts[0].StartsWith("'") && innerParts[0].EndsWith("'"))
-                    {
-                        return $"{function}({innerParts[0]})";
-                    }
-                    var col = AddTablePrefixToColumn(innerParts[0], tableName, aliasList);
-                    return $"{function}({col})";
+                    return $"{function}({innerParams[0]})";
                 }
 
+                // SUBSTRING(string, start, length) veya SUBSTR(string, start)
                 if (functionString == "SUBSTRING" || functionString == "SUBSTR")
                 {
                     string function = "SUBSTRING";
-                    if (innerParts.Count != 3)
+                    if (innerParams.Count != 2 && innerParams.Count != 3)
                     {
                         throw new Exception($"Invalid usage of string function {functionString} with incorrect number of parameters.");
                     }
-                    var col = innerParts[0];
-                    if (!(col.StartsWith("'") && col.EndsWith("'")))
-                    {
-                        col = AddTablePrefixToColumn(col, tableName, aliasList);
-                    }
-                    // innerParts[1] ve innerParts[2] sayı olmalı
-                    if (!int.TryParse(innerParts[1], out var start) || !int.TryParse(innerParts[2], out var length))
+                    var col = innerParams[0];
+                    // innerParams[1] ve innerParams[2] sayı olmalı
+                    if (!int.TryParse(innerParams[1], out var start) || !int.TryParse(innerParams[2], out var length))
                     {
                         throw new Exception($"Invalid usage of string function {functionString} with non-numeric start or length parameters.");
                     }
@@ -440,19 +467,14 @@ namespace DynamicDbQueryApi.Services
 
                 if (functionString == "CONCAT")
                 {
-                    if (innerParts.Count < 2)
+                    if (innerParams.Count < 2)
                     {
                         throw new Exception($"Invalid usage of string function {functionString} with less than two parameters.");
                     }
                     var cols = new List<string>();
-                    foreach (var part in innerParts)
+                    foreach (var part in innerParams)
                     {
                         var p = part;
-                        // eğer string ise tablo ismi ekleme
-                        if (!((p.StartsWith("'") && p.EndsWith("'")) || (p.StartsWith("\"") && p.EndsWith("\""))))
-                        {
-                            p = AddTablePrefixToColumn(part, tableName, aliasList);
-                        }
                         cols.Add(p);
                     }
                     return $"{functionString}({string.Join(", ", cols)})";
@@ -460,62 +482,36 @@ namespace DynamicDbQueryApi.Services
 
                 if (functionString == "UPPER" || functionString == "LOWER" || functionString == "LTRIM" || functionString == "RTRIM" || functionString == "TRIM" || functionString == "REVERSE")
                 {
-                    if (innerParts.Count != 1)
+                    if (innerParams.Count != 1)
                     {
                         throw new Exception($"Invalid usage of string function {functionString} with multiple parameters.");
                     }
-                    var col = innerParts[0];
-                    // eğer string ise tablo ismi ekleme
-                    if (!(col.StartsWith("'") && col.EndsWith("'")))
-                    {
-                        col = AddTablePrefixToColumn(col, tableName, aliasList);
-                    }
+                    var col = innerParams[0];
                     return $"{functionString}({col})";
                 }
 
+                // INDEXOF(string, search) veya INDEXOF(string, search, startIndex)
                 if (functionString == "INDEXOF")
                 {
-                    if (innerParts.Count != 2)
+                    if (innerParams.Count != 2 || innerParams.Count != 3)
                     {
                         throw new Exception($"Invalid usage of string function {functionString} with incorrect number of parameters.");
                     }
-                    var col = innerParts[0];
-                    if (!(col.StartsWith("'") && col.EndsWith("'")))
-                    {
-                        col = AddTablePrefixToColumn(col, tableName, aliasList);
-                    }
-                    var search = innerParts[1];
-                    // eğer string ise tablo ismi ekleme
-                    if (!(search.StartsWith("'") && search.EndsWith("'")))
-                    {
-                        search = AddTablePrefixToColumn(search, tableName, aliasList);
-                    }
+                    var col = innerParams[0];
+                    var search = innerParams[1];
                     return $"{functionString}({col}, {search})";
                 }
 
                 if (functionString == "REPLACE")
                 {
-                    if (innerParts.Count != 3)
+                    if (innerParams.Count != 3)
                     {
                         throw new Exception($"Invalid usage of string function {functionString} with incorrect number of parameters.");
                     }
-                    var col = innerParts[0];
-                    if (!(col.StartsWith("'") && col.EndsWith("'")))
-                    {
-                        col = AddTablePrefixToColumn(col, tableName, aliasList);
-                    }
-                    var search = innerParts[1];
-                    // eğer string ise tablo ismi ekleme
-                    if (!(search.StartsWith("'") && search.EndsWith("'")))
-                    {
-                        search = AddTablePrefixToColumn(search, tableName, aliasList);
-                    }
-                    var replace = innerParts[2];
-                    // eğer string ise tablo ismi ekleme
-                    if (!(replace.StartsWith("'") && replace.EndsWith("'")))
-                    {
-                        replace = AddTablePrefixToColumn(replace, tableName, aliasList);
-                    }
+                    var col = innerParams[0];
+                    var search = innerParams[1];
+                    var replace = innerParams[2];
+
                     return $"{functionString}({col}, {search}, {replace})";
                 }
             }
@@ -525,19 +521,13 @@ namespace DynamicDbQueryApi.Services
             if (nullFuncs.Contains(functionString))
             {
                 string function = "COALESCE";
-                var innerParts = inner.Split(',', StringSplitOptions.RemoveEmptyEntries).Select(p => p.Trim()).ToList();
 
-                if (innerParts.Count >= 2)
+                if (innerParams.Count >= 2)
                 {
                     var cols = new List<string>();
-                    foreach (var part in innerParts)
+                    foreach (var part in innerParams)
                     {
                         var p = part;
-                        // eğer string ise tablo ismi ekleme
-                        if (!(p.StartsWith("'") && p.EndsWith("'")))
-                        {
-                            p = AddTablePrefixToColumn(part, tableName, aliasList);
-                        }
                         cols.Add(p);
                     }
                     return $"{function}({string.Join(", ", cols)})";
@@ -562,6 +552,12 @@ namespace DynamicDbQueryApi.Services
         {
             if (string.IsNullOrWhiteSpace(column)) return column;
 
+            // Eğer sayı ise tablo ismi ekleme
+            if (int.TryParse(column, out _))
+            {
+                return column;
+            }
+
             // Eğer tek tırnak içinde string ise tablo ismi ekleme
             if (column.StartsWith("'") && column.EndsWith("'"))
             {
@@ -574,15 +570,23 @@ namespace DynamicDbQueryApi.Services
             if (column == "*") return column;
 
             // Regex: func ( ... ) şeklinde olanları yakala -> ...
-            var pattern = $@"^(?<func>[A-Za-z_][A-Za-z0-9_]*)\s*\(\s*(?<inner>.*?)\s*\)$";
-            var funcMatch = Regex.Match(column, pattern, RegexOptions.IgnoreCase);
+            // var pattern = $@"^(?<func>[A-Za-z_][A-Za-z0-9_]*)\s*\(\s*(?<inner>.*?)\s*\)$";
+            // var funcMatch = Regex.Match(column, pattern, RegexOptions.IgnoreCase);
 
-            if (funcMatch.Success)
+            // if (funcMatch.Success)
+            // {
+            //     var funcName = funcMatch.Groups["func"].Value.ToUpperInvariant();
+            //     var inner = funcMatch.Groups["inner"].Value.Trim();
+
+            //     // Fonksiyonu parse et
+            //     return ParseFunction(funcName, inner, tableName, aliasList);
+            // }
+
+            Console.WriteLine($"Add table prefix extraction: {column}");
+            var func = ExtractFunction(column);
+            if (func != null)
             {
-                var funcName = funcMatch.Groups["func"].Value.ToUpperInvariant();
-                var inner = funcMatch.Groups["inner"].Value.Trim();
-
-                // Fonksiyonu parse et
+                var (funcName, inner) = func.Value;
                 return ParseFunction(funcName, inner, tableName, aliasList);
             }
 
@@ -619,6 +623,23 @@ namespace DynamicDbQueryApi.Services
                 {
                     depth--;
                     if (depth == 0) return i;
+                }
+            }
+            return -1; // Not found
+        }
+
+        // Tek tırnaklı String sonunu bulma
+        private int FindClosingQuote(string str, int startIdx)
+        {
+            for (int i = startIdx + 1; i < str.Length; i++)
+            {
+                if (str[i] == '\'')
+                {
+                    // Eğer öncesinde \ yoksa kapatma tırnağıdır
+                    if (i == 0 || str[i - 1] != '\\')
+                    {
+                        return i;
+                    }
                 }
             }
             return -1; // Not found
@@ -811,7 +832,7 @@ namespace DynamicDbQueryApi.Services
 
             // Genel operatorler (>=, <=, !=, <>, =, >, <, CONTAINS, BEGINSWITH, ENDSWITH, LIKE)
             var m = Regex.Match(s,
-                @"^\s*(?<col>[\w\.\-\(\)\*\s,']+?)\s*(?<op>>=|<=|!=|<>|=|>|<|LIKE|CONTAINS|BEGINSWITH|ENDSWITH)\s*(?<rhs>.+?)\s*$",
+                @"^\s*(?<col>[\w\.\-\(\)\*\s,']+?)\s*(?<op>>=|<=|!=|<>|==|=|>|<|LIKE|CONTAINS|BEGINSWITH|ENDSWITH)\s*(?<rhs>.+?)\s*$",
                 RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             if (!m.Success)
@@ -842,8 +863,9 @@ namespace DynamicDbQueryApi.Services
             ComparisonOperator comp;
             switch (op)
             {
+                case "==": comp = ComparisonOperator.Eq; break;
                 case "=": comp = ComparisonOperator.Eq; break;
-                case "!=":
+                case "!=": comp = ComparisonOperator.Neq; break;
                 case "<>": comp = ComparisonOperator.Neq; break;
                 case ">": comp = ComparisonOperator.Gt; break;
                 case "<": comp = ComparisonOperator.Lt; break;
@@ -884,6 +906,52 @@ namespace DynamicDbQueryApi.Services
                 Operator = comp,
                 Value = rhs
             };
+        }
+
+        // , lerden bölme (parantez içi ve string içi değilse)
+        private List<string> SplitByCommas(string input)
+        {
+            List<string> result = new List<string>();
+            for (int i = 0; i < input.Length; i++)
+            {
+                if (input[i] == '(')
+                {
+                    // Parantez içindeki virgülleri yok say
+                    int closeIdx = FindClosingParenthesis(input, i);
+                    if (closeIdx == -1)
+                    {
+                        throw new Exception("Could not find closing parenthesis in FETCH columns.");
+                    }
+                    i = closeIdx;
+                }
+
+                else if (input[i] == '\'')
+                {
+                    // String içindeki virgülleri yok say
+                    int closeIdx = FindClosingQuote(input, i);
+                    if (closeIdx == -1)
+                    {
+                        throw new Exception("Could not find closing quote in FETCH columns.");
+                    }
+                    i = closeIdx;
+                }
+
+                else if (input[i] == ',')
+                {
+                    // Virgül bulundu, böl
+                    result.Add(input.Substring(0, i).Trim());
+                    input = input.Substring(i + 1).Trim();
+                    i = -1;
+                }
+            }
+            // Son parçayı ekle
+            if (!string.IsNullOrWhiteSpace(input))
+            {
+                result.Add(input.Trim());
+            }
+
+            return result;
+
         }
     }
 }

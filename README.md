@@ -22,7 +22,8 @@ as vb sorulabilir
 ***filterları test et ----- null, not null != null da en son convert edilebilir
 ***filterlar butun dblerde test et
 
-* gelirse sadece ona bak
+**** sql builder iç içe fonksiyon kontrolu recursive
+**** alias isimleri düzelt fonksiyonlar için
 
 expression splitter düzenle
 
