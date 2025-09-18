@@ -103,9 +103,6 @@ namespace DynamicDbQueryApi.Services
 
             List<string> columns = SplitByCommas(columnsPart);
 
-            Console.WriteLine($"Text fetch columns: {string.Join(" - ", columns)}");
-
-
             List<QueryColumnModel> columnModels = new List<QueryColumnModel>();
 
             for (int i = 0; i < columns.Count; i++)
@@ -121,7 +118,6 @@ namespace DynamicDbQueryApi.Services
                 else
                 {
                     alias = expression.ToLowerInvariant().Replace('.', '_').Replace('(', '_').Replace(')', '_').Replace('*', 'a').Replace(',', '_').Replace(' ', '_').Replace('-', '_');
-
                 }
                 columnModels.Add(new QueryColumnModel
                 {
@@ -164,7 +160,7 @@ namespace DynamicDbQueryApi.Services
                     Table = table,
                     TableKey = "Key", // Varsayılan anahtar
                     IncludeTable = parts[0],
-                    IncludeKey = "Key", // Varsayılan yabancı anahtar
+                    IncludeKey = "Key", // Varsayılan include table anahtarı
                     JoinType = joinType
                 });
 
@@ -181,7 +177,7 @@ namespace DynamicDbQueryApi.Services
                             Table = parentTable,
                             TableKey = "Key", // Varsayılan anahtar
                             IncludeTable = childTable,
-                            IncludeKey = "Key", // Varsayılan yabancı anahtar
+                            IncludeKey = "Key", // Varsayılan include table anahtarı
                             JoinType = joinType
                         });
                     }
@@ -304,7 +300,14 @@ namespace DynamicDbQueryApi.Services
                 if (!m.Success) return 0;
             }
 
-            return int.TryParse(m.Groups[1].Value, out var limit) ? limit : 0;
+            if (int.TryParse(m.Groups[1].Value, out var limit))
+            {
+                return limit;
+            }
+            else
+            {
+                throw new Exception("Could not parse LIMIT/TAKE value.");
+            }
         }
 
         // SKIP(int) veya SKIP int veya OFFSET(int) veya OFFSET int kısmını parse etme
@@ -317,7 +320,14 @@ namespace DynamicDbQueryApi.Services
                 if (!m.Success) return 0;
             }
 
-            return int.TryParse(m.Groups[1].Value, out var offset) ? offset : 0;
+            if (int.TryParse(m.Groups[1].Value, out var offset))
+            {
+                return offset;
+            }
+            else
+            {
+                throw new Exception("Could not parse OFFSET/SKIP value.");
+            }
         }
 
         // Parantezlerin dengeli olup olmadığını kontrol etme
@@ -335,6 +345,7 @@ namespace DynamicDbQueryApi.Services
             return balance == 0;
         }
 
+        // String eğer fonksiyon ise fonksiyon adını ve içini çıkarma
         private (string function, string inner)? ExtractFunction(string s)
         {
             var start = Regex.Match(s, @"^(?<func>[A-Za-z_][A-Za-z0-9_]*)\s*\(", RegexOptions.IgnoreCase);
@@ -355,6 +366,7 @@ namespace DynamicDbQueryApi.Services
             return null;
         }
 
+        // Fonksiyonları parse etme
         private string ParseFunction(string functionString, string inner, string tableName, List<string>? aliasList = null)
         {
             // Eğer inner boşsa hata fırlat
@@ -362,33 +374,17 @@ namespace DynamicDbQueryApi.Services
             {
                 throw new Exception($"Function {functionString} requires parameters.");
             }
-            Console.WriteLine($"Parse function extraction: {inner}");
 
-            // Eğer fonksiyonun içinde başka bir fonksiyon varsa önce onu parse et
-            // var innerFunc = ExtractFunction(inner);
-            // if (innerFunc != null)
-            // {
-            //     var (innerFuncName, innerFuncBody) = innerFunc.Value;
-
-            //     inner = ParseFunction(innerFuncName, innerFuncBody, tableName, aliasList);
-            // }
-
+            // Fonksiyon içindeki parametreleri ayır
             var innerParams = SplitByCommas(inner);
-            Console.WriteLine($"Parse function inner params: {string.Join(" - ", innerParams)}");
 
             if (innerParams.Count != 0)
             {
                 for (int i = 0; i < innerParams.Count; i++)
                 {
-                    if (!int.TryParse(innerParams[i], out _))
-                    {
-                        innerParams[i] = AddTablePrefixToColumn(innerParams[i], tableName, aliasList);
-                    }
+                    innerParams[i] = AddTablePrefixToColumn(innerParams[i], tableName, aliasList);
                 }
             }
-
-            Console.WriteLine($"Function inner params after table prefix: {string.Join(" - ", innerParams)}");
-
 
             // Aggregate fonksiyonlarını yakala (COUNT, SUM, AVG, MIN, MAX)
             var aggregateFuncs = new[] { "COUNT", "SUM", "AVG", "MIN", "MAX" };
@@ -396,13 +392,6 @@ namespace DynamicDbQueryApi.Services
             {
                 if (innerParams.Count == 1)
                 {
-                    // eğer sayı ise tablo ismi ekleme
-                    // if (int.TryParse(innerParams[0], out _))
-                    // {
-                    //     return $"{functionString}({innerParams[0]})";
-                    // }
-                    // var col = AddTablePrefixToColumn(innerParams[0], tableName, aliasList);
-                    // return $"{functionString}({col})";
                     return $"{functionString}({innerParams[0]})";
                 }
                 else
@@ -444,7 +433,6 @@ namespace DynamicDbQueryApi.Services
                     {
                         throw new Exception($"Invalid usage of string function {functionString} with multiple parameters.");
                     }
-                    // Eğer string ise tablo ismi ekleme
                     return $"{function}({innerParams[0]})";
                 }
 
@@ -457,12 +445,24 @@ namespace DynamicDbQueryApi.Services
                         throw new Exception($"Invalid usage of string function {functionString} with incorrect number of parameters.");
                     }
                     var col = innerParams[0];
-                    // innerParams[1] ve innerParams[2] sayı olmalı
-                    if (!int.TryParse(innerParams[1], out var start) || !int.TryParse(innerParams[2], out var length))
+                    if (innerParams.Count == 2)
                     {
-                        throw new Exception($"Invalid usage of string function {functionString} with non-numeric start or length parameters.");
+                        // SUBSTRING(string, start)
+                        if (!int.TryParse(innerParams[1], out var start))
+                        {
+                            throw new Exception($"Invalid usage of string function {functionString} with non-numeric start parameter.");
+                        }
+                        return $"{function}({col}, {start})";
                     }
-                    return $"{function}({col}, {start}, {length})";
+                    else if (innerParams.Count == 3)
+                    {
+                        // SUBSTRING(string, start, length)
+                        if (!int.TryParse(innerParams[1], out var start) || !int.TryParse(innerParams[2], out var length))
+                        {
+                            throw new Exception($"Invalid usage of string function {functionString} with non-numeric start or length parameters.");
+                        }
+                        return $"{function}({col}, {start}, {length})";
+                    }
                 }
 
                 if (functionString == "CONCAT")
@@ -493,7 +493,7 @@ namespace DynamicDbQueryApi.Services
                 // INDEXOF(string, search) veya INDEXOF(string, search, startIndex)
                 if (functionString == "INDEXOF")
                 {
-                    if (innerParams.Count != 2 || innerParams.Count != 3)
+                    if (innerParams.Count != 2)
                     {
                         throw new Exception($"Invalid usage of string function {functionString} with incorrect number of parameters.");
                     }
@@ -569,20 +569,7 @@ namespace DynamicDbQueryApi.Services
             // COUNT(*) veya SUM(*) gibi durumlar için kontrol et
             if (column == "*") return column;
 
-            // Regex: func ( ... ) şeklinde olanları yakala -> ...
-            // var pattern = $@"^(?<func>[A-Za-z_][A-Za-z0-9_]*)\s*\(\s*(?<inner>.*?)\s*\)$";
-            // var funcMatch = Regex.Match(column, pattern, RegexOptions.IgnoreCase);
-
-            // if (funcMatch.Success)
-            // {
-            //     var funcName = funcMatch.Groups["func"].Value.ToUpperInvariant();
-            //     var inner = funcMatch.Groups["inner"].Value.Trim();
-
-            //     // Fonksiyonu parse et
-            //     return ParseFunction(funcName, inner, tableName, aliasList);
-            // }
-
-            Console.WriteLine($"Add table prefix extraction: {column}");
+            // Eğer fonksiyon ise fonksiyon adını ve içini çıkar ve parse et
             var func = ExtractFunction(column);
             if (func != null)
             {
@@ -628,7 +615,7 @@ namespace DynamicDbQueryApi.Services
             return -1; // Not found
         }
 
-        // Tek tırnaklı String sonunu bulma
+        // Tek tırnaklı string sonunu bulma
         private int FindClosingQuote(string str, int startIdx)
         {
             for (int i = startIdx + 1; i < str.Length; i++)
@@ -643,53 +630,6 @@ namespace DynamicDbQueryApi.Services
                 }
             }
             return -1; // Not found
-        }
-
-        // En dıştaki parantez içi operandları çıkarma ve yerlerine $0, $1, ... koyma
-        public static List<string> ExtractTopLevelOperands(ref string body, out string replacedBody)
-        {
-            var expressions = new List<string>();
-            var sb = new StringBuilder();
-            int depth = 0;
-            int start = -1;
-            int counter = 0;
-
-            for (int i = 0; i < body.Length; i++)
-            {
-                char c = body[i];
-
-                if (c == '(')
-                {
-                    if (depth == 0)
-                    {
-                        // Parantez başlangıcı
-                        start = i + 1;
-                    }
-                    depth++;
-                }
-                else if (c == ')')
-                {
-                    depth--;
-
-                    if (depth == 0 && start >= 0)
-                    {
-                        string inner = body.Substring(start, i - start);
-                        string placeholder = $"${counter++}";
-                        expressions.Add(inner.Trim());
-                        sb.Append(placeholder);
-                        start = -1;
-                    }
-                }
-                else
-                {
-                    if (depth == 0)
-                    {
-                        sb.Append(c);
-                    }
-                }
-            }
-            replacedBody = sb.ToString().Trim();
-            return expressions;
         }
 
         // FILTER ifadesini FilterModel yapısına dönüştürme
@@ -830,7 +770,7 @@ namespace DynamicDbQueryApi.Services
 
             var s = expr.Trim();
 
-            // Genel operatorler (>=, <=, !=, <>, =, >, <, CONTAINS, BEGINSWITH, ENDSWITH, LIKE)
+            // Genel operatorler (>=, <=, !=, <>, ==, =, >, <, CONTAINS, BEGINSWITH, ENDSWITH, LIKE)
             var m = Regex.Match(s,
                 @"^\s*(?<col>[\w\.\-\(\)\*\s,']+?)\s*(?<op>>=|<=|!=|<>|==|=|>|<|LIKE|CONTAINS|BEGINSWITH|ENDSWITH)\s*(?<rhs>.+?)\s*$",
                 RegexOptions.IgnoreCase | RegexOptions.Singleline);
@@ -951,7 +891,6 @@ namespace DynamicDbQueryApi.Services
             }
 
             return result;
-
         }
     }
 }

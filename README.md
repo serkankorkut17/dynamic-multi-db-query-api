@@ -1,49 +1,104 @@
-# dynamic-multi-db-query-api
-count, sum, avg, min, max, joins, group by, order by, limit, offset, distinct
+# Dynamic DB Query
 
-eklenecek:
-LENGTH(col) - LEN(col)
-SUBSTRING(col, start, len) - SUBSTR(col, start, len)
-CONCAT(col1, col2)
+## SQL vs My Query Language
+|                |SQL                          |MY QUERY                        |
+|------------|----------------------|-----------------------------|
+|SELECT|   SELECT name, surname     |FETCH (name, surname)  |
+|DISTINCT|   SELECT DISTINCT   |FETCHD / FETCH DISTINCT(...) |
+|FROM  |FROM table            |FROM table / FROM (table)|
+|JOIN  |[joinType] JOIN table2 ...|INCLUDE (table2)|
+|JOIN CHAINING |... JOIN table3 ...|INCLUDE (table2.table3)|
+|SELECT (JOIN) |SELECT table2.id| FETCH (name, surname, table2.id)|
+|WHERE |WHERE age >= 18 | FILTER (age >= 18)|
+|GROUP BY |GROUP BY name | GROUPBY (name)|
+|HAVING |HAVING COUNT(*) >= 20 | HAVING (COUNT(*) >= 20)|
+|ORDER BY |ORDER BY name DESC | ORDERBY (name DESC)|
+|LIMIT |LIMIT 10 | TAKE (10) / LIMIT (10)|
+|OFFSET |OFFSET 10 | SKIP (10) / OFFSET (10)|
 
-FETCH(Ad, Soyad) FROM Dataset
-FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City
-FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City GROUPBY (Country)
-FETCH(Ad, Soyad, City.Name, City.Country.Name) FROM Person INCLUDE (City.Country)
+My Query Example:
+```sql
+FETCH(City.Country.Name AS country_name, COUNT(*) AS total)
+FROM(person)
+INCLUDE(City.Country)
+FILTER((name = 'Serkan' OR grade > 3) AND (surname BEGINSWITH 'Ah' AND email CONTAINS '@' AND email ENDSWITH '.com'))
+GROUPBY(City.Country.Name)
+HAVING(COUNT(*) > 2)
+ORDERBY(total DESC)
+TAKE(10)
+```
+PostgreSQL:
+```sql
+SELECT co.name AS country_name, COUNT(*) AS total
+FROM person p
+LEFT JOIN city c ON c.id = p.city_id
+LEFT JOIN country co ON co.id = c.country_id
+WHERE (p.name =  'Serkan'  OR p.grade >  3)
+AND (p.surname LIKE  'Ah%'  AND p.email LIKE  '%@%'  AND p.email LIKE  '%.com')
+GROUP BY co.name
+HAVING  COUNT(*) >  2
+ORDER BY total DESC
+LIMIT  10;
+```
 
-FETCH(Country, COUNT(*)) FILTER((Ad = 'Serkan' OR Grade > 3) AND (Soyad BEGINSWITH 'Ah' AND Email CONTAINS '@' AND Email ENDSWITH '.com' ))
+## Supported Operators
 
-FETCH(Country, COUNT(*) AS count) FROM(Person) GROUPBY(Name) HAVING(count(*) > 2) ORDERBY(Name ASC) TAKE(10) LIMIT(10)
+### 1. Comparison Operators
 
-queryleri at uygun mudur diye sor
-as vb sorulabilir 
+|MY QUERY                       |SQL EQUIVALENT             |
+|-------------------------------|---------------------------|
+|= / ==													|   =     							  	|
+|!= / <>												|   <>  									  |
+|>															|   >  										   |
+|<															|   < 											 |
+|>=															|   >= 										  |
+|<=															|   <=											|
 
-# ########################
-***filterları test et ----- null, not null != null da en son convert edilebilir
-***filterlar butun dblerde test et
+  
+### 2. String Match Operators
 
-**** sql builder iç içe fonksiyon kontrolu recursive
-**** alias isimleri düzelt fonksiyonlar için
+|MY QUERY                       |SQL EQUIVALENT             |
+|-------------------------------|---------------------------|
+|CONTAINS												|   col LIKE '%val%'  	  	|
+|BEGINSWITH											|   col LIKE 'val%'  			  |
+|ENDSWITH												|   col LIKE '%val'  		   |
+|LIKE														|   col LIKE 'same'				|
 
-expression splitter düzenle
+  
+### 3. NULL Operators
 
-# POSTGRESQL
-Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb;SSL Mode=Disable;
+|MY QUERY                       |SQL EQUIVALENT             |
+|-------------------------------|---------------------------|
+|col = NULL											|   col IS NULL  	  	|
+|col == NULL										|   col IS NULL  			  |
+|col != NULL										|   col IS NOT NULL  		   |
+|col <> NULL										|   col IS NOT NULL				|
+  
 
-postgresql://postgres:postgres@localhost:5432/querydb?sslmode=disable
+### 4. Logical Operators & Precedence
 
-# MSSQL
-Server=localhost,1433;Database=master;User Id=sa;Password=Merhaba123.;Encrypt=true;TrustServerCertificate=true;
+|OPERATORS                      |PRECEDENCE             |
+|-------------------------------|---------------------------|
+|(...)													|   1 (Highest)  					 |
+|AND														|   2 (High) 	  					|
+|OR															|   3 (Low)  			 			 |
 
-Server=tcp:localhost,1433;Initial Catalog=master;User ID=sa;Password=Merhaba123.;Encrypt=true;TrustServerCertificate=true;
+Example: FILTER(a = 1 OR b = 2 AND c = 3)
+Internal: a = 1 OR (b = 2 AND c = 3)
 
-# MYSQL
-Server=localhost;Port=3306;Database=querydb;User=mysql;Password=mysql;SslMode=None;AllowPublicKeyRetrieval=True
 
-mysql://mysql:mysql@localhost:3306/querydb
+## Supported Functions
 
-# ORACLE
-User Id=system;Password=oracle;Data Source=localhost/FREEPDB1;
-User Id=system;Password=oracle;Data Source=localhost:1521/FREEPDB1;
+### 1. Aggregate Functions
 
-system/oracle@localhost/FREEPDB1
+
+
+### 2. Numeric Functions
+
+
+
+### 3. String Functions
+
+
+
+### 4. Null Functions

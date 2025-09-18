@@ -41,6 +41,12 @@ namespace DynamicDbQueryApi.Services
 
             var connection = await context.GetOpenConnectionAsync();
 
+            // Eğer connection null ise hata fırlat
+            if (connection == null)
+            {
+                throw new Exception("Could not open database connection. Please check the connection string and database type.");
+            }
+            connection.Close();
             return await connection.QueryAsync(request.Query);
         }
 
@@ -54,6 +60,12 @@ namespace DynamicDbQueryApi.Services
             var dbType = request.DbType.ToLower();
 
             var connection = await context.GetOpenConnectionAsync();
+
+            // Eğer connection null ise hata fırlat
+            if (connection == null)
+            {
+                throw new Exception("Could not open database connection. Please check the connection string and database type.");
+            }
 
             // Input stringini QueryModel'e çevir
             var model = _queryParserService.Parse(request.Query);

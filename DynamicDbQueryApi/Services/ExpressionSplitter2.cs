@@ -4,6 +4,52 @@ using System.Text;
 
 public static class ExpressionSplitter2
 {
+    // En dıştaki parantez içi operandları çıkarma ve yerlerine $0, $1, ... koyma (bozuk versiyon)
+    public static List<string> ExtractTopLevelOperands(ref string body, out string replacedBody)
+    {
+        var expressions = new List<string>();
+        var sb = new StringBuilder();
+        int depth = 0;
+        int start = -1;
+        int counter = 0;
+
+        for (int i = 0; i < body.Length; i++)
+        {
+            char c = body[i];
+
+            if (c == '(')
+            {
+                if (depth == 0)
+                {
+                    // Parantez başlangıcı
+                    start = i + 1;
+                }
+                depth++;
+            }
+            else if (c == ')')
+            {
+                depth--;
+
+                if (depth == 0 && start >= 0)
+                {
+                    string inner = body.Substring(start, i - start);
+                    string placeholder = $"${counter++}";
+                    expressions.Add(inner.Trim());
+                    sb.Append(placeholder);
+                    start = -1;
+                }
+            }
+            else
+            {
+                if (depth == 0)
+                {
+                    sb.Append(c);
+                }
+            }
+        }
+        replacedBody = sb.ToString().Trim();
+        return expressions;
+    }
     // Basit versiyon: üst-seviye operandları alır, nested içeriğe girmez.
     public static List<string> SimplerExtractTopLevelOperands(ref string body, out string replacedBody)
     {
