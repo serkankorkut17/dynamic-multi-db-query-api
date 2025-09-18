@@ -32,7 +32,7 @@ namespace DynamicDbQueryApi.Services
                         var funcName = funcInfo.Value.funcName;
                         var inner = funcInfo.Value.inner;
 
-                        var args = inner.Split(',').Select(a => a.Trim()).ToList();
+                        var args = SplitByCommas(inner);
 
                         // Fonksiyonu oluştur
                         var funcSql = BuildFunction(dbType, funcName, args);
@@ -138,27 +138,61 @@ namespace DynamicDbQueryApi.Services
             return sql;
         }
 
+        public int FindClosingParenthesis(string str, int openIdx)
+        {
+            int depth = 0;
+            for (int i = openIdx; i < str.Length; i++)
+            {
+                if (str[i] == '(')
+                {
+                    depth++;
+                }
+                else if (str[i] == ')')
+                {
+                    depth--;
+                    if (depth == 0) return i;
+                }
+            }
+            return -1; // Not found
+        }
+
         // Kolonun bir fonksiyon olup olmadığını kontrol etme (örneğin COUNT(*), SUM(col) vb.)
         public (string funcName, string inner)? GetFunction(string column)
         {
-            if (string.IsNullOrWhiteSpace(column)) return null;
-
-            // Regex: func ( ... ) şeklinde olanları yakala -> ...
-            var pattern = $@"^(?<func>[A-Za-z_][A-Za-z0-9_]*)\s*\(\s*(?<inner>.*?)\s*\)$";
-            var funcMatch = Regex.Match(column, pattern, RegexOptions.IgnoreCase);
-
-            if (funcMatch.Success)
+            var start = Regex.Match(column, @"^(?<func>[A-Za-z_][A-Za-z0-9_]*)\s*\(", RegexOptions.IgnoreCase);
+            if (start.Success)
             {
-                var funcName = funcMatch.Groups["func"].Value.ToUpperInvariant();
-                var inner = funcMatch.Groups["inner"].Value.Trim();
+                // Parantez başlangıç indeksini ve kapanış indeksini bul
+                int openIdx = start.Index + start.Length - 1;
+                int bodyStart = openIdx + 1;
+                int closeIdx = FindClosingParenthesis(column, openIdx);
+                if (closeIdx == -1) throw new Exception("Could not find closing parenthesis for function in column.");
 
-                return (funcName, inner);
+                var body = column.Substring(bodyStart, closeIdx - bodyStart).Trim();
+
+                var funcName = start.Groups["func"].Value.ToUpperInvariant();
+                // Fonksiyonu parse et
+                return (funcName, body);
             }
             return null;
         }
 
         public string BuildFunction(string dbType, string functionName, List<string> args)
         {
+            // Eğer argumanlarda fonksiyonlar varsa onları da işle
+            for (int i = 0; i < args.Count; i++)
+            {
+                var funcInfo = GetFunction(args[i]);
+                if (funcInfo != null)
+                {
+                    var funcName = funcInfo.Value.funcName;
+                    var inner = funcInfo.Value.inner;
+                    var innerArgs = SplitByCommas(inner);
+                    var funcSql = BuildFunction(dbType, funcName, innerArgs);
+                    args[i] = funcSql;
+                }
+            }
+
             // Aggregate fonksiyonlarını oluştur (COUNT, SUM, AVG, MIN, MAX)
             var aggregateFuncs = new[] { "COUNT", "SUM", "AVG", "MIN", "MAX" };
             if (aggregateFuncs.Contains(functionName))
@@ -366,9 +400,307 @@ namespace DynamicDbQueryApi.Services
             }
 
             // Tarih fonksiyonlarını oluştur (NOW, CURRENT_DATE, CURRENT_TIME, CURRENT_TIMESTAMP, DATEADD, DATEDIFF, DATENAME, DATEPART, DAY, MONTH, YEAR)
-            // var dateFuncs = new[] { "NOW", "CURRENT_DATE", "CURRENT_TIME", "CURRENT_TIMESTAMP", "DATEADD", "DATEDIFF", "DATENAME", "DATEPART", "DAY", "MONTH", "YEAR" };
+            var dateFuncs = new[] { "NOW", "GETDATE", "CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME", "DATEADD", "DATEDIFF", "DATENAME", "DATEPART", "DAY", "MONTH", "YEAR" };
+            if (dateFuncs.Contains(functionName))
+            {
+                if ((functionName.Equals("NOW", StringComparison.OrdinalIgnoreCase) || functionName.Equals("GETDATE", StringComparison.OrdinalIgnoreCase) || functionName.Equals("CURRENT_TIMESTAMP", StringComparison.OrdinalIgnoreCase)) && args.Count == 0)
+                {
+                    return "CURRENT_TIMESTAMP";
+                }
+                else if (functionName.Equals("CURRENT_DATE", StringComparison.OrdinalIgnoreCase) && args.Count == 0)
+                {
+                    return "CURRENT_DATE";
+                }
+                else if (functionName.Equals("CURRENT_TIME", StringComparison.OrdinalIgnoreCase) && args.Count == 0)
+                {
+                    if (dbType == "mssql" || dbType == "sqlserver")
+                    {
+                        return "CONVERT (TIME, CURRENT_TIMESTAMP)";
+                    }
+                    else if (dbType == "oracle")
+                    {
+                        return "TO_CHAR(SYSDATE, 'HH24:MI:SS')";
+                    }
+                    else
+                    {
+                        return "CURRENT_TIME";
+                    }
+                }
+                else if (functionName.Equals("DATEADD", StringComparison.OrdinalIgnoreCase) && args.Count == 3)
+                {
+                    var interval = args[0].Trim('\'').ToUpperInvariant();
+                    var number = args[2];
+                    var date = args[1];
+
+                    if (dbType == "postgresql" || dbType == "postgres")
+                    {
+                        if (date.StartsWith("'") && date.EndsWith("'"))
+                        {
+                            date = ConvertStringToDate(dbType, date);
+                        }
+                        return $"({date} + INTERVAL '{number} {interval}')";
+                    }
+                    else if (dbType == "mysql")
+                    {
+                        return $"DATE_ADD({date}, INTERVAL {number} {interval})";
+                    }
+                    else if (dbType == "mssql" || dbType == "sqlserver")
+                    {
+                        return $"DATEADD({interval}, {number}, {date})";
+                    }
+                    else if (dbType == "oracle")
+                    {
+                        if (date.StartsWith("'") && date.EndsWith("'"))
+                        {
+                            date = ConvertStringToDate(dbType, date);
+                        }
+                        if (interval == "SECOND" || interval == "SECONDS")
+                        {
+                            return $"({date} + {number} / 86400)";
+                        }
+                        else if (interval == "MINUTE" || interval == "MINUTES")
+                        {
+                            return $"({date} + {number} / 1440)";
+                        }
+                        else if (interval == "HOUR" || interval == "HOURS")
+                        {
+                            return $"({date} + {number} / 24)";
+                        }
+                        else if (interval == "DAY" || interval == "DAYS")
+                        {
+                            return $"({date} + {number})";
+                        }
+                        else if (interval == "WEEK" || interval == "WEEKS")
+                        {
+                            return $"({date} + {number} * 7)";
+                        }
+                        else if (interval == "MONTH" || interval == "MONTHS")
+                        {
+                            return $"ADD_MONTHS({date}, {number})";
+                        }
+                        else if (interval == "YEAR" || interval == "YEARS")
+                        {
+                            return $"ADD_MONTHS({date}, {number} * 12)";
+                        }
+                        else
+                        {
+                            throw new NotSupportedException($"Interval {interval} is not supported in Oracle DATEADD emulation.");
+                        }
+                    }
+                }
+                else if (functionName.Equals("DATEDIFF", StringComparison.OrdinalIgnoreCase) && args.Count == 3)
+                {
+                    var interval = args[0].Trim('\'').ToUpperInvariant();
+                    var startDate = args[1];
+                    var endDate = args[2];
+
+                    if (dbType == "postgresql" || dbType == "postgres")
+                    {
+                        if (startDate.StartsWith("'") && startDate.EndsWith("'"))
+                        {
+                            startDate = ConvertStringToDate(dbType, startDate);
+                        }
+                        if (endDate.StartsWith("'") && endDate.EndsWith("'"))
+                        {
+                            endDate = ConvertStringToDate(dbType, endDate);
+                        }
+                        if (interval == "SECOND")
+                        {
+                            return $"FLOOR(EXTRACT(EPOCH FROM ({endDate} - {startDate})))";
+                        }
+                        else if (interval == "MINUTE")
+                        {
+                            return $"FLOOR(EXTRACT(EPOCH FROM ({endDate} - {startDate})) / 60)";
+                        }
+                        else if (interval == "HOUR")
+                        {
+                            return $"FLOOR(EXTRACT(EPOCH FROM ({endDate} - {startDate})) / 3600)";
+                        }
+                        else if (interval == "DAY")
+                        {
+                            return $"FLOOR(EXTRACT(EPOCH FROM ({endDate} - {startDate})) / 86400)";
+                        }
+                        else if (interval == "WEEK")
+                        {
+                            return $"FLOOR(EXTRACT(EPOCH FROM ({endDate} - {startDate})) / (86400 * 7))";
+                        }
+                        else if (interval == "MONTH")
+                        {
+                            return $"(EXTRACT(YEAR FROM AGE({endDate}, {startDate})) * 12 + EXTRACT(MONTH FROM AGE({endDate}, {startDate})))";
+                        }
+                        else if (interval == "YEAR")
+                        {
+                            return $"EXTRACT(YEAR FROM AGE({endDate}, {startDate}))";
+                        }
+                        else
+                        {
+                            throw new NotSupportedException($"Interval {interval} is not supported in PostgreSQL DATEDIFF emulation.");
+                        }
+                    }
+                    else if (dbType == "mysql")
+                    {
+                        return $"TIMESTAMPDIFF({interval}, {startDate}, {endDate})";
+                    }
+                    else if (dbType == "mssql" || dbType == "sqlserver")
+                    {
+                        return $"DATEDIFF({interval}, {startDate}, {endDate})";
+                    }
+                    else if (dbType == "oracle")
+                    {
+                        if (startDate.StartsWith("'") && startDate.EndsWith("'"))
+                        {
+                            startDate = ConvertStringToDate(dbType, startDate);
+                        }
+                        if (endDate.StartsWith("'") && endDate.EndsWith("'"))
+                        {
+                            endDate = ConvertStringToDate(dbType, endDate);
+                        }
+                        if (interval == "SECOND")
+                        {
+                            return $"FLOOR(({endDate} - {startDate}) * 86400)";
+                        }
+                        else if (interval == "MINUTE")
+                        {
+                            return $"FLOOR(({endDate} - {startDate}) * 1440)";
+                        }
+                        else if (interval == "HOUR")
+                        {
+                            return $"FLOOR(({endDate} - {startDate}) * 24)";
+                        }
+                        else if (interval == "DAY")
+                        {
+                            return $"({endDate} - {startDate})";
+                        }
+                        else if (interval == "WEEK")
+                        {
+                            return $"FLOOR(({endDate} - {startDate}) / 7)";
+                        }
+                        else if (interval == "MONTH")
+                        {
+                            return $"MONTHS_BETWEEN({endDate}, {startDate})";
+                        }
+                        else if (interval == "YEAR")
+                        {
+                            return $"FLOOR(MONTHS_BETWEEN({endDate}, {startDate}) / 12)";
+                        }
+                        else
+                        {
+                            throw new NotSupportedException($"Interval {interval} is not supported in Oracle DATEDIFF emulation.");
+                        }
+                    }
+                }
+                else if ((functionName.Equals("DAY", StringComparison.OrdinalIgnoreCase) || functionName.Equals("MONTH", StringComparison.OrdinalIgnoreCase) || functionName.Equals("YEAR", StringComparison.OrdinalIgnoreCase)) && args.Count == 1)
+                {
+                    var date = args[0];
+
+                    if (dbType == "mssql" || dbType == "sqlserver")
+                    {
+                        return $"{functionName}({date})";
+                    }
+                    else if (dbType == "postgresql" || dbType == "postgres")
+                    {
+                        // date variable eğer '' ise DATE ya da TIMESTAMP'a cast et
+                        if (date.StartsWith("'") && date.EndsWith("'"))
+                        {
+                            date = ConvertStringToDate(dbType, date);
+                        }
+
+                        return $"EXTRACT({functionName} FROM {date})";
+                    }
+                    else if (dbType == "mysql")
+                    {
+                        return $"{functionName}({date})";
+                    }
+                    else if (dbType == "oracle")
+                    {
+                        if (date.StartsWith("'") && date.EndsWith("'"))
+                        {
+                            date = ConvertStringToDate(dbType, date);
+                        }
+                        return $"EXTRACT({functionName} FROM {date})";
+                    }
+                }
+                else if ((functionName.Equals("DATENAME", StringComparison.OrdinalIgnoreCase) || functionName.Equals("TO_CHAR", StringComparison.OrdinalIgnoreCase)) && args.Count == 2)
+                {
+                    var interval = args[0].Trim('\'').ToUpperInvariant();
+                    var date = args[1];
+
+                    if (dbType == "mssql" || dbType == "sqlserver")
+                    {
+                        if (interval == "DAY")
+                        {
+                            interval = "WEEKDAY";
+                        }
+
+                        return $"DATENAME({interval}, {date})";
+                    }
+                    else if (dbType == "postgresql" || dbType == "postgres")
+                    {
+                        if (date.StartsWith("'") && date.EndsWith("'"))
+                        {
+                            date = ConvertStringToDate(dbType, date);
+                        }
+                        return $"TO_CHAR({date}, '{interval}')";
+                    }
+                    else if (dbType == "mysql")
+                    {
+                        if (interval == "MONTH")
+                        {
+                            return $"MONTHNAME({date})";
+                        }
+                        else if (interval == "DAY")
+                        {
+                            return $"DAYNAME({date})";
+                        }
+                        else
+                        {
+                            throw new NotSupportedException($"Interval {interval} is not supported in MySQL DATENAME emulation.");
+                        }
+                    }
+                    else if (dbType == "oracle")
+                    {
+                        if (date.StartsWith("'") && date.EndsWith("'"))
+                        {
+                            date = ConvertStringToDate(dbType, date);
+                        }
+                        return $"TO_CHAR({date}, '{interval}')";
+                    }
+                }
+            }
 
             throw new NotSupportedException($"Function {functionName} with {args.Count} args is not supported.");
+        }
+
+        // Oracle String to DATE/TIMESTAMP dönüşümü
+        public string ConvertStringToDate(string dbType, string dateString)
+        {
+            if (dbType == "oracle")
+            {
+                // Tarih formatını belirle
+                if (dateString.Contains(":"))
+                {
+                    return $"TO_TIMESTAMP({dateString}, 'YYYY-MM-DD HH24:MI:SS')";
+                }
+                else
+                {
+                    return $"TO_DATE({dateString}, 'YYYY-MM-DD')";
+                }
+            }
+            else if (dbType == "postgresql" || dbType == "postgres")
+            {
+                if (dateString.Contains(":"))
+                {
+                    return $"{dateString}::TIMESTAMP";
+                }
+                else
+                {
+                    return $"{dateString}::DATE";
+                }
+            }
+            else
+            {
+                return $"{dateString}";
+            }
         }
 
         // FilterModel'den SQL WHERE/HAVING koşulu oluşturma
@@ -533,6 +865,67 @@ namespace DynamicDbQueryApi.Services
             sqlBuilder.Append("\n);");
 
             return sqlBuilder.ToString();
+        }
+
+        // , lerden bölme (parantez içi ve string içi değilse)
+        private List<string> SplitByCommas(string input)
+        {
+            List<string> result = new List<string>();
+            for (int i = 0; i < input.Length; i++)
+            {
+                if (input[i] == '(')
+                {
+                    // Parantez içindeki virgülleri yok say
+                    int closeIdx = FindClosingParenthesis(input, i);
+                    if (closeIdx == -1)
+                    {
+                        throw new Exception("Could not find closing parenthesis in FETCH columns.");
+                    }
+                    i = closeIdx;
+                }
+
+                else if (input[i] == '\'')
+                {
+                    // String içindeki virgülleri yok say
+                    int closeIdx = FindClosingQuote(input, i);
+                    if (closeIdx == -1)
+                    {
+                        throw new Exception("Could not find closing quote in FETCH columns.");
+                    }
+                    i = closeIdx;
+                }
+
+                else if (input[i] == ',')
+                {
+                    // Virgül bulundu, böl
+                    result.Add(input.Substring(0, i).Trim());
+                    input = input.Substring(i + 1).Trim();
+                    i = -1;
+                }
+            }
+            // Son parçayı ekle
+            if (!string.IsNullOrWhiteSpace(input))
+            {
+                result.Add(input.Trim());
+            }
+
+            return result;
+        }
+
+        private int FindClosingQuote(string str, int startIdx)
+        {
+            for (int i = startIdx + 1; i < str.Length; i++)
+            {
+                if (str[i] == '\'')
+                {
+                    // Eğer öncesinde \ yoksa kapatma tırnağıdır
+                    if (i == 0 || str[i - 1] != '\\')
+                    {
+                        return i;
+                    }
+                }
+            }
+            return -1; // Not found
         }
     }
 }

@@ -1,6 +1,8 @@
 # dynamic-multi-db-query-api
 count, sum, avg, min, max, joins, group by, order by, limit, offset, distinct
 
+contains(...) oluyo mu bak !!!!!
+
 eklenecek:
 LENGTH(col) - LEN(col)
 SUBSTRING(col, start, len) - SUBSTR(col, start, len)

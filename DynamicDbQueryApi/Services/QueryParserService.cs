@@ -539,7 +539,53 @@ namespace DynamicDbQueryApi.Services
             }
 
             // Tarih fonksiyonlarını yakala (NOW, CURRENT_DATE, CURRENT_TIME, CURRENT_TIMESTAMP, DATEADD, DATEDIFF, DATENAME, DATEPART, DAY, MONTH, YEAR)
-            // var dateFuncs = new[] { "NOW", "CURRENT_DATE", "CURRENT_TIME", "CURRENT_TIMESTAMP", "DATEADD", "DATEDIFF", "DATENAME", "DATEPART", "DAY", "MONTH", "YEAR" };
+            var dateFuncs = new[] { "NOW", "GETDATE", "CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME", "DATEADD", "DATEDIFF", "DATENAME", "TO_CHAR", "DAY", "MONTH", "YEAR" };
+            if (dateFuncs.Contains(functionString))
+            {
+                if (functionString == "NOW" || functionString == "GETDATE" || functionString == "CURRENT_TIMESTAMP" || functionString == "CURRENT_DATE" || functionString == "CURRENT_TIME")
+                {
+                    if (innerParams.Count != 0)
+                    {
+                        throw new Exception($"Invalid usage of date function {functionString} with parameters.");
+                    }
+                    return $"{functionString}()";
+                }
+
+                if (functionString == "DAY" || functionString == "MONTH" || functionString == "YEAR")
+                {
+                    if (innerParams.Count != 1)
+                    {
+                        throw new Exception($"Invalid usage of date function {functionString} with incorrect number of parameters.");
+                    }
+                    return $"{functionString}({innerParams[0]})";
+                }
+
+                if (functionString == "DATEADD" || functionString == "DATEDIFF")
+                {
+                    if (innerParams.Count != 3)
+                    {
+                        throw new Exception($"Invalid usage of date function {functionString} with incorrect number of parameters.");
+                    }
+                    var col = innerParams[0];
+                    var interval = innerParams[1];
+                    var number = innerParams[2];
+
+                    return $"{functionString}({col}, {interval}, {number})";
+                }
+
+                if (functionString == "DATENAME" || functionString == "TO_CHAR")
+                {
+                    if (innerParams.Count != 2)
+                    {
+                        throw new Exception($"Invalid usage of date function {functionString} with incorrect number of parameters.");
+                    }
+                    var part = innerParams[0];
+                    var col = innerParams[1];
+
+                    return $"{functionString}({part}, {col})";
+                }
+            }
+
 
 
             // Eğer tanımlanamayan bir fonksiyon ise hata fırlat
