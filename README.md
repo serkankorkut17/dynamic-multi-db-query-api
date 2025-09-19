@@ -110,11 +110,26 @@ Internal: a = 1 OR (b = 2 AND c = 3)
 | MAX(col)    | MAX(Grade) | Maximum     |
 
 
-- Form: IF(condition, true_val, false_val)
-- Where: usable anywhere an expression is allowed (FETCH, GROUPBY, HAVING, ORDERBY, and even FILTER).
+### 2. Conditional Functions
+
+| Function    | Example    | Description |
+|-------------|------------|-------------|
+| IF(condition, true_val, false_val) | IF(grade >= 90, 'A', 'B')  | Classic if else   |
+| IFS(cond1, val1, cond2, val2, ..., elseVal)   | IFS(grade >= 90, 'A', grade >= 80, 'B', 'C') | If, Else If, ... , Else         |
+| CASE(cond1, val1, cond2, val2, ..., elseVal)    | CASE(grade >= 90, 'A', grade >= 80, 'B', 'C') | Switch-Case     |
+
+- IF(condition, true_val, false_val)
+- CASE/IFS(cond1, val1, cond2, val2, ..., elseVal) → SQL: CASE WHEN cond1 THEN val1 WHEN cond2 THEN val2 ... ELSE elseVal END
+
+Example:
+```sql
+FETCH(
+  CASE(grade >= 90, 'A', grade >= 80, 'B', 'C') AS letter
+)
+```
 
 
-### 2. Numeric Functions
+### 3. Numeric Functions
 
 | Function               | Example        | Description        |
 |------------------------|----------------|--------------------|
@@ -131,7 +146,7 @@ Internal: a = 1 OR (b = 2 AND c = 3)
 | LOG10(x)               | LOG10(100)     | Base-10 log        |
 
 
-### 3. String Functions
+### 4. String Functions
 
 | Function               | Example         | Description        |
 |------------------------|-----------------|--------------------|
@@ -147,7 +162,7 @@ Internal: a = 1 OR (b = 2 AND c = 3)
 | REVERSE(str)           | REVERSE(Code)    | Reverse string    |
 
 
-### 4. Null Functions
+### 5. Null Functions
 
 | Function               | Example          | Description       |
 |------------------------|------------------|-------------------|
@@ -157,7 +172,7 @@ Internal: a = 1 OR (b = 2 AND c = 3)
 | NVL(a,b, ...)          | NVL(Phone,'-')    | Alias            |
 
 
-### 5. Date / Time Functions
+### 6. Date / Time Functions
 
 | Function               | Example          | Description           |
 |------------------------|------------------|-----------------------|
