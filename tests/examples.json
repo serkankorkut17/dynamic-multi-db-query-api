@@ -170,5 +170,12 @@
 		"mysql": "SELECT id, first_name, last_name FROM students ORDER BY first_name LIMIT 10 OFFSET 5",
 		"mssql": "SELECT id, first_name, last_name FROM students ORDER BY first_name OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY",
 		"oracle": "SELECT id, first_name, last_name FROM students ORDER BY first_name OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY"
+	},
+	{
+		"dsl": "FETCH(CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total) FROM students FILTER(ISNULL(first_name, 'noname') CONTAINS LOWER('T')) GROUPBY(name) ORDERBY(total DESC)",
+		"postgres": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE ISNULL(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name ORDER BY total DESC",
+		"mysql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE IFNULL(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name ORDER BY total DESC",
+		"mssql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE ISNULL(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name ORDER BY total DESC",
+		"oracle": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE NVL(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name ORDER BY total DESC"
 	}
 ]

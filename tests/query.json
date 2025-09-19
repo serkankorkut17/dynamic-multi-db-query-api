@@ -97,6 +97,14 @@
 			"mysql": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent < 20 OR progress_percent > 80 ORDER BY progress_percent DESC LIMIT 25",
 			"mssql": "SELECT TOP 25 id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent < 20 OR progress_percent > 80 ORDER BY progress_percent DESC",
 			"oracle": "SELECT id, student_id, course_id, progress_percent FROM enrollments WHERE progress_percent < 20 OR progress_percent > 80 ORDER BY progress_percent DESC FETCH FIRST 25 ROWS ONLY"
+		},
+		{
+			"id": 11,
+			"dsl": "FETCH(CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total) FROM students FILTER(ISNULL(first_name, 'noname') CONTAINS LOWER('T')) GROUPBY(name) HAVING(total > 2) ORDERBY(total DESC)",
+			"postgres": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING total > 2 ORDER BY total DESC",
+			"mysql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING total > 2 ORDER BY total DESC",
+			"mssql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY CONCAT(LOWER(first_name), '-', UPPER(last_name)) HAVING total > 2 ORDER BY total DESC",
+			"oracle": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING total > 2 ORDER BY total DESC"
 		}
 	]
 }

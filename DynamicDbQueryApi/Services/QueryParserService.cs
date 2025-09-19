@@ -33,6 +33,11 @@ namespace DynamicDbQueryApi.Services
             queryModel.Columns = ParseFetchColumns(queryString, queryModel.Table);
             List<string> aliasList = queryModel.Columns.Where(c => !string.IsNullOrWhiteSpace(c.Alias)).Select(c => c.Alias!).ToList();
 
+            // Alias - Kolon Dictionary
+            var aliasColumnDict = queryModel.Columns
+                .Where(c => !string.IsNullOrWhiteSpace(c.Alias))
+                .ToDictionary(c => c.Alias!, c => c.Expression);
+
             // DISTINCT Part
             queryModel.Distinct = queryString.Contains("FETCHD", StringComparison.OrdinalIgnoreCase) || queryString.Contains("FETCHDISTINCT", StringComparison.OrdinalIgnoreCase) || queryString.Contains("FETCH DISTINCT", StringComparison.OrdinalIgnoreCase);
 
@@ -40,16 +45,16 @@ namespace DynamicDbQueryApi.Services
             queryModel.Includes = ParseIncludes(queryString, queryModel.Table);
 
             // FILTER Part
-            queryModel.Filters = ParseFilters(queryString, queryModel.Table, aliasList);
+            queryModel.Filters = ParseFilters(queryString, queryModel.Table, aliasColumnDict);
 
             // GROUP BY Part
-            queryModel.GroupBy = ParseGroupBy(queryString, queryModel.Table, aliasList);
+            queryModel.GroupBy = ParseGroupBy(queryString, queryModel.Table, aliasColumnDict);
 
             // HAVING Part
-            queryModel.Having = ParseHaving(queryString, queryModel.Table, aliasList);
+            queryModel.Having = ParseHaving(queryString, queryModel.Table, aliasColumnDict);
 
             // ORDER BY Part
-            queryModel.OrderBy = ParseOrderBy(queryString, queryModel.Table, aliasList);
+            queryModel.OrderBy = ParseOrderBy(queryString, queryModel.Table, aliasColumnDict);
 
             // LIMIT Part
             queryModel.Limit = ParseLimit(queryString);
@@ -117,7 +122,20 @@ namespace DynamicDbQueryApi.Services
                 }
                 else
                 {
-                    alias = expression.ToLowerInvariant().Replace('.', '_').Replace('(', '_').Replace(')', '_').Replace('*', 'a').Replace(',', '_').Replace(' ', '_').Replace('-', '_');
+                    if (IsDateOrTimestamp(expression))
+                    {
+                        alias = "date_" + i;
+                    }
+                    else
+                    {
+                        alias = expression.ToLowerInvariant().Replace('.', '_').Replace('(', '_').Replace(')', '_').Replace('*', 'a').Replace(',', '_').Replace(' ', '_').Replace('-', '_').Replace("\"", "");
+                    }
+
+                    // Eğer alias sayı ile başlıyorsa başına _ ekle
+                    if (char.IsDigit(alias[0]))
+                    {
+                        alias = "_" + alias;
+                    }
                 }
                 columnModels.Add(new QueryColumnModel
                 {
@@ -137,7 +155,7 @@ namespace DynamicDbQueryApi.Services
 
             var body = m.Groups[1].Value;
 
-            var includeTables = body.Split(',').Select(c => c.Trim()).Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+            var includeTables = SplitByCommas(body);
 
             foreach (var include in includeTables)
             {
@@ -188,7 +206,7 @@ namespace DynamicDbQueryApi.Services
         }
 
         // FILTER(...) kısmını parse etme
-        private FilterModel? ParseFilters(string queryString, string tableName, List<string> aliasList)
+        private FilterModel? ParseFilters(string queryString, string tableName, Dictionary<string, string> aliasColumnDict)
         {
             var start = Regex.Match(queryString, @"\bFILTER\s*\(", RegexOptions.IgnoreCase);
             if (!start.Success) return null;
@@ -204,33 +222,33 @@ namespace DynamicDbQueryApi.Services
             if (string.IsNullOrWhiteSpace(body)) return null;
 
             // FILTER ifadesini FilterModel yapısına dönüştür
-            var filterModel = BuildFilterModel(body, tableName, aliasList);
+            var filterModel = BuildFilterModel(body, tableName, aliasColumnDict);
 
 
             return filterModel;
         }
 
         // GROUPBY(...) kısmını parse etme
-        private List<string> ParseGroupBy(string queryString, string tableName, List<string> aliasList)
+        private List<string> ParseGroupBy(string queryString, string tableName, Dictionary<string, string> aliasColumnDict)
         {
             var m = Regex.Match(queryString, @"\bGROUPBY\s*\(\s*(.*?)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
             if (!m.Success) return new List<string>();
 
             var body = m.Groups[1].Value;
 
-            var groupByColumns = body.Split(',').Select(c => c.Trim()).Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+            var groupByColumns = SplitByCommas(body);
 
             // Her column için tablo ismi ekle
             for (int i = 0; i < groupByColumns.Count; i++)
             {
-                groupByColumns[i] = AddTablePrefixToColumn(groupByColumns[i], tableName, aliasList);
+                groupByColumns[i] = AddTablePrefixToColumn(groupByColumns[i], tableName, aliasColumnDict);
             }
 
             return groupByColumns;
         }
 
         // HAVING(...) kısmını parse etme
-        private FilterModel? ParseHaving(string queryString, string tableName, List<string> aliasList)
+        private FilterModel? ParseHaving(string queryString, string tableName, Dictionary<string, string> aliasColumnDict)
         {
             var start = Regex.Match(queryString, @"\bHAVING\s*\(", RegexOptions.IgnoreCase);
             if (!start.Success) return null;
@@ -246,13 +264,13 @@ namespace DynamicDbQueryApi.Services
             if (string.IsNullOrWhiteSpace(body)) return null;
 
             // HAVING ifadesini FilterModel yapısına dönüştür
-            var filterModel = BuildFilterModel(body, tableName, aliasList);
+            var filterModel = BuildFilterModel(body, tableName, aliasColumnDict);
 
             return filterModel;
         }
 
         // ORDERBY(...) kısmını parse etme
-        private List<OrderByModel> ParseOrderBy(string queryString, string tableName, List<string> aliasList)
+        private List<OrderByModel> ParseOrderBy(string queryString, string tableName, Dictionary<string, string> aliasColumnDict)
         {
             var start = Regex.Match(queryString, @"\bORDERBY\s*\(", RegexOptions.IgnoreCase);
             if (!start.Success) return new List<OrderByModel>();
@@ -266,7 +284,7 @@ namespace DynamicDbQueryApi.Services
             var body = queryString.Substring(bodyStart, closeIdx - bodyStart).Trim();
 
             var orderByColumns = new List<OrderByModel>();
-            var columns = body.Split(',').Where(c => !string.IsNullOrWhiteSpace(c)).Select(c => c.Trim()).ToList();
+            var columns = SplitByCommas(body);
 
             // Her column için tablo ismi ekle ve DESC kontrolü yap
             foreach (var column in columns)
@@ -276,7 +294,7 @@ namespace DynamicDbQueryApi.Services
                     var parts = column.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length > 0)
                     {
-                        var columnWithPrefix = AddTablePrefixToColumn(parts[0], tableName, aliasList);
+                        var columnWithPrefix = AddTablePrefixToColumn(parts[0], tableName, aliasColumnDict);
                         var orderByModel = new OrderByModel
                         {
                             Column = columnWithPrefix,
@@ -300,9 +318,11 @@ namespace DynamicDbQueryApi.Services
                 if (!m.Success) return 0;
             }
 
-            if (int.TryParse(m.Groups[1].Value, out var limit))
+            var limit = m.Groups[1].Value;
+
+            if (int.TryParse(limit, out var limitValue))
             {
-                return limit;
+                return limitValue;
             }
             else
             {
@@ -320,9 +340,11 @@ namespace DynamicDbQueryApi.Services
                 if (!m.Success) return 0;
             }
 
-            if (int.TryParse(m.Groups[1].Value, out var offset))
+            var offset = m.Groups[1].Value;
+
+            if (int.TryParse(offset, out var offsetValue))
             {
-                return offset;
+                return offsetValue;
             }
             else
             {
@@ -367,23 +389,86 @@ namespace DynamicDbQueryApi.Services
         }
 
         // Fonksiyonları parse etme
-        private string ParseFunction(string functionString, string inner, string tableName, List<string>? aliasList = null)
+        private string ParseFunction(string functionString, string inner, string tableName, Dictionary<string, string>? aliasColumnDict = null)
         {
             // Eğer inner boşsa hata fırlat
-            if (string.IsNullOrWhiteSpace(inner))
-            {
-                throw new Exception($"Function {functionString} requires parameters.");
-            }
+            // if (string.IsNullOrWhiteSpace(inner))
+            // {
+            //     throw new Exception($"Function {functionString} requires parameters.");
+            // }
 
             // Fonksiyon içindeki parametreleri ayır
-            var innerParams = SplitByCommas(inner);
+            List<string> innerParams;
+            if (string.IsNullOrWhiteSpace(inner))
+            {
+                innerParams = new List<string>();
+            }
+            else
+            {
+                innerParams = SplitByCommas(inner);
+            }
 
             if (innerParams.Count != 0)
             {
                 for (int i = 0; i < innerParams.Count; i++)
                 {
-                    innerParams[i] = AddTablePrefixToColumn(innerParams[i], tableName, aliasList);
+                    if (functionString.Equals("IF", StringComparison.OrdinalIgnoreCase) && i == 0)
+                    {
+                        // IF fonksiyonunun ilk parametresi bir condition olduğu için burada işlem yapma
+                        continue;
+                    }
+                    if (functionString.Equals("CASE", StringComparison.OrdinalIgnoreCase) || functionString.Equals("IFS", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // CASE/IFS fonksiyonunun çift parametreleri condition olduğu için burada işlem yapma
+                        if (i % 2 == 0) continue;
+                    }
+                    innerParams[i] = AddTablePrefixToColumn(innerParams[i], tableName, aliasColumnDict);
                 }
+            }
+
+            // IF fonksiyonunu yakala (IF(condition, trueValue, falseValue))
+            if (functionString.Equals("IF", StringComparison.OrdinalIgnoreCase))
+            {
+                if (innerParams.Count == 3)
+                {
+                    var condition = innerParams[0];
+                    var filterModel = BuildFilterModel(condition, tableName, aliasColumnDict!);
+                    var trueValue = AddTablePrefixToColumn(innerParams[1], tableName, aliasColumnDict);
+                    var falseValue = AddTablePrefixToColumn(innerParams[2], tableName, aliasColumnDict);
+                    var options = new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    };
+                    string conditionString = JsonSerializer.Serialize<FilterModel>(filterModel!, options);
+
+                    return $"IF({conditionString}, {trueValue}, {falseValue})";
+                }
+                else
+                {
+                    throw new Exception($"Invalid usage of IF function with incorrect number of parameters.");
+                }
+            }
+
+            // CASE/IFS: (cond1, val1, cond2, val2, ..., elseVal)
+            if (functionString.Equals("CASE", StringComparison.OrdinalIgnoreCase) ||
+                functionString.Equals("IFS", StringComparison.OrdinalIgnoreCase))
+            {
+                if (innerParams.Count < 3 || innerParams.Count % 2 == 0)
+                    throw new Exception("CASE/IFS requires (cond1, val1, ..., elseVal) with odd arg count.");
+
+                for (int i = 0; i < innerParams.Count - 1; i += 2)
+                {
+                    var condRaw = innerParams[i].Trim();
+                    var condModel = BuildFilterModel(condRaw, tableName, aliasColumnDict!);
+                    var options = new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    };
+                    string conditionString = JsonSerializer.Serialize<FilterModel>(condModel!, options);
+                    innerParams[i] = conditionString;
+                }
+
+                return $"IFS({string.Join(", ", innerParams)})";
             }
 
             // Aggregate fonksiyonlarını yakala (COUNT, SUM, AVG, MIN, MAX)
@@ -594,9 +679,15 @@ namespace DynamicDbQueryApi.Services
         }
 
         // Columnlara table ismi ekleme
-        private string AddTablePrefixToColumn(string column, string tableName, List<string>? aliasList = null)
+        private string AddTablePrefixToColumn(string column, string tableName, Dictionary<string, string>? aliasColumnDict = null)
         {
             if (string.IsNullOrWhiteSpace(column)) return column;
+
+            // Eğer TRUE, FALSE, NULL ise tablo ismi ekleme
+            if (column.Equals("TRUE", StringComparison.OrdinalIgnoreCase) || column.Equals("FALSE", StringComparison.OrdinalIgnoreCase) || column.Equals("NULL", StringComparison.OrdinalIgnoreCase))
+            {
+                return column.ToUpperInvariant();
+            }
 
             // Eğer sayı ise tablo ismi ekleme
             if (int.TryParse(column, out _))
@@ -620,13 +711,13 @@ namespace DynamicDbQueryApi.Services
             if (func != null)
             {
                 var (funcName, inner) = func.Value;
-                return ParseFunction(funcName, inner, tableName, aliasList);
+                return ParseFunction(funcName, inner, tableName, aliasColumnDict);
             }
 
-            // Eğer aliasList verilmişse ve column bu listede varsa tablo ismi ekleme
-            if (aliasList != null && aliasList.Contains(column, StringComparer.OrdinalIgnoreCase))
+            // Eğer aliasColumnDict verilmişse ve column bu dictte varsa karşılığı ile değiştir
+            if (aliasColumnDict != null && aliasColumnDict.TryGetValue(column, out var actualColumn))
             {
-                return column;
+                return actualColumn;
             }
 
             var parts = column.Split('.');
@@ -679,11 +770,11 @@ namespace DynamicDbQueryApi.Services
         }
 
         // FILTER ifadesini FilterModel yapısına dönüştürme
-        private FilterModel? BuildFilterModel(string body, string tableName, List<string> aliasList)
+        private FilterModel? BuildFilterModel(string body, string tableName, Dictionary<string, string> aliasColumnDict)
         {
             if (IsSingleConditionFilter(body))
             {
-                var cond = ParseConditionFilter(body, tableName, aliasList);
+                var cond = ParseConditionFilter(body, tableName, aliasColumnDict);
                 return cond;
             }
 
@@ -742,8 +833,8 @@ namespace DynamicDbQueryApi.Services
                 filter.Operator = tokens[1].Equals("AND", StringComparison.OrdinalIgnoreCase) ? LogicalOperator.And : LogicalOperator.Or;
 
                 // Recursive olarak sol ve sağ ifadeleri işle
-                filter.Left = BuildFilterModel(tokens[0], tableName, aliasList)!;
-                filter.Right = BuildFilterModel(tokens[2], tableName, aliasList)!;
+                filter.Left = BuildFilterModel(tokens[0], tableName, aliasColumnDict)!;
+                filter.Right = BuildFilterModel(tokens[2], tableName, aliasColumnDict)!;
 
                 return filter;
             }
@@ -810,15 +901,15 @@ namespace DynamicDbQueryApi.Services
         }
 
         // Tekil condition filter ifadesini parse etme
-        private ConditionFilterModel? ParseConditionFilter(string expr, string tableName, List<string> aliasList)
+        private ConditionFilterModel? ParseConditionFilter(string expr, string tableName, Dictionary<string, string> aliasColumnDict)
         {
             if (string.IsNullOrWhiteSpace(expr)) return null;
 
             var s = expr.Trim();
 
-            // Genel operatorler (>=, <=, !=, <>, ==, =, >, <, CONTAINS, BEGINSWITH, ENDSWITH, LIKE)
+            // Genel operatorler (>=, <=, !=, <>, ==, =, >, <, CONTAINS, STARTSWITH, BEGINSWITH, ENDSWITH, LIKE)
             var m = Regex.Match(s,
-                @"^\s*(?<col>[\w\.\-\(\)\*\s,']+?)\s*(?<op>>=|<=|!=|<>|==|=|>|<|LIKE|CONTAINS|BEGINSWITH|ENDSWITH)\s*(?<rhs>.+?)\s*$",
+                @"^\s*(?<col>[\w\.\-\(\)\*\s,']+?)\s*(?<op>>=|<=|!=|<>|==|=|>|<|LIKE|CONTAINS|STARTSWITH|BEGINSWITH|ENDSWITH)\s*(?<rhs>.+?)\s*$",
                 RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             if (!m.Success)
@@ -858,11 +949,13 @@ namespace DynamicDbQueryApi.Services
                 case ">=": comp = ComparisonOperator.Gte; break;
                 case "<=": comp = ComparisonOperator.Lte; break;
                 case "CONTAINS": comp = ComparisonOperator.Contains; break;
+                case "STARTSWITH": comp = ComparisonOperator.BeginsWith; break;
                 case "BEGINSWITH": comp = ComparisonOperator.BeginsWith; break;
                 case "ENDSWITH": comp = ComparisonOperator.EndsWith; break;
                 case "LIKE": comp = ComparisonOperator.Like; break;
                 default: return null;
             }
+
 
             // Eğer comp != ve rhs == NULL ise IS NOT NULL yap
             if (comp == ComparisonOperator.Neq && rhs.Equals("NULL", StringComparison.OrdinalIgnoreCase))
@@ -874,17 +967,9 @@ namespace DynamicDbQueryApi.Services
                 comp = ComparisonOperator.IsNull;
             }
 
-            // Eğer col sayı veya string değil ise tablo ismi ekle
-            if (!(double.TryParse(col, out _) || !(col.StartsWith("'") && col.EndsWith("'"))))
-            {
-                col = AddTablePrefixToColumn(col, tableName, aliasList);
-            }
 
-            // Eğer rhs sayı veya string değil ise tablo ismi ekle
-            if (!(double.TryParse(rhs, out _) || !(rhs.StartsWith("'") && rhs.EndsWith("'"))))
-            {
-                rhs = AddTablePrefixToColumn(rhs, tableName, aliasList);
-            }
+            col = AddTablePrefixToColumn(col, tableName, aliasColumnDict);
+            rhs = AddTablePrefixToColumn(rhs, tableName, aliasColumnDict);
 
             return new ConditionFilterModel
             {
@@ -937,6 +1022,21 @@ namespace DynamicDbQueryApi.Services
             }
 
             return result;
+        }
+
+        private static bool IsDateOrTimestamp(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return false;
+            s = s.Trim();
+
+            // 'YYYY-MM-DD' ya da YYYY-MM-DD
+            var dateOnly = new Regex(@"^'?(\d{4}-\d{2}-\d{2})'?$", RegexOptions.Compiled);
+
+            // 'YYYY-MM-DD HH:MM:SS' ya da 'YYYY-MM-DDTHH:MM:SS' ya da YYYY-MM-DD HH:MM:SS ya da YYYY-MM-DDTHH:MM:SS
+            var tsSpace = new Regex(@"^'?(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})(\.\d{1,3})?'?$", RegexOptions.Compiled);
+            var tsIso = new Regex(@"^'?(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{1,3})?(Z|[+\-]\d{2}:\d{2})?'?$", RegexOptions.Compiled);
+
+            return dateOnly.IsMatch(s) || tsSpace.IsMatch(s) || tsIso.IsMatch(s);
         }
     }
 }

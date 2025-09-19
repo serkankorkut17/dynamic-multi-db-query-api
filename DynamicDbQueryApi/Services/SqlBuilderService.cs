@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DynamicDbQueryApi.DTOs;
@@ -26,36 +27,8 @@ namespace DynamicDbQueryApi.Services
                     if (i > 0) columnsBuilder.Append(", ");
 
                     // Kolon bir fonksiyon ise fonksiyonu ve içindeki argümanları işle
-                    var funcInfo = GetFunction(c.Expression);
-                    if (funcInfo != null)
-                    {
-                        var funcName = funcInfo.Value.funcName;
-                        var inner = funcInfo.Value.inner;
-
-                        var args = SplitByCommas(inner);
-
-                        // Fonksiyonu oluştur
-                        var funcSql = BuildFunction(dbType, funcName, args);
-                        if (!string.IsNullOrEmpty(c.Alias))
-                        {
-                            columnsBuilder.Append($"{funcSql} AS {c.Alias}");
-                        }
-                        else
-                        {
-                            columnsBuilder.Append(funcSql);
-                        }
-                    }
-                    else
-                    {
-                        if (!string.IsNullOrEmpty(c.Alias))
-                        {
-                            columnsBuilder.Append($"{c.Expression} AS {c.Alias}");
-                        }
-                        else
-                        {
-                            columnsBuilder.Append(c.Expression);
-                        }
-                    }
+                    var columnSql = BuildSelectColumn(dbType, c);
+                    columnsBuilder.Append(columnSql);
                 }
             }
             else
@@ -94,11 +67,21 @@ namespace DynamicDbQueryApi.Services
                 sql += $" WHERE {whereClause}";
             }
 
-
             // GROUP BY Part
             if (model.GroupBy.Any())
             {
-                sql += " GROUP BY " + string.Join(", ", model.GroupBy);
+                StringBuilder groupByBuilder = new StringBuilder();
+                for (int i = 0; i < model.GroupBy.Count; i++)
+                {
+                    var gb = model.GroupBy[i];
+                    if (i > 0) groupByBuilder.Append(", ");
+
+                    // Kolon bir fonksiyon ise fonksiyonu ve içindeki argümanları işle
+                    var groupByColumnSql = BuildGroupByColumn(dbType, gb);
+                    groupByBuilder.Append(groupByColumnSql);
+                }
+                var groupByClause = groupByBuilder.ToString();
+                sql += $" GROUP BY {groupByClause}";
             }
 
             // HAVING Part
@@ -111,7 +94,18 @@ namespace DynamicDbQueryApi.Services
             // ORDER BY Part
             if (model.OrderBy.Any())
             {
-                sql += " ORDER BY " + string.Join(", ", model.OrderBy.Select(o => $"{o.Column} {(o.Desc ? "DESC" : "ASC")}"));
+                StringBuilder orderByBuilder = new StringBuilder();
+                for (int i = 0; i < model.OrderBy.Count; i++)
+                {
+                    var ob = model.OrderBy[i];
+                    if (i > 0) orderByBuilder.Append(", ");
+
+                    // Kolon bir fonksiyon ise fonksiyonu ve içindeki argümanları işle
+                    var orderByColumnSql = BuildOrderByColumn(dbType, ob);
+                    orderByBuilder.Append(orderByColumnSql);
+                }
+                var orderByClause = orderByBuilder.ToString();
+                sql += $" ORDER BY {orderByClause}";
             }
 
             // LIMIT and OFFSET Part
@@ -177,11 +171,100 @@ namespace DynamicDbQueryApi.Services
             return null;
         }
 
+        public string BuildSelectColumn(string dbType, QueryColumnModel column)
+        {
+            // Kolon bir fonksiyon ise fonksiyonu ve içindeki argümanları işle
+            var funcInfo = GetFunction(column.Expression);
+            if (funcInfo != null)
+            {
+                var funcName = funcInfo.Value.funcName;
+                var inner = funcInfo.Value.inner;
+
+                var args = SplitByCommas(inner);
+
+                // Fonksiyonu oluştur
+                var funcSql = BuildFunction(dbType, funcName, args);
+                if (!string.IsNullOrEmpty(column.Alias))
+                {
+                    return $"{funcSql} AS {column.Alias}";
+                }
+                else
+                {
+                    return funcSql;
+                }
+            }
+            else if (IsDateOrTimestamp(column.Expression))
+            {
+                Console.WriteLine($"Text '{column.Expression}' looks like a date or timestamp. Converting.");
+
+                return ConvertStringToDate(dbType, column.Expression) + (string.IsNullOrEmpty(column.Alias) ? "" : $" AS {column.Alias}");
+            }
+            else
+            {
+                if (!string.IsNullOrEmpty(column.Alias))
+                {
+                    return $"{column.Expression} AS {column.Alias}";
+                }
+                else
+                {
+                    return column.Expression;
+                }
+            }
+        }
+
+        public string BuildGroupByColumn(string dbType, string column)
+        {
+            // Kolon bir fonksiyon ise fonksiyonu ve içindeki argümanları işle
+            var funcInfo = GetFunction(column);
+            if (funcInfo != null)
+            {
+                var funcName = funcInfo.Value.funcName;
+                var inner = funcInfo.Value.inner;
+                var args = SplitByCommas(inner);
+                var funcSql = BuildFunction(dbType, funcName, args);
+                return funcSql;
+            }
+            else
+            {
+                return column;
+            }
+        }
+
+        public string BuildOrderByColumn(string dbType, OrderByModel orderBy)
+        {
+            // Kolon bir fonksiyon ise fonksiyonu ve içindeki argümanları işle
+            var funcInfo = GetFunction(orderBy.Column);
+            if (funcInfo != null)
+            {
+                var funcName = funcInfo.Value.funcName;
+                var inner = funcInfo.Value.inner;
+                var args = SplitByCommas(inner);
+                var funcSql = BuildFunction(dbType, funcName, args);
+                return $"{funcSql} {(orderBy.Desc ? "DESC" : "ASC")}";
+            }
+            else
+            {
+                return $"{orderBy.Column} {(orderBy.Desc ? "DESC" : "ASC")}";
+            }
+        }
+
+        // Fonksiyonları dbType'a göre oluşturma
         public string BuildFunction(string dbType, string functionName, List<string> args)
         {
             // Eğer argumanlarda fonksiyonlar varsa onları da işle
             for (int i = 0; i < args.Count; i++)
             {
+                if (functionName.Equals("IF", StringComparison.OrdinalIgnoreCase) && i == 0)
+                {
+                    // IF fonksiyonunun ilk argümanı bir filtre olabilir, bu yüzden işlemiyoruz
+                    continue;
+                }
+
+                if (functionName.Equals("CASE", StringComparison.OrdinalIgnoreCase) || functionName.Equals("IFS", StringComparison.OrdinalIgnoreCase))
+                {
+                    // CASE/IFS fonksiyonunun çift argümanları condition olabilir, bu yüzden işlemiyoruz
+                    if (i % 2 == 0) continue;
+                }
                 var funcInfo = GetFunction(args[i]);
                 if (funcInfo != null)
                 {
@@ -191,6 +274,55 @@ namespace DynamicDbQueryApi.Services
                     var funcSql = BuildFunction(dbType, funcName, innerArgs);
                     args[i] = funcSql;
                 }
+            }
+
+            // Conditional function
+            if (functionName.Equals("IF", StringComparison.OrdinalIgnoreCase))
+            {
+                var condition = args[0];
+                var trueValue = args[1];
+                var falseValue = args[2];
+
+                var options = new JsonSerializerOptions
+                {
+                    WriteIndented = true
+                };
+                FilterModel deserializedFilter = JsonSerializer.Deserialize<FilterModel>(condition, options)!;
+
+                var conditionSql = ConvertFilterToSql(dbType, deserializedFilter);
+
+                if (dbType == "mysql")
+                    return $"IF({conditionSql}, {trueValue}, {falseValue})";
+                if (dbType == "mssql" || dbType == "sqlserver")
+                    return $"IIF({conditionSql}, {trueValue}, {falseValue})";
+
+                // PostgreSQL / Oracle
+                return $"CASE WHEN {conditionSql} THEN {trueValue} ELSE {falseValue} END";
+            }
+
+            if (functionName.Equals("CASE", StringComparison.OrdinalIgnoreCase) ||
+                functionName.Equals("IFS", StringComparison.OrdinalIgnoreCase))
+            {
+
+                var whenParts = new List<string>();
+                for (int i = 0; i < args.Count - 1; i += 2)
+                {
+                    var condArg = args[i].Trim();
+                    var valArg = args[i + 1];
+
+                    var condSql = condArg;
+                    var options = new JsonSerializerOptions
+                    {
+                        WriteIndented = true
+                    };
+                    FilterModel deserializedFilter = JsonSerializer.Deserialize<FilterModel>(condArg, options)!;
+
+                    condSql = ConvertFilterToSql(dbType, deserializedFilter);
+
+                    whenParts.Add($"WHEN {condSql} THEN {valArg}");
+                }
+                var elseVal = args[^1];
+                return $"CASE {string.Join(" ", whenParts)} ELSE {elseVal} END";
             }
 
             // Aggregate fonksiyonlarını oluştur (COUNT, SUM, AVG, MIN, MAX)
@@ -674,6 +806,11 @@ namespace DynamicDbQueryApi.Services
         // Oracle String to DATE/TIMESTAMP dönüşümü
         public string ConvertStringToDate(string dbType, string dateString)
         {
+            if (!IsDateOrTimestamp(dateString))
+            {
+                return dateString;
+            }
+
             if (dbType == "oracle")
             {
                 // Tarih formatını belirle
@@ -703,6 +840,45 @@ namespace DynamicDbQueryApi.Services
             }
         }
 
+        private static bool IsDateOrTimestamp(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return false;
+            s = s.Trim();
+
+            // 'YYYY-MM-DD' ya da YYYY-MM-DD
+            var dateOnly = new Regex(@"^'?(\d{4}-\d{2}-\d{2})'?$", RegexOptions.Compiled);
+
+            // 'YYYY-MM-DD HH:MM:SS' ya da 'YYYY-MM-DDTHH:MM:SS' ya da YYYY-MM-DD HH:MM:SS ya da YYYY-MM-DDTHH:MM:SS
+            var tsSpace = new Regex(@"^'?(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})(\.\d{1,3})?'?$", RegexOptions.Compiled);
+            var tsIso = new Regex(@"^'?(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{1,3})?(Z|[+\-]\d{2}:\d{2})?'?$", RegexOptions.Compiled);
+
+            return dateOnly.IsMatch(s) || tsSpace.IsMatch(s) || tsIso.IsMatch(s);
+        }
+
+        public string ConcatExpressions(string dbType, List<string> expressions)
+        {
+            if (expressions == null || expressions.Count == 0) return "";
+
+            if (dbType == "oracle")
+            {
+                return string.Join(" || ", expressions);
+            }
+            else if (dbType == "mysql")
+            {
+                List<string> modifiedArgs = new List<string>();
+                foreach (var arg in expressions)
+                {
+                    // null koruması ekle
+                    modifiedArgs.Add($"COALESCE({arg}, '')");
+                }
+                return $"CONCAT({string.Join(", ", modifiedArgs)})";
+            }
+            else
+            {
+                return $"CONCAT({string.Join(", ", expressions)})";
+            }
+        }
+
         // FilterModel'den SQL WHERE/HAVING koşulu oluşturma
         public string ConvertFilterToSql(string dbType, FilterModel filter)
         {
@@ -718,7 +894,15 @@ namespace DynamicDbQueryApi.Services
                 {
                     var funcName = funcInfo.Value.funcName;
                     var inner = funcInfo.Value.inner;
-                    var args = inner.Split(',').Select(a => a.Trim()).ToList();
+                    List<string> args;
+                    if (string.IsNullOrEmpty(inner))
+                    {
+                        args = new List<string>();
+                    }
+                    else
+                    {
+                        args = SplitByCommas(inner);
+                    }
                     columnName = BuildFunction(dbType, funcName, args);
                 }
 
@@ -728,7 +912,7 @@ namespace DynamicDbQueryApi.Services
                 {
                     var funcName = funcValueInfo.Value.funcName;
                     var inner = funcValueInfo.Value.inner;
-                    var args = inner.Split(',').Select(a => a.Trim()).ToList();
+                    var args = SplitByCommas(inner);
                     value = BuildFunction(dbType, funcName, args);
                 }
 
@@ -751,15 +935,40 @@ namespace DynamicDbQueryApi.Services
                 {
                     // Stringdeki tırnakları kaldır
                     string valueRaw = value.ToString().Trim('\'');
-                    string pattern = comparisonOperator switch
+
+                    // Eğer value fonksiyon ise CONCAT ile 
+                    if (funcValueInfo != null)
                     {
-                        ComparisonOperator.Like => $"{valueRaw}",
-                        ComparisonOperator.Contains => $"%{valueRaw}%",
-                        ComparisonOperator.BeginsWith => $"{valueRaw}%",
-                        ComparisonOperator.EndsWith => $"%{valueRaw}",
-                        _ => throw new NotSupportedException($"Unsupported operator {comparisonOperator}")
-                    };
-                    return $"{columnName} LIKE '{pattern}'";
+                        if (comparisonOperator == ComparisonOperator.Like)
+                        {
+                            valueRaw = value.ToString();
+                        }
+                        else if (comparisonOperator == ComparisonOperator.Contains)
+                        {
+                            valueRaw = ConcatExpressions(dbType, new List<string> { "'%'", value.ToString(), "'%'" });
+                        }
+                        else if (comparisonOperator == ComparisonOperator.BeginsWith)
+                        {
+                            valueRaw = ConcatExpressions(dbType, new List<string> { value.ToString(), "'%'" });
+                        }
+                        else if (comparisonOperator == ComparisonOperator.EndsWith)
+                        {
+                            valueRaw = ConcatExpressions(dbType, new List<string> { "'%'", value.ToString() });
+                        }
+                        return $"{columnName} LIKE {valueRaw}";
+                    }
+                    else
+                    {
+                        string pattern = comparisonOperator switch
+                        {
+                            ComparisonOperator.Like => $"{valueRaw}",
+                            ComparisonOperator.Contains => $"%{valueRaw}%",
+                            ComparisonOperator.BeginsWith => $"{valueRaw}%",
+                            ComparisonOperator.EndsWith => $"%{valueRaw}",
+                            _ => throw new NotSupportedException($"Unsupported operator {comparisonOperator}")
+                        };
+                        return $"{columnName} LIKE '{pattern}'";
+                    }
                 }
                 else
                 {
@@ -895,6 +1104,17 @@ namespace DynamicDbQueryApi.Services
                     i = closeIdx;
                 }
 
+                else if (input[i] == '{')
+                {
+                    // Süslü parantez içindeki virgülleri yok say
+                    int closeIdx = FindClosingBracket(input, i);
+                    if (closeIdx == -1)
+                    {
+                        throw new Exception("Could not find closing bracket in FETCH columns.");
+                    }
+                    i = closeIdx;
+                }
+
                 else if (input[i] == ',')
                 {
                     // Virgül bulundu, böl
@@ -923,6 +1143,18 @@ namespace DynamicDbQueryApi.Services
                     {
                         return i;
                     }
+                }
+            }
+            return -1; // Not found
+        }
+
+        private int FindClosingBracket(string str, int startIdx)
+        {
+            for (int i = startIdx + 1; i < str.Length; i++)
+            {
+                if (str[i] == '}')
+                {
+                    return i;
                 }
             }
             return -1; // Not found

@@ -71,7 +71,11 @@ namespace DynamicDbQueryApi.Services
             var model = _queryParserService.Parse(request.Query);
 
             // İlişkili tablolardaki foreign keyleri bul ve IncludeModel'leri güncelle
-            _logger.LogInformation("Initial Model: {Model}", JsonSerializer.Serialize(model));
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true
+            };
+            _logger.LogInformation("Initial Model: {Model}", JsonSerializer.Serialize(model, options));
             var filtersText = FilterPrinter.Dump(model.Filters);
             Console.WriteLine("Filters:\n" + filtersText);
 
@@ -89,8 +93,7 @@ namespace DynamicDbQueryApi.Services
                     include.IncludeKey = updatedInclude.IncludeKey;
                 }
             }
-            _logger.LogInformation("Generated Model: {Model}", JsonSerializer.Serialize(model));
-
+            // _logger.LogInformation("Generated Model: {Model}", JsonSerializer.Serialize(model, options));
 
             var sql = _sqlBuilderService.BuildSqlQuery(dbType, model);
             _logger.LogInformation("Generated SQL: {Sql}", sql);

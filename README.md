@@ -22,7 +22,7 @@ FETCH(City.Country.Name AS country_name, COUNT(*) AS total)
 FROM(person)
 INCLUDE(City.Country)
 FILTER((name = 'Serkan' OR grade > 3) AND (surname BEGINSWITH 'Ah' AND email CONTAINS '@' AND email ENDSWITH '.com'))
-GROUPBY(City.Country.Name)
+GROUPBY(country_name)
 HAVING(COUNT(*) > 2)
 ORDERBY(total DESC)
 TAKE(10)
@@ -41,6 +41,12 @@ ORDER BY total DESC
 LIMIT  10;
 ```
 
+## Aliases
+
+- Define column aliases in FETCH: `FETCH(SUM(price) AS total, ...)`.
+- In the query you can reference aliases in FILTER, GROUPBY, HAVING, and ORDERBY.
+
+
 ## Supported Operators
 
 ### 1. Comparison Operators
@@ -49,8 +55,8 @@ LIMIT  10;
 |-------------------------------|---------------------------|
 |= / ==													|   =     							  	|
 |!= / <>												|   <>  									  |
-|>															|   >  										   |
-|<															|   < 											 |
+|>															|   >  										  |
+|<															|   < 										  |
 |>=															|   >= 										  |
 |<=															|   <=											|
 
@@ -60,28 +66,32 @@ LIMIT  10;
 |OPERATOR                       |SQL EQUIVALENT             |
 |-------------------------------|---------------------------|
 |CONTAINS												|   col LIKE '%val%'  	  	|
+|STARTSWITH											|   col LIKE 'val%'  			  |
 |BEGINSWITH											|   col LIKE 'val%'  			  |
-|ENDSWITH												|   col LIKE '%val'  		   |
-|LIKE														|   col LIKE 'same'				|
+|ENDSWITH												|   col LIKE '%val'  		    |
+|LIKE														|   col LIKE 'same'				  |
+
+- Usage: column OPERATOR 'value', column OPERATOR('...')
+> name CONTAINS('serkan')
 
   
 ### 3. NULL Operators
 
 |OPERATOR                       |SQL EQUIVALENT             |
 |-------------------------------|---------------------------|
-|col = NULL											|   col IS NULL  	  	|
-|col == NULL										|   col IS NULL  			  |
-|col != NULL										|   col IS NOT NULL  		   |
-|col <> NULL										|   col IS NOT NULL				|
+|col = NULL											|   col IS NULL  	  	      |
+|col == NULL										|   col IS NULL  			      |
+|col != NULL										|   col IS NOT NULL  		    |
+|col <> NULL										|   col IS NOT NULL				  |
   
 
 ### 4. Logical Operators & Precedence
 
-|OPERATOR                       |PRECEDENCE             |
+|OPERATOR                       |PRECEDENCE                 |
 |-------------------------------|---------------------------|
-|(...)													|   1 (Highest)  					 |
-|AND														|   2 (High) 	  					|
-|OR															|   3 (Low)  			 			 |
+|(...)													|   1 (Highest)  					  |
+|AND														|   2 (High) 	  					  |
+|OR															|   3 (Low)  			 			    |
 
 Example: FILTER(a = 1 OR b = 2 AND c = 3)
 Internal: a = 1 OR (b = 2 AND c = 3)
@@ -91,13 +101,17 @@ Internal: a = 1 OR (b = 2 AND c = 3)
 
 ### 1. Aggregate Functions
 
-| Function    | Example    | Description | Generated SQL|
-|-------------|------------|-------------|--------------|
-| COUNT(expr) | COUNT(*).  | Row count   | COUNT(*)     |
-| SUM(col)    | SUM(Price) | Sum         | SUM(Price)   |
-| AVG(col)    | AVG(Grade) | Average     | AVG(Grade)   |
-| MIN(col)    | MIN(Grade) | Minimum     | MIN(Grade)   |
-| MAX(col)    | MAX(Grade) | Maximum     | MAX(Grade)   |
+| Function    | Example    | Description |
+|-------------|------------|-------------|
+| COUNT(expr) | COUNT(*).  | Row count   |
+| SUM(col)    | SUM(Price) | Sum         |
+| AVG(col)    | AVG(Grade) | Average     |
+| MIN(col)    | MIN(Grade) | Minimum     |
+| MAX(col)    | MAX(Grade) | Maximum     |
+
+
+- Form: IF(condition, true_val, false_val)
+- Where: usable anywhere an expression is allowed (FETCH, GROUPBY, HAVING, ORDERBY, and even FILTER).
 
 
 ### 2. Numeric Functions
@@ -123,6 +137,7 @@ Internal: a = 1 OR (b = 2 AND c = 3)
 |------------------------|-----------------|--------------------|
 | LENGTH(col) / LEN(col) | LENGTH(Name)    | Length             |
 | SUBSTRING(str,start,len) / SUBSTR | SUBSTRING(Name,0,3) | Slice (0-based) |
+| SUBSTRING(str,start) / SUBSTR | SUBSTRING(Name,0) | Slice (0-based) |
 | CONCAT(a,b,...)        | CONCAT(First,Last) | Concatenate     |
 | LOWER(col)             | LOWER(Name)      | To lower          |
 | UPPER(col)             | UPPER(Name)      | To upper          |
@@ -136,19 +151,21 @@ Internal: a = 1 OR (b = 2 AND c = 3)
 
 | Function               | Example          | Description       |
 |------------------------|------------------|-------------------|
-| COALESCE(a,b,...)      | COALESCE(Email,'-') | First non-null |
-| IFNULL(a,b)            | IFNULL(Phone,'-') | Alias            |
-| ISNULL(a,b)            | ISNULL(Phone,'-') | Alias            |
-| NVL(a,b)               | NVL(Phone,'-')    | Alias            |
+| COALESCE(a,b, ...)     | COALESCE(Email,'-') | First non-null |
+| IFNULL(a,b, ...)       | IFNULL(Phone,'-') | Alias            |
+| ISNULL(a,b, ...)       | ISNULL(Phone,'-') | Alias            |
+| NVL(a,b, ...)          | NVL(Phone,'-')    | Alias            |
 
 
 ### 5. Date / Time Functions
 
 | Function               | Example          | Description           |
 |------------------------|------------------|-----------------------|
-| NOW() / GETDATE() / CURRENT_TIMESTAMP | NOW() | Current timestamp |
-| CURRENT_DATE           | CURRENT_DATE     | Current date          |
-| CURRENT_TIME           | CURRENT_TIME     | Current time          |
+| NOW()                  | NOW()            | Current timestamp     |
+| GETDATE()              | GETDATE()        | Current timestamp     |
+| CURRENT_TIMESTAMP()    | CURRENT_TIMESTAMP() | Current timestamp |
+| CURRENT_DATE()         | CURRENT_DATE()     | Current date          |
+| CURRENT_TIME()         | CURRENT_TIME()     | Current time          |
 | DATEADD(unit,date,n)   | DATEADD(DAY,Date,5) | Add interval       |
 | DATEDIFF(unit,start,end) | DATEDIFF(DAY,Start,End) | Difference   |
 | DAY(date)              | DAY(CreatedAt)   | Day part              |
@@ -175,10 +192,10 @@ Internal: a = 1 OR (b = 2 AND c = 3)
 
 
 ### 6. DSL → SQL Example
-My Query Example:
+My Query:
 ```sql
-FETCH(CONCAT(LOWER(p.Name), '-', YEAR(p.CreatedAt)) AS slug, COUNT(*) AS total)
-FROM Person p
+FETCH(CONCAT(LOWER(person.Name), '-', YEAR(person.CreatedAt)) AS slug, COUNT(*) AS total)
+FROM Person
 GROUPBY(slug)
 ORDERBY(total DESC)
 ```
