@@ -112,6 +112,16 @@ namespace DynamicDbQueryApi.Services
 
             for (int i = 0; i < columns.Count; i++)
             {
+                // Eğer * ise direkt ekle ve alias null bırak
+                if (columns[i].Trim() == "*")
+                {
+                    columnModels.Add(new QueryColumnModel
+                    {
+                        Expression = "*",
+                        Alias = null
+                    });
+                    continue;
+                }
                 // Alias için " AS " ile ayır
                 var parts = Regex.Split(columns[i], @"\s+AS\s+", RegexOptions.IgnoreCase);
                 var expression = AddTablePrefixToColumn(parts[0].Trim(), tableName);
@@ -129,11 +139,20 @@ namespace DynamicDbQueryApi.Services
                     }
                     else if (func != null)
                     {
-                        alias = func.Value.function.ToLowerInvariant() + "_" + i;
+                        alias = func.Value.function.ToLowerInvariant();
                     }
                     else
                     {
-                        alias = expression.ToLowerInvariant().Replace('.', '_').Replace('(', '_').Replace(')', '_').Replace('*', 'a').Replace(',', '_').Replace(' ', '_').Replace('-', '_').Replace("\"", "");
+                        // Diğer karakterleri kaldır ve sadece harf, rakam, _ bırak
+                        alias = Regex.Replace(parts[0].Trim(), @"[^\w]", "_").ToLowerInvariant();
+
+                        // harflerle başlamıyorsa başına _ ekle
+                        if (!string.IsNullOrWhiteSpace(alias) && !char.IsLetter(alias[0]) && alias[0] != '_')
+                        {
+                            alias = "_" + alias;
+                        }
+
+                        // Eğer alias çok uzunsa kısalt
                     }
 
                     // Eğer alias sayı ile başlıyorsa başına _ ekle
@@ -147,6 +166,24 @@ namespace DynamicDbQueryApi.Services
                     Expression = expression,
                     Alias = alias
                 });
+            }
+
+            // Aynı alias varsa sonuna _1, _2 ekle
+            var aliasCount = new Dictionary<string, int>();
+            foreach (var column in columnModels)
+            {
+                if (!string.IsNullOrEmpty(column.Alias))
+                {
+                    if (aliasCount.ContainsKey(column.Alias))
+                    {
+                        aliasCount[column.Alias]++;
+                        column.Alias += "_" + aliasCount[column.Alias];
+                    }
+                    else
+                    {
+                        aliasCount[column.Alias] = 1;
+                    }
+                }
             }
             return columnModels;
         }
@@ -705,14 +742,33 @@ namespace DynamicDbQueryApi.Services
                 return column.ToUpperInvariant();
             }
 
-            // Eğer sayı ise tablo ismi ekleme
-            if (int.TryParse(column, out _))
+            // Eğer tek tırnak içinde string ise tablo ismi ekleme
+            if (column.StartsWith("'") && column.EndsWith("'"))
             {
                 return column;
             }
 
-            // Eğer tek tırnak içinde string ise tablo ismi ekleme
-            if (column.StartsWith("'") && column.EndsWith("'"))
+            // Eğer x+y, x-y, x*y, x/y işlemi ise tablo ismi ekleme
+            if (Regex.IsMatch(column, @"^[\w\d\._\-]+\s*[\+\-\*/]\s*[\w\d\._\-]+$"))
+            {
+                var partsMath = Regex.Split(column, @"\s*([\+\-\*/])\s*");
+                if (partsMath.Length == 3)
+                {
+                    var left = AddTablePrefixToColumn(partsMath[0], tableName, aliasColumnDict);
+                    var op = partsMath[1];
+                    var right = AddTablePrefixToColumn(partsMath[2], tableName, aliasColumnDict);
+                    return $"{left} {op} {right}";
+                }
+            }
+
+            // Eğer 3.14, -42 gibi sayı ise tablo ismi ekleme
+            if (double.TryParse(column, out _))
+            {
+                return column;
+            }
+
+            // Eğer sayı ise tablo ismi ekleme
+            if (int.TryParse(column, out _))
             {
                 return column;
             }
