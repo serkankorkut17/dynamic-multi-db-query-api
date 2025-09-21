@@ -72,7 +72,8 @@ LIMIT  10;
 |LIKE														|   col LIKE 'same'				  |
 
 - Usage: column OPERATOR 'value', column OPERATOR('...')
-> name CONTAINS('serkan')
+> name CONTAINS('Serkan')
+> LOWER(name) CONTAINS('serkan')
 
   
 ### 3. NULL Operators
@@ -103,7 +104,7 @@ Internal: a = 1 OR (b = 2 AND c = 3)
 
 | Function    | Example    | Description |
 |-------------|------------|-------------|
-| COUNT(expr) | COUNT(*).  | Row count   |
+| COUNT(expr) | COUNT(*)   | Row count   |
 | SUM(col)    | SUM(Price) | Sum         |
 | AVG(col)    | AVG(Grade) | Average     |
 | MIN(col)    | MIN(Grade) | Minimum     |
@@ -114,9 +115,9 @@ Internal: a = 1 OR (b = 2 AND c = 3)
 
 | Function    | Example    | Description |
 |-------------|------------|-------------|
-| IF(condition, true_val, false_val) | IF(grade >= 90, 'A', 'B')  | Classic if else   |
+| IF(condition, true_val, false_val) | IF(grade >= 90, 'A', 'B')  | Classic If - Else   |
 | IFS(cond1, val1, cond2, val2, ..., elseVal)   | IFS(grade >= 90, 'A', grade >= 80, 'B', 'C') | If, Else If, ... , Else         |
-| CASE(cond1, val1, cond2, val2, ..., elseVal)    | CASE(grade >= 90, 'A', grade >= 80, 'B', 'C') | Switch-Case     |
+| CASE(cond1, val1, cond2, val2, ..., elseVal)    | CASE(grade >= 90, 'A', grade >= 80, 'B', 'C') | Switch - Case     |
 
 - IF(condition, true_val, false_val)
 - CASE/IFS(cond1, val1, cond2, val2, ..., elseVal) → SQL: CASE WHEN cond1 THEN val1 WHEN cond2 THEN val2 ... ELSE elseVal END
@@ -178,9 +179,13 @@ FETCH(
 |------------------------|------------------|-----------------------|
 | NOW()                  | NOW()            | Current timestamp     |
 | GETDATE()              | GETDATE()        | Current timestamp     |
-| CURRENT_TIMESTAMP()    | CURRENT_TIMESTAMP() | Current timestamp |
-| CURRENT_DATE()         | CURRENT_DATE()     | Current date          |
-| CURRENT_TIME()         | CURRENT_TIME()     | Current time          |
+| CURRENT_TIMESTAMP()    | CURRENT_TIMESTAMP() | Current timestamp  |
+| NOW(timezone)          | NOW('Istanbul')  | Current timestamp with time zone     |
+| TODAY()                | TODAY()          | Current date          |
+| CURRENT_DATE()         | CURRENT_DATE()   | Current date          |
+| TODAY(timezone)        | TODAY('Istanbul')| Current date with time zone |
+| TIME()                 | TIME()           | Current time          |
+| CURRENT_TIME()         | CURRENT_TIME()   | Current time          |
 | DATEADD(unit,date,n)   | DATEADD(DAY,Date,5) | Add interval       |
 | DATEDIFF(unit,start,end) | DATEDIFF(DAY,Start,End) | Difference   |
 | DAY(date)              | DAY(CreatedAt)   | Day part              |
@@ -188,14 +193,49 @@ FETCH(
 | YEAR(date)             | YEAR(CreatedAt)  | Year part             | 
 | DATENAME(unit,date)    | DATENAME(MONTH,CreatedAt) | Name of part |
 
+- For POSTGRESQL, MYSQL and ORACLE databases timezone should be IANA timezone.
+> Examples: 'Europe/Istanbul', 'America/New_York', 'Asia/Tokyo', 'UTC', 'Etc/GMT+3', 'Etc/GMT-2', etc.
+
+- For SQL SERVER database timezone should be Windows timezone.
+> Examples: 'Turkey Standard Time', 'Eastern Standard Time', 'Tokyo Standard Time', 'UTC', 'GMT Standard Time', etc.
+
+- NOW() / GETDATE() / CURRENT_TIMESTAMP() => returns timestamp without time zone (UTC)
+> NOW() => "2025-09-19T22:37:44"
+
+- NOW(timezone) / GETDATE(timezone) / CURRENT_TIMESTAMP(timezone) => returns timestamp in specified timezone
+> NOW('Europe/Istanbul') => "2025-09-20T01:37:44" (UTC+3)
+
+- TODAY() / CURRENT_DATE() => returns date (YYYY-MM-DD)
+> TODAY() => "2025-09-19"
+
+- TODAY(timezone) / CURRENT_DATE(timezone) => returns date (YYYY-MM-DD) in specified timezone
+> TODAY('Europe/Istanbul') => "2025-09-20" (UTC+3)
+
+- TIME() / CURRENT_TIME() => returns time (HH:MM:SS)
+> TIME() => "22:37:44"
+
+- TIME(timezone) / CURRENT_TIME(timezone) => returns time (HH:MM:SS) in specified timezone
+> TIME('Europe/Istanbul') => "01:37:44" (UTC+3)
+
+- TODAY() / CURRENT_DATE() => returns date (YYYY-MM-DD)
+> TODAY() => "2025-09-19"
+
 - DATEADD: unit can be SECOND, MINUTE, HOUR, DAY, WEEK, MONTH, YEAR
-> DATEADD(HOUR,'2025-09-18 12:34:56',2) => 2025-09-18 14:34:56
+> DATEADD(HOUR,'2025-09-18T12:34:56',2) => 2025-09-18T14:34:56
+> DATEADD(SECOND,'2025-01-12T00:00:00',5) => 2025-09-18T12:35:01
 
 - DATEDIFF: unit can be SECOND, MINUTE, HOUR, DAY, WEEK, MONTH, YEAR
 > DATEDIFF(DAY,'2025-09-03','2025-09-18') => 15
+> DATEDIFF(YEAR,'2025-01-03','2026-01-02') => 0
+
+- DAY / MONTH / YEAR
+> YEAR('2025-09-18') => 2025
+> MONTH('2025-09-18') => 12
+> DAY('2025-09-18') => 18
 
 - DATENAME: unit can be MONTH or DAY
-> DATENAME(MONTH, '2025-09-18') => 'September'
+> DATENAME(MONTH, '2025-09-18') => 'SEPTEMBER' or 'September'
+> DATENAME(DAY, '2025-09-18') => 'THURSDAY' or 'Thursday'
 
 ### Notes
 - SUBSTRING/SUBSTR start index is 0 in my Query Language; adjusted to 1-based in SQL.

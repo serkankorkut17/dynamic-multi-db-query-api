@@ -122,9 +122,14 @@ namespace DynamicDbQueryApi.Services
                 }
                 else
                 {
+                    var func = ExtractFunction(parts[0].Trim());
                     if (IsDateOrTimestamp(expression))
                     {
                         alias = "date_" + i;
+                    }
+                    else if (func != null)
+                    {
+                        alias = func.Value.function.ToLowerInvariant() + "_" + i;
                     }
                     else
                     {
@@ -624,14 +629,18 @@ namespace DynamicDbQueryApi.Services
             }
 
             // Tarih fonksiyonlarını yakala (NOW, CURRENT_DATE, CURRENT_TIME, CURRENT_TIMESTAMP, DATEADD, DATEDIFF, DATENAME, DATEPART, DAY, MONTH, YEAR)
-            var dateFuncs = new[] { "NOW", "GETDATE", "CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME", "DATEADD", "DATEDIFF", "DATENAME", "TO_CHAR", "DAY", "MONTH", "YEAR" };
+            var dateFuncs = new[] { "NOW", "GETDATE", "CURRENT_TIMESTAMP", "CURRENT_DATE", "TODAY", "CURRENT_TIME", "TIME","DATEADD", "DATEDIFF", "DATENAME", "TO_CHAR", "DAY", "MONTH", "YEAR" };
             if (dateFuncs.Contains(functionString))
             {
-                if (functionString == "NOW" || functionString == "GETDATE" || functionString == "CURRENT_TIMESTAMP" || functionString == "CURRENT_DATE" || functionString == "CURRENT_TIME")
+                if (functionString == "NOW" || functionString == "GETDATE" || functionString == "CURRENT_TIMESTAMP" || functionString == "CURRENT_DATE" || functionString == "TODAY" || functionString == "CURRENT_TIME" || functionString == "TIME")
                 {
-                    if (innerParams.Count != 0)
+                    if (innerParams.Count > 1)
                     {
                         throw new Exception($"Invalid usage of date function {functionString} with parameters.");
+                    }
+                    else if (innerParams.Count == 1 && !string.IsNullOrWhiteSpace(innerParams[0]))
+                    {
+                        return $"{functionString}({innerParams[0]})";
                     }
                     return $"{functionString}()";
                 }
@@ -685,6 +694,13 @@ namespace DynamicDbQueryApi.Services
 
             // Eğer TRUE, FALSE, NULL ise tablo ismi ekleme
             if (column.Equals("TRUE", StringComparison.OrdinalIgnoreCase) || column.Equals("FALSE", StringComparison.OrdinalIgnoreCase) || column.Equals("NULL", StringComparison.OrdinalIgnoreCase))
+            {
+                return column.ToUpperInvariant();
+            }
+
+            //  Eğer SECOND, MINUTE, HOUR, DAY, WEEK, MONTH, YEAR ise tablo ismi ekleme
+            var dateParts = new[] { "SECOND", "MINUTE", "HOUR", "DAY", "WEEK", "MONTH", "YEAR" };
+            if (dateParts.Contains(column.ToUpperInvariant()))
             {
                 return column.ToUpperInvariant();
             }

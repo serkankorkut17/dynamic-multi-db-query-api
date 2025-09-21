@@ -532,26 +532,139 @@ namespace DynamicDbQueryApi.Services
             }
 
             // Tarih fonksiyonlarını oluştur (NOW, CURRENT_DATE, CURRENT_TIME, CURRENT_TIMESTAMP, DATEADD, DATEDIFF, DATENAME, DATEPART, DAY, MONTH, YEAR)
-            var dateFuncs = new[] { "NOW", "GETDATE", "CURRENT_TIMESTAMP", "CURRENT_DATE", "CURRENT_TIME", "DATEADD", "DATEDIFF", "DATENAME", "DATEPART", "DAY", "MONTH", "YEAR" };
+            var dateFuncs = new[] { "NOW", "GETDATE", "CURRENT_TIMESTAMP", "CURRENT_DATE", "TODAY", "CURRENT_TIME", "TIME", "DATEADD", "DATEDIFF", "DATENAME", "DATEPART", "DAY", "MONTH", "YEAR" };
             if (dateFuncs.Contains(functionName))
             {
                 if ((functionName.Equals("NOW", StringComparison.OrdinalIgnoreCase) || functionName.Equals("GETDATE", StringComparison.OrdinalIgnoreCase) || functionName.Equals("CURRENT_TIMESTAMP", StringComparison.OrdinalIgnoreCase)) && args.Count == 0)
                 {
+                    if (dbType == "postgresql" || dbType == "postgres")
+                    {
+                        return "now() AT TIME ZONE 'UTC'";
+                    }
+                    else if (dbType == "mssql" || dbType == "sqlserver")
+                    {
+                        return "GETUTCDATE()";
+                    }
+                    else if (dbType == "mysql")
+                    {
+                        return "UTC_TIMESTAMP()";
+                    }
+                    else if (dbType == "oracle")
+                    {
+                        return "SYS_EXTRACT_UTC(SYSTIMESTAMP)";
+                    }
                     return "CURRENT_TIMESTAMP";
                 }
-                else if (functionName.Equals("CURRENT_DATE", StringComparison.OrdinalIgnoreCase) && args.Count == 0)
+                else if ((functionName.Equals("NOW", StringComparison.OrdinalIgnoreCase) || functionName.Equals("GETDATE", StringComparison.OrdinalIgnoreCase) || functionName.Equals("CURRENT_TIMESTAMP", StringComparison.OrdinalIgnoreCase)) && args.Count == 1)
                 {
+                    var tz = args[0];
+
+                    if (dbType == "postgresql" || dbType == "postgres")
+                    {
+                        return $"now() AT TIME ZONE {tz}";
+                    }
+                    else if (dbType == "mssql" || dbType == "sqlserver")
+                    {
+                        return $"GETUTCDATE() AT TIME ZONE {tz}";
+                    }
+                    else if (dbType == "mysql")
+                    {
+                        return $"CONVERT_TZ(UTC_TIMESTAMP(), 'UTC', {tz})";
+                    }
+                    else if (dbType == "oracle")
+                    {
+                        return $"SYS_EXTRACT_UTC(SYSTIMESTAMP) AT TIME ZONE {tz}";
+                    }
+                    return "CURRENT_TIMESTAMP";
+                }
+                else if ((functionName.Equals("CURRENT_DATE", StringComparison.OrdinalIgnoreCase) ||
+          functionName.Equals("TODAY", StringComparison.OrdinalIgnoreCase)) && args.Count == 0)
+                {
+                    // UTC date
+                    if (dbType == "postgresql" || dbType == "postgres")
+                    {
+                        return "TO_CHAR(CURRENT_DATE AT TIME ZONE 'UTC', 'YYYY-MM-DD')";
+                    }
+                    else if (dbType == "mssql" || dbType == "sqlserver")
+                    {
+                        return "FORMAT(CAST(GETUTCDATE() AS DATE), 'yyyy-MM-dd')";
+                    }
+                    else if (dbType == "mysql")
+                    {
+                        return "DATE_FORMAT(UTC_DATE(), '%Y-%m-%d')";
+                    }
+                    else if (dbType == "oracle")
+                    {
+                        return "TO_CHAR(TRUNC(SYS_EXTRACT_UTC(SYSTIMESTAMP)), 'YYYY-MM-DD')";
+                    }
                     return "CURRENT_DATE";
                 }
-                else if (functionName.Equals("CURRENT_TIME", StringComparison.OrdinalIgnoreCase) && args.Count == 0)
+                else if ((functionName.Equals("CURRENT_DATE", StringComparison.OrdinalIgnoreCase) ||
+                          functionName.Equals("TODAY", StringComparison.OrdinalIgnoreCase)) && args.Count == 1)
                 {
-                    if (dbType == "mssql" || dbType == "sqlserver")
+                    var tz = args[0];
+
+                    if (dbType == "postgresql" || dbType == "postgres")
+                    {
+                        return $"TO_CHAR((now() AT TIME ZONE {tz})::date, 'YYYY-MM-DD')";
+                    }
+                    else if (dbType == "mssql" || dbType == "sqlserver")
+                    {
+                        return $"FORMAT(CAST(GETUTCDATE() AT TIME ZONE 'UTC' AT TIME ZONE {tz} AS date), 'yyyy-MM-dd')";
+                    }
+                    else if (dbType == "mysql")
+                    {
+                        return $"DATE_FORMAT(CONVERT_TZ(UTC_TIMESTAMP(), 'UTC', {tz}), '%Y-%m-%d')";
+                    }
+                    else if (dbType == "oracle")
+                    {
+                        return $"TO_CHAR(TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE {tz} AS DATE)), 'YYYY-MM-DD')";
+                    }
+                    return "CURRENT_DATE";
+                }
+                else if ((functionName.Equals("CURRENT_TIME", StringComparison.OrdinalIgnoreCase) || functionName.Equals("TIME", StringComparison.OrdinalIgnoreCase)) && args.Count == 0)
+                {
+                    if (dbType == "postgresql" || dbType == "postgres")
+                    {
+                        return "TO_CHAR(NOW() AT TIME ZONE 'UTC', 'HH24:MI:SS')";
+                    }
+                    else if (dbType == "mysql")
+                    {
+                        return "UTC_TIME()";
+                    }
+                    else if (dbType == "mssql" || dbType == "sqlserver")
                     {
                         return "CONVERT (TIME, CURRENT_TIMESTAMP)";
                     }
                     else if (dbType == "oracle")
                     {
                         return "TO_CHAR(SYSDATE, 'HH24:MI:SS')";
+                    }
+                    else
+                    {
+                        return "CURRENT_TIME";
+                    }
+                }
+                else if ((functionName.Equals("CURRENT_TIME", StringComparison.OrdinalIgnoreCase) ||
+          functionName.Equals("TIME", StringComparison.OrdinalIgnoreCase)) && args.Count == 1)
+                {
+                    var tz = args[0];
+
+                    if (dbType == "postgresql" || dbType == "postgres")
+                    {
+                        return $"TO_CHAR(NOW() AT TIME ZONE {tz}, 'HH24:MI:SS')";
+                    }
+                    else if (dbType == "mysql")
+                    {
+                        return $"DATE_FORMAT(CONVERT_TZ(UTC_TIMESTAMP(), 'UTC', {tz}), '%H:%i:%s')";
+                    }
+                    else if (dbType == "mssql" || dbType == "sqlserver")
+                    {
+                        return $"FORMAT(GETUTCDATE() AT TIME ZONE 'UTC' AT TIME ZONE {tz}, 'HH:mm:ss')";
+                    }
+                    else if (dbType == "oracle")
+                    {
+                        return $"TO_CHAR(SYSTIMESTAMP AT TIME ZONE {tz}, 'HH24:MI:SS')";
                     }
                     else
                     {
@@ -638,31 +751,31 @@ namespace DynamicDbQueryApi.Services
                         }
                         if (interval == "SECOND")
                         {
-                            return $"FLOOR(EXTRACT(EPOCH FROM ({endDate} - {startDate})))";
+                            return $"FLOOR(EXTRACT(EPOCH FROM ({args[2]}::TIMESTAMP - {args[1]}::TIMESTAMP)))";
                         }
                         else if (interval == "MINUTE")
                         {
-                            return $"FLOOR(EXTRACT(EPOCH FROM ({endDate} - {startDate})) / 60)";
+                            return $"FLOOR(EXTRACT(EPOCH FROM ({args[2]}::TIMESTAMP - {args[1]}::TIMESTAMP)) / 60)";
                         }
                         else if (interval == "HOUR")
                         {
-                            return $"FLOOR(EXTRACT(EPOCH FROM ({endDate} - {startDate})) / 3600)";
+                            return $"FLOOR(EXTRACT(EPOCH FROM ({args[2]}::TIMESTAMP - {args[1]}::TIMESTAMP)) / 3600)";
                         }
                         else if (interval == "DAY")
                         {
-                            return $"FLOOR(EXTRACT(EPOCH FROM ({endDate} - {startDate})) / 86400)";
+                            return $"({endDate} - {startDate})";
                         }
                         else if (interval == "WEEK")
                         {
-                            return $"FLOOR(EXTRACT(EPOCH FROM ({endDate} - {startDate})) / (86400 * 7))";
+                            return $"FLOOR((({endDate} - {startDate})::double precision) / 7)";
                         }
                         else if (interval == "MONTH")
                         {
-                            return $"(EXTRACT(YEAR FROM AGE({endDate}, {startDate})) * 12 + EXTRACT(MONTH FROM AGE({endDate}, {startDate})))";
+                            return $"(DATE_PART('year', AGE({endDate}, {startDate})) * 12 + DATE_PART('month', AGE({endDate}, {startDate})))";
                         }
                         else if (interval == "YEAR")
                         {
-                            return $"EXTRACT(YEAR FROM AGE({endDate}, {startDate}))";
+                            return $"DATE_PART('year', AGE({endDate}, {startDate}))";
                         }
                         else
                         {
@@ -675,7 +788,12 @@ namespace DynamicDbQueryApi.Services
                     }
                     else if (dbType == "mssql" || dbType == "sqlserver")
                     {
-                        return $"DATEDIFF({interval}, {startDate}, {endDate})";
+                        var diff = $"DATEDIFF({interval}, {startDate}, {endDate})";
+                        return
+                            $"CASE WHEN {endDate} >= {startDate} " +
+                            $"THEN {diff} - CASE WHEN DATEADD(YEAR, {diff}, {startDate}) > {endDate} THEN 1 ELSE 0 END " +
+                            $"ELSE {diff} + CASE WHEN DATEADD(YEAR, {diff}, {startDate}) < {endDate} THEN 1 ELSE 0 END END";
+
                     }
                     else if (dbType == "oracle")
                     {
@@ -709,7 +827,7 @@ namespace DynamicDbQueryApi.Services
                         }
                         else if (interval == "MONTH")
                         {
-                            return $"MONTHS_BETWEEN({endDate}, {startDate})";
+                            return $"FLOOR(MONTHS_BETWEEN({endDate}, {startDate}))";
                         }
                         else if (interval == "YEAR")
                         {
@@ -772,7 +890,7 @@ namespace DynamicDbQueryApi.Services
                         {
                             date = ConvertStringToDate(dbType, date);
                         }
-                        return $"TO_CHAR({date}, '{interval}')";
+                        return $"TRIM(TO_CHAR({date}, '{interval}'))";
                     }
                     else if (dbType == "mysql")
                     {
@@ -795,7 +913,7 @@ namespace DynamicDbQueryApi.Services
                         {
                             date = ConvertStringToDate(dbType, date);
                         }
-                        return $"TO_CHAR({date}, '{interval}')";
+                        return $"TRIM(TO_CHAR({date}, '{interval}'))";
                     }
                 }
             }
@@ -816,6 +934,7 @@ namespace DynamicDbQueryApi.Services
                 // Tarih formatını belirle
                 if (dateString.Contains(":"))
                 {
+                    dateString = dateString.Replace("T", " "); // 'T' karakterini boşlukla değiştir
                     return $"TO_TIMESTAMP({dateString}, 'YYYY-MM-DD HH24:MI:SS')";
                 }
                 else
