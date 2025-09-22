@@ -1,16 +1,9 @@
 # dynamic-multi-db-query-api
 
-FETCH(Ad, Soyad) FROM Dataset
-FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City
-FETCH(Ad, Soyad, City.Name) FROM Person INCLUDE City GROUPBY (Country)
-FETCH(Ad, Soyad, City.Name, City.Country.Name) FROM Person INCLUDE (City.Country)
-
-FETCH(Country, COUNT(*)) FILTER((Ad = 'Serkan' OR Grade > 3) AND (Soyad BEGINSWITH 'Ah' AND Email CONTAINS '@' AND Email ENDSWITH '.com' ))
-
-FETCH(Country, COUNT(*) AS count) FROM(Person) GROUPBY(Name) HAVING(count(*) > 2) ORDERBY(Name ASC) TAKE(10) LIMIT(10)
-
-
 expression splitter düzenle
+mathematical expression parser yapılacak
+TIME() bozuk olabilir işlemler için - +
+
 
 # POSTGRESQL
 Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb;SSL Mode=Disable;

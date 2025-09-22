@@ -101,10 +101,138 @@
 		{
 			"id": 11,
 			"dsl": "FETCH(CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total) FROM students FILTER(ISNULL(first_name, 'noname') CONTAINS LOWER('T')) GROUPBY(name) HAVING(total > 2) ORDERBY(total DESC)",
-			"postgres": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING total > 2 ORDER BY total DESC",
+			"postgres": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING COUNT(*) > 2 ORDER BY total DESC",
 			"mysql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING total > 2 ORDER BY total DESC",
-			"mssql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY CONCAT(LOWER(first_name), '-', UPPER(last_name)) HAVING total > 2 ORDER BY total DESC",
+			"mssql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY CONCAT(LOWER(first_name), '-', UPPER(last_name)) HAVING COUNT(*) > 2 ORDER BY total DESC",
 			"oracle": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING total > 2 ORDER BY total DESC"
+		},
+		{
+			"id": 12,
+			"dsl": "FETCH(DATEDIFF('year', birth_date, CURRENT_DATE()) AS age, COUNT(*) AS cnt) FROM students GROUPBY(age) ORDERBY(cnt DESC) LIMIT(10)",
+			"postgres": "SELECT DATE_PART('year', AGE(CURRENT_DATE, birth_date)) AS age, COUNT(*) AS cnt FROM students GROUP BY DATE_PART('year', AGE(CURRENT_DATE, birth_date)) ORDER BY cnt DESC LIMIT 10",
+			"mysql": "SELECT TIMESTAMPDIFF(YEAR, birth_date, CURRENT_DATE()) AS age, COUNT(*) AS cnt FROM students GROUP BY TIMESTAMPDIFF(YEAR, birth_date, CURRENT_DATE()) ORDER BY cnt DESC LIMIT 10",
+			"mssql": "SELECT TOP 10 real_age, COUNT(*) AS cnt FROM (SELECT DATEDIFF(year, birth_date, GETDATE()) - CASE WHEN DATEADD(year, DATEDIFF(year, birth_date, GETDATE()), birth_date) > GETDATE() THEN 1 ELSE 0 END AS real_age FROM students) t GROUP BY real_age ORDER BY cnt DESC;",
+			"oracle": "SELECT age, cnt FROM (SELECT FLOOR(MONTHS_BETWEEN(TRUNC(SYSDATE), birth_date)/12) AS age, COUNT(*) AS cnt FROM students GROUP BY FLOOR(MONTHS_BETWEEN(TRUNC(SYSDATE), birth_date)/12)) t ORDER BY cnt DESC FETCH FIRST 10 ROWS ONLY"
+		},
+		{
+			"id": 13,
+			"dsl": "FETCH(courses.name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count) FROM courses INCLUDE(enrollments.grades INNER) GROUPBY(courses.name) HAVING(grade_count >= 10) ORDERBY(avg_grade DESC) LIMIT(10)",
+			"postgres": "SELECT c.name, AVG(g.grade) AS avg_grade, COUNT(g.id) AS grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC LIMIT 10",
+			"mysql": "SELECT c.name, AVG(g.grade) AS avg_grade, COUNT(g.id) AS grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC LIMIT 10",
+			"mssql": "SELECT TOP 10 c.name, AVG(g.grade) AS avg_grade, COUNT(g.id) AS grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC",
+			"oracle": "SELECT c.name, AVG(g.grade) avg_grade, COUNT(g.id) grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC FETCH FIRST 10 ROWS ONLY"
+		},
+		{
+			"id": 14,
+			"dsl": "FETCH(students.id, students.first_name, COUNT(enrollments.id) AS enrolls) FROM students INCLUDE(enrollments) GROUPBY(students.id, students.first_name) HAVING(enrolls >= 3) ORDERBY(enrolls DESC, students.id ASC) LIMIT(20)",
+			"postgres": "SELECT st.id, st.first_name, COUNT(e.id) AS enrolls FROM students st JOIN enrollments e ON e.student_id = st.id GROUP BY st.id, st.first_name HAVING COUNT(e.id) >= 3 ORDER BY enrolls DESC, st.id ASC LIMIT 20",
+			"mysql": "SELECT st.id, st.first_name, COUNT(e.id) AS enrolls FROM students st JOIN enrollments e ON e.student_id = st.id GROUP BY st.id, st.first_name HAVING COUNT(e.id) >= 3 ORDER BY enrolls DESC, st.id ASC LIMIT 20",
+			"mssql": "SELECT TOP 20 st.id, st.first_name, COUNT(e.id) AS enrolls FROM students st JOIN enrollments e ON e.student_id = st.id GROUP BY st.id, st.first_name HAVING COUNT(e.id) >= 3 ORDER BY enrolls DESC, st.id ASC",
+			"oracle": "SELECT st.id, st.first_name, COUNT(e.id) enrolls FROM students st JOIN enrollments e ON e.student_id = st.id GROUP BY st.id, st.first_name HAVING COUNT(e.id) >= 3 ORDER BY enrolls DESC, st.id ASC FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 15,
+			"dsl": "FETCH(schools.city, COUNT(students.id) AS cnt) FROM students INCLUDE(classes.schools) GROUPBY(schools.city) ORDERBY(cnt DESC) LIMIT(10)",
+			"postgres": "SELECT sc.city, COUNT(st.id) AS cnt FROM students st LEFT JOIN classes cl ON cl.id = st.class_id LEFT JOIN schools sc ON sc.id = cl.school_id GROUP BY sc.city ORDER BY cnt DESC LIMIT 10",
+			"mysql": "SELECT sc.city, COUNT(st.id) AS cnt FROM students st LEFT JOIN classes cl ON cl.id = st.class_id LEFT JOIN schools sc ON sc.id = cl.school_id GROUP BY sc.city ORDER BY cnt DESC LIMIT 10",
+			"mssql": "SELECT TOP 10 sc.city, COUNT(st.id) AS cnt FROM students st LEFT JOIN classes cl ON cl.id = st.class_id LEFT JOIN schools sc ON sc.id = cl.school_id GROUP BY sc.city ORDER BY cnt DESC",
+			"oracle": "SELECT sc.city, COUNT(st.id) cnt FROM students st LEFT JOIN classes cl ON cl.id = st.class_id LEFT JOIN schools sc ON sc.id = cl.school_id GROUP BY sc.city ORDER BY cnt DESC FETCH FIRST 10 ROWS ONLY"
+		},
+		{
+			"id": 16,
+			"dsl": "FETCH(id, name, created_at) FROM classes FILTER(created_at >= DATEADD(DAY, NOW(),-90)) ORDERBY(created_at DESC) LIMIT(20)",
+			"postgres": "SELECT id, name, created_at FROM classes WHERE created_at >= NOW() - INTERVAL '90 days' ORDER BY created_at DESC LIMIT 20",
+			"mysql": "SELECT id, name, created_at FROM classes WHERE created_at >= (NOW() - INTERVAL 90 DAY) ORDER BY created_at DESC LIMIT 20",
+			"mssql": "SELECT TOP 20 id, name, created_at FROM classes WHERE created_at >= DATEADD(DAY, -90, SYSDATETIME()) ORDER BY created_at DESC",
+			"oracle": "SELECT id, name, created_at FROM classes WHERE created_at >= (SYSTIMESTAMP - INTERVAL '90' DAY) ORDER BY created_at DESC FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 17,
+			"dsl": "FETCH(teachers.id, teachers.first_name, teachers.last_name, teachers.salary) FROM teachers INCLUDE(schools) FILTER(schools.is_public = TRUE AND teachers.salary != NULL) ORDERBY(teachers.salary DESC) LIMIT(10)",
+			"postgres": "SELECT t.id, t.first_name, t.last_name, t.salary FROM teachers t JOIN schools sc ON sc.id = t.school_id WHERE sc.is_public = TRUE AND t.salary IS NOT NULL ORDER BY t.salary DESC LIMIT 10",
+			"mysql": "SELECT t.id, t.first_name, t.last_name, t.salary FROM teachers t JOIN schools sc ON sc.id = t.school_id WHERE sc.is_public = 1 AND t.salary IS NOT NULL ORDER BY t.salary DESC LIMIT 10",
+			"mssql": "SELECT TOP 10 t.id, t.first_name, t.last_name, t.salary FROM teachers t JOIN schools sc ON sc.id = t.school_id WHERE sc.is_public = 1 AND t.salary IS NOT NULL ORDER BY t.salary DESC",
+			"oracle": "SELECT t.id, t.first_name, t.last_name, t.salary FROM teachers t JOIN schools sc ON sc.id = t.school_id WHERE sc.is_public = 1 AND t.salary IS NOT NULL ORDER BY t.salary DESC FETCH FIRST 10 ROWS ONLY"
+		},
+		{
+			"id": 18,
+			"dsl": "FETCH(students.id, students.first_name, COUNT(enrollments.id) AS enrolls) FROM students INCLUDE(enrollments) GROUPBY(students.id, students.first_name) HAVING(enrolls >= 3) ORDERBY(enrolls DESC, students.id ASC) LIMIT(20)",
+			"postgres": "SELECT st.id, st.first_name, COUNT(e.id) AS enrolls FROM students st JOIN enrollments e ON e.student_id = st.id GROUP BY st.id, st.first_name HAVING COUNT(e.id) >= 3 ORDER BY enrolls DESC, st.id ASC LIMIT 20",
+			"mysql": "SELECT st.id, st.first_name, COUNT(e.id) AS enrolls FROM students st JOIN enrollments e ON e.student_id = st.id GROUP BY st.id, st.first_name HAVING COUNT(e.id) >= 3 ORDER BY enrolls DESC, st.id ASC LIMIT 20",
+			"mssql": "SELECT TOP 20 st.id, st.first_name, COUNT(e.id) AS enrolls FROM students st JOIN enrollments e ON e.student_id = st.id GROUP BY st.id, st.first_name HAVING COUNT(e.id) >= 3 ORDER BY enrolls DESC, st.id ASC",
+			"oracle": "SELECT st.id, st.first_name, COUNT(e.id) enrolls FROM students st JOIN enrollments e ON e.student_id = st.id GROUP BY st.id, st.first_name HAVING COUNT(e.id) >= 3 ORDER BY enrolls DESC, st.id ASC FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 19,
+			"dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt) FROM enrollments FILTER(enrolled_at >= DATEADD(DAY, NOW(), -7)) GROUPBY(yr, mo, dy) ORDERBY(yr DESC, mo DESC, dy DESC)",
+			"postgres": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, EXTRACT(DAY FROM enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= NOW() - INTERVAL '7 days' GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), EXTRACT(DAY FROM enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
+			"mysql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= (NOW() - INTERVAL 7 DAY) GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAY(enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
+			"mssql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= DATEADD(DAY, -7, SYSDATETIME()) GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAY(enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
+			"oracle": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, EXTRACT(DAY FROM enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= (SYSTIMESTAMP - INTERVAL '7' DAY) GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), EXTRACT(DAY FROM enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC"
+		},
+		{
+			"id": 20,
+			"dsl": "FETCH(id, name, established_year) FROM schools FILTER(established_year <= 2000) ORDERBY(established_year ASC, name ASC) LIMIT(20)",
+			"postgres": "SELECT id, name, established_year FROM schools WHERE established_year <= 2000 ORDER BY established_year, name LIMIT 20",
+			"mysql": "SELECT id, name, established_year FROM schools WHERE established_year <= 2000 ORDER BY established_year, name LIMIT 20",
+			"mssql": "SELECT TOP 20 id, name, established_year FROM schools WHERE established_year <= 2000 ORDER BY established_year, name",
+			"oracle": "SELECT id, name, established_year FROM schools WHERE established_year <= 2000 ORDER BY established_year, name FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 21,
+			"dsl": "FETCH(courses.name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count) FROM courses INCLUDE(enrollments.grades) GROUPBY(courses.name) HAVING(grade_count >= 10) ORDERBY(avg_grade DESC) LIMIT(10)",
+			"postgres": "SELECT c.name, AVG(g.grade) AS avg_grade, COUNT(g.id) AS grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC LIMIT 10",
+			"mysql": "SELECT c.name, AVG(g.grade) AS avg_grade, COUNT(g.id) AS grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC LIMIT 10",
+			"mssql": "SELECT TOP 10 c.name, AVG(g.grade) AS avg_grade, COUNT(g.id) AS grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC",
+			"oracle": "SELECT c.name, AVG(g.grade) avg_grade, COUNT(g.id) grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC FETCH FIRST 10 ROWS ONLY"
+		},
+		{
+			"id": 22,
+			"dsl": "FETCH(students.id, students.first_name, IFS(students.gpa >= 3.5, 'A', students.gpa >= 3.0, 'B', students.gpa >= 2.5, 'C', 'D') AS gpa_band) FROM students ORDERBY(gpa_band ASC, students.last_name ASC) LIMIT(30)",
+			"postgres": "SELECT st.id, st.first_name, CASE WHEN st.gpa >= 3.5 THEN 'A' WHEN st.gpa >= 3.0 THEN 'B' WHEN st.gpa >= 2.5 THEN 'C' ELSE 'D' END AS gpa_band FROM students st ORDER BY gpa_band, st.last_name LIMIT 30",
+			"mysql": "SELECT st.id, st.first_name, CASE WHEN st.gpa >= 3.5 THEN 'A' WHEN st.gpa >= 3.0 THEN 'B' WHEN st.gpa >= 2.5 THEN 'C' ELSE 'D' END AS gpa_band FROM students st ORDER BY gpa_band, st.last_name LIMIT 30",
+			"mssql": "SELECT TOP 30 st.id, st.first_name, CASE WHEN st.gpa >= 3.5 THEN 'A' WHEN st.gpa >= 3.0 THEN 'B' WHEN st.gpa >= 2.5 THEN 'C' ELSE 'D' END AS gpa_band FROM students st ORDER BY gpa_band, st.last_name",
+			"oracle": "SELECT st.id, st.first_name, CASE WHEN st.gpa >= 3.5 THEN 'A' WHEN st.gpa >= 3.0 THEN 'B' WHEN st.gpa >= 2.5 THEN 'C' ELSE 'D' END gpa_band FROM students st ORDER BY gpa_band, st.last_name FETCH FIRST 30 ROWS ONLY"
+		},
+		{
+			"id": 23,
+			"dsl": "FETCH(courses.name, COUNT(enrollments.id) AS enroll_cnt) FROM courses INCLUDE(enrollments) GROUPBY(courses.name) HAVING(enroll_cnt > 5) ORDERBY(enroll_cnt DESC)",
+			"postgres": "SELECT c.name, COUNT(e.id) AS enroll_cnt FROM courses c LEFT JOIN enrollments e ON e.course_id = c.id GROUP BY c.name HAVING COUNT(e.id) > 5 ORDER BY enroll_cnt DESC",
+			"mysql": "SELECT c.name, COUNT(e.id) AS enroll_cnt FROM courses c LEFT JOIN enrollments e ON e.course_id = c.id GROUP BY c.name HAVING COUNT(e.id) > 5 ORDER BY enroll_cnt DESC",
+			"mssql": "SELECT c.name, COUNT(e.id) AS enroll_cnt FROM courses c LEFT JOIN enrollments e ON e.course_id = c.id GROUP BY c.name HAVING COUNT(e.id) > 5 ORDER BY enroll_cnt DESC",
+			"oracle": "SELECT c.name, COUNT(e.id) enroll_cnt FROM courses c LEFT JOIN enrollments e ON e.course_id = c.id GROUP BY c.name HAVING COUNT(e.id) > 5 ORDER BY enroll_cnt DESC"
+		},
+		{
+			"id": 24,
+			"dsl": "FETCH(id, first_name, last_name) FROM students FILTER(LENGTH(first_name) > LENGTH(last_name)) ORDERBY(id) LIMIT(15)",
+			"postgres": "SELECT id, first_name, last_name FROM students WHERE LENGTH(first_name) > LENGTH(last_name) ORDER BY id LIMIT 15",
+			"mysql": "SELECT id, first_name, last_name FROM students WHERE CHAR_LENGTH(first_name) > CHAR_LENGTH(last_name) ORDER BY id LIMIT 15",
+			"mssql": "SELECT TOP 15 id, first_name, last_name FROM students WHERE LEN(first_name) > LEN(last_name) ORDER BY id",
+			"oracle": "SELECT id, first_name, last_name FROM students WHERE LENGTH(first_name) > LENGTH(last_name) ORDER BY id FETCH FIRST 15 ROWS ONLY"
+		},
+		{
+			"id": 25,
+			"dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, COUNT(*) AS cnt) FROM enrollments GROUPBY(yr, mo) ORDERBY(yr DESC, mo DESC) LIMIT(12)",
+			"postgres": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, COUNT(*) AS cnt FROM enrollments GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at) ORDER BY yr DESC, mo DESC LIMIT 12",
+			"mysql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, COUNT(*) AS cnt FROM enrollments GROUP BY YEAR(enrolled_at), MONTH(enrolled_at) ORDER BY yr DESC, mo DESC LIMIT 12",
+			"mssql": "SELECT TOP 12 YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, COUNT(*) AS cnt FROM enrollments GROUP BY YEAR(enrolled_at), MONTH(enrolled_at) ORDER BY yr DESC, mo DESC",
+			"oracle": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, COUNT(*) AS cnt FROM enrollments GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at) ORDER BY yr DESC, mo DESC FETCH FIRST 12 ROWS ONLY"
+		},
+		{
+			"id": 26,
+			"dsl": "FETCH(first_name, last_name, hire_date) FROM teachers FILTER(hire_date >= DATEADD(YEAR, TODAY(), -5)) ORDERBY(hire_date DESC) LIMIT(20)",
+			"postgres": "SELECT first_name, last_name, hire_date FROM teachers WHERE hire_date >= (CURRENT_DATE - INTERVAL '5 years') ORDER BY hire_date DESC LIMIT 20",
+			"mysql": "SELECT first_name, last_name, hire_date FROM teachers WHERE hire_date >= (CURRENT_DATE - INTERVAL 5 YEAR) ORDER BY hire_date DESC LIMIT 20",
+			"mssql": "SELECT TOP 20 first_name, last_name, hire_date FROM teachers WHERE hire_date >= DATEADD(YEAR, -5, CAST(GETDATE() AS date)) ORDER BY hire_date DESC",
+			"oracle": "SELECT first_name, last_name, hire_date FROM teachers WHERE hire_date >= (TRUNC(SYSDATE) - INTERVAL '5' YEAR) ORDER BY hire_date DESC FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 27,
+			"dsl": "FETCH(id, first_name) FROM students FILTER(first_name STARTSWITH 'A') ORDERBY(first_name ASC) LIMIT(20)",
+			"postgres": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name LIMIT 20",
+			"mysql": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name LIMIT 20",
+			"mssql": "SELECT TOP 20 id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name",
+			"oracle": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name FETCH FIRST 20 ROWS ONLY"
 		}
 	]
 }

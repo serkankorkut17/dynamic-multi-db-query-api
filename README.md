@@ -1,20 +1,21 @@
 # Dynamic DB Query
 
 ## SQL vs My Query Language
-|                |SQL                          |MY QUERY                        |
-|------------|----------------------|-----------------------------|
-|SELECT|   SELECT name, surname     |FETCH (name, surname)  |
-|DISTINCT|   SELECT DISTINCT   |FETCHD / FETCH DISTINCT(...) |
-|FROM  |FROM table            |FROM table / FROM (table)|
-|JOIN  |[joinType] JOIN table2 ...|INCLUDE (table2)|
-|JOIN CHAINING |... JOIN table3 ...|INCLUDE (table2.table3)|
-|SELECT (JOIN) |SELECT table2.id| FETCH (name, surname, table2.id)|
-|WHERE |WHERE age >= 18 | FILTER (age >= 18)|
-|GROUP BY |GROUP BY name | GROUPBY (name)|
-|HAVING |HAVING COUNT(*) >= 20 | HAVING (COUNT(*) >= 20)|
-|ORDER BY |ORDER BY name DESC | ORDERBY (name DESC)|
-|LIMIT |LIMIT 10 | TAKE (10) / LIMIT (10)|
-|OFFSET |OFFSET 10 | SKIP (10) / OFFSET (10)|
+|                 |SQL                        |MY QUERY                     |
+|-----------------|---------------------------|-----------------------------|
+|SELECT           |SELECT name, surname       |FETCH (name, surname)        |
+|DISTINCT         |SELECT DISTINCT            |FETCHD / FETCH DISTINCT(...) |
+|FROM             |FROM table                 |FROM table / FROM (table)    |
+|JOIN             |[joinType] JOIN table2 ... |INCLUDE (table2) (left join) |
+|INNER JOIN       |INNER JOIN table2 ...      |INCLUDE (table2 INNER)       |
+|JOIN CHAINING    |... JOIN table3 ...        |INCLUDE (table2.table3)      |
+|SELECT (JOIN)    |SELECT table2.id           |FETCH (name, surname, table2.id)|
+|WHERE            |WHERE age >= 18            |FILTER (age >= 18)           |
+|GROUP BY         |GROUP BY name              |GROUPBY (name)               |
+|HAVING           |HAVING COUNT(*) >= 20      |HAVING (COUNT(*) >= 20)      |
+|ORDER BY         |ORDER BY name DESC         |ORDERBY (name DESC)          |
+|LIMIT            |LIMIT 10                   |TAKE (10) / LIMIT (10)       |
+|OFFSET           |OFFSET 10                  |SKIP (10) / OFFSET (10)      |
 
 My Query Example:
 ```sql
@@ -45,6 +46,19 @@ LIMIT  10;
 
 - Define column aliases in FETCH: `FETCH(SUM(price) AS total, ...)`.
 - In the query you can reference aliases in FILTER, GROUPBY, HAVING, and ORDERBY.
+- Table aliases cannot be manually set.
+
+
+## JOINs
+
+- Use `INCLUDE(table2)` for JOINs. Default is LEFT JOIN.
+- For INNER JOIN use `INCLUDE(table2 INNER)`.
+- For RIGHT JOIN use `INCLUDE(table2 RIGHT)`.
+- For FULL JOIN use `INCLUDE(table2 FULL)`.
+
+## Arithmetic Operators
+
+- Not supported for now.
 
 
 ## Supported Operators

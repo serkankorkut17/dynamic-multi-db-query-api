@@ -405,11 +405,8 @@ namespace DynamicDbQueryApi.Services
                     }
                 }
 
-                else
-                {
-                    var joinedArgs = string.Join(", ", args);
-                    return $"{functionName}({joinedArgs})";
-                }
+                var joinedArgs = string.Join(", ", args);
+                return $"{functionName}({joinedArgs})";
             }
 
             // Metin fonksiyonlarını oluştur (LENGTH, LEN, SUBSTRING, SUBSTR, CONCAT, LOWER, UPPER, TRIM, LTRIM, RTRIM, INDEXOF, REPLACE, REVERSE)
@@ -583,7 +580,8 @@ namespace DynamicDbQueryApi.Services
                     // UTC date
                     if (dbType == "postgresql" || dbType == "postgres")
                     {
-                        return "TO_CHAR(CURRENT_DATE AT TIME ZONE 'UTC', 'YYYY-MM-DD')";
+                        return "(CURRENT_DATE AT TIME ZONE 'UTC')::date";
+                        // return "TO_CHAR(CURRENT_DATE AT TIME ZONE 'UTC', 'YYYY-MM-DD')";
                     }
                     else if (dbType == "mssql" || dbType == "sqlserver")
                     {
@@ -595,7 +593,8 @@ namespace DynamicDbQueryApi.Services
                     }
                     else if (dbType == "oracle")
                     {
-                        return "TO_CHAR(TRUNC(SYS_EXTRACT_UTC(SYSTIMESTAMP)), 'YYYY-MM-DD')";
+                        return "TRUNC(SYS_EXTRACT_UTC(SYSTIMESTAMP))";
+                        // return "TO_CHAR(TRUNC(SYS_EXTRACT_UTC(SYSTIMESTAMP)), 'YYYY-MM-DD')";
                     }
                     return "CURRENT_DATE";
                 }
@@ -606,7 +605,8 @@ namespace DynamicDbQueryApi.Services
 
                     if (dbType == "postgresql" || dbType == "postgres")
                     {
-                        return $"TO_CHAR((now() AT TIME ZONE {tz})::date, 'YYYY-MM-DD')";
+                        return $"(now() AT TIME ZONE {tz})::date";
+                        // return $"TO_CHAR((now() AT TIME ZONE {tz})::date, 'YYYY-MM-DD')";
                     }
                     else if (dbType == "mssql" || dbType == "sqlserver")
                     {
@@ -618,7 +618,8 @@ namespace DynamicDbQueryApi.Services
                     }
                     else if (dbType == "oracle")
                     {
-                        return $"TO_CHAR(TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE {tz} AS DATE)), 'YYYY-MM-DD')";
+                        return $"TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE {tz} AS DATE))";
+                        // return $"TO_CHAR(TRUNC(CAST(SYSTIMESTAMP AT TIME ZONE {tz} AS DATE)), 'YYYY-MM-DD')";
                     }
                     return "CURRENT_DATE";
                 }

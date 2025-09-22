@@ -114,6 +114,7 @@ async function run() {
 
 				// if (!same) hasDiff = true;
 				dbResults.push({
+					id: q.id,
 					dsl: q.dsl,
 					sql: q[dbType],
 					convertedSql,

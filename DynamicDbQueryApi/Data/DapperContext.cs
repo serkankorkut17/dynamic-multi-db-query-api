@@ -57,6 +57,10 @@ namespace DynamicDbQueryApi.Data
         public async Task<IDbConnection> GetOpenConnectionAsync()
         {
             var connection = CreateConnection();
+            if (connection is OracleConnection oc)
+            {
+                oc.SuppressGetDecimalInvalidCastException = true;
+            }
             try
             {
                 await ((DbConnection)connection).OpenAsync();
