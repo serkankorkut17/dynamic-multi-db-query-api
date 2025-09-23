@@ -42,9 +42,14 @@ app.UseSerilogRequestLogging();
 
 app.UseAuthorization();
 
-// Serve wwwroot/index.html at '/'
 app.UseDefaultFiles();
 app.UseStaticFiles();
+
+app.MapGet("/", (IWebHostEnvironment env) =>
+    Results.File(Path.Combine(env.WebRootPath, "index.html"), "text/html"));
+
+app.MapGet("/compare", (IWebHostEnvironment env) =>
+    Results.File(Path.Combine(env.WebRootPath, "compare.html"), "text/html"));
 
 app.MapControllers();
 

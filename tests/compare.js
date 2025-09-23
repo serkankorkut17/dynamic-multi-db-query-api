@@ -2,7 +2,6 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const https = require("https");
-const { log } = require("console");
 
 const baseUrl = "http://localhost:5177";
 

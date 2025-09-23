@@ -35,9 +35,10 @@ namespace DynamicDbQueryApi.Services
         }
 
         // Düz SQL sorgusu çalıştırır
-        public async Task<IEnumerable<dynamic>> SQLQueryAsync(QueryRequestDTO request)
+        public async Task<QueryResultDTO> SQLQueryAsync(QueryRequestDTO request)
         {
             var context = new DapperContext(request.DbType, request.ConnectionString);
+            var sql = request.Query;
 
             var connection = await context.GetOpenConnectionAsync();
 
@@ -46,8 +47,38 @@ namespace DynamicDbQueryApi.Services
             {
                 throw new Exception("Could not open database connection. Please check the connection string and database type.");
             }
+
+            var data = await connection.QueryAsync(sql);
+
+            bool writtenToOutputDb = false;
+
+            // Output db bilgilerini ayarla
+            if (request.WriteToOutputDb)
+            {
+                if (string.IsNullOrEmpty(request.OutputDbType) ||
+                    string.IsNullOrEmpty(request.OutputConnectionString) ||
+                    string.IsNullOrEmpty(request.OutputTableName))
+                {
+                    throw new Exception("OutputDbType, OutputConnectionString and OutputTableName must be provided to write to output database.");
+                }
+
+                var outputContext = new DapperContext(request.OutputDbType, request.OutputConnectionString);
+                var outputDbType = request.OutputDbType.ToLower();
+                var outputTableName = request.OutputTableName;
+                var outputConnection = await outputContext.GetOpenConnectionAsync();
+
+                await SaveDataToOutputDb(outputDbType, outputConnection, outputTableName, data);
+                writtenToOutputDb = true;
+            }
+
+            // bağlantıyı kapat
             connection.Close();
-            return await connection.QueryAsync(request.Query);
+            return new QueryResultDTO
+            {
+                Sql = sql,
+                Data = data,
+                WrittenToOutputDb = writtenToOutputDb
+            };
         }
 
         // Özel query dilini parse edip SQL'e çevirir ve çalıştırır
@@ -107,82 +138,34 @@ namespace DynamicDbQueryApi.Services
 
             var data = await connection.QueryAsync(sql);
 
+            bool writtenToOutputDb = false;
+
             // Output db bilgilerini ayarla
-            if (!string.IsNullOrEmpty(request.OutputDbType) &&
-                !string.IsNullOrEmpty(request.OutputConnectionString) &&
-                !string.IsNullOrEmpty(request.OutputTableName) && false)
+            if (request.WriteToOutputDb)
             {
+                if (string.IsNullOrEmpty(request.OutputDbType) ||
+                    string.IsNullOrEmpty(request.OutputConnectionString) ||
+                    string.IsNullOrEmpty(request.OutputTableName))
+                {
+                    throw new Exception("OutputDbType, OutputConnectionString and OutputTableName must be provided to write to output database.");
+                }
+
                 var outputContext = new DapperContext(request.OutputDbType, request.OutputConnectionString);
                 var outputDbType = request.OutputDbType.ToLower();
                 var outputTableName = request.OutputTableName;
                 var outputConnection = await outputContext.GetOpenConnectionAsync();
 
-                // Kolon aliaslarını al
-                Dictionary<string, string> columnAliases = model.Columns.ToDictionary(c => c.Expression, c => c.Alias ?? c.Expression);
-
-                // Input db'den kolonların data tiplerini al
-                Dictionary<string, string> columnDataTypes = await GetColumnDataTypesAsync(connection, outputDbType, model.Columns);
-                _logger.LogInformation("Column Data Types: {ColumnDataTypes}", JsonSerializer.Serialize(columnDataTypes));
-
-                // Eğer hedef db tipi farklı ise kolonların data tiplerini dönüştür
-                if (dbType != outputDbType)
+                try
                 {
-                    columnDataTypes = ConvertColumnDataTypes(columnDataTypes, outputDbType);
-                    _logger.LogInformation("Converted Column Data Types: {ColumnDataTypes}", JsonSerializer.Serialize(columnDataTypes));
+                    await SaveDataToOutputDb(outputDbType, outputConnection, outputTableName, data);
+                    writtenToOutputDb = true;
                 }
-
-                string ensureSql = await IsTableAndColumnsExistAsync(outputConnection,
-                    outputDbType,
-                    outputTableName,
-                    columnDataTypes,
-                    columnAliases);
-
-                _logger.LogInformation("Ensure Table and Columns SQL: {Sql}", ensureSql);
-
-                // Eğer tablo yoksa oluştur
-                if (!string.IsNullOrEmpty(ensureSql))
+                catch (Exception ex)
                 {
-                    await outputConnection.ExecuteAsync(ensureSql);
+                    _logger.LogError(ex, "Error saving data to output database");
+
                 }
-
-                var targetColumns = columnAliases.Values.ToList();
-
-                var insertSql = $"INSERT INTO {outputTableName} ({string.Join(", ", targetColumns)}) VALUES ({string.Join(", ", targetColumns.Select((c, i) => $"@p{i}"))})";
-
-                // Datadaki her bir satırı insert et
-                foreach (IDictionary<string, object> row in data)
-                {
-                    var dp = new DynamicParameters();
-                    for (int i = 0; i < targetColumns.Count; i++)
-                    {
-                        var key = targetColumns[i];
-                        row.TryGetValue(key, out var val);
-
-                        // Oracle'da boolean için 1/0 kullan
-                        if (outputDbType == "oracle")
-                        {
-                            if (val is bool b)
-                            {
-                                dp.Add($"p{i}", b ? 1 : 0);
-                            }
-                            else if (val is string s && (s.Equals("true", StringComparison.OrdinalIgnoreCase) || s.Equals("false", StringComparison.OrdinalIgnoreCase)))
-                            {
-                                dp.Add($"p{i}", s.Equals("true", StringComparison.OrdinalIgnoreCase) ? 1 : 0);
-                            }
-                            else
-                            {
-                                dp.Add($"p{i}", val ?? DBNull.Value);
-                            }
-                        }
-                        else
-                        {
-                            dp.Add($"p{i}", val ?? DBNull.Value);
-                        }
-                    }
-
-                    await outputConnection.ExecuteAsync(insertSql, dp);
-                    outputConnection.Close();
-                }
+                outputConnection.Close();
             }
 
             // bağlantıyı kapat
@@ -190,7 +173,8 @@ namespace DynamicDbQueryApi.Services
             return new QueryResultDTO
             {
                 Sql = sql,
-                Data = data
+                Data = data,
+                WrittenToOutputDb = writtenToOutputDb
             };
         }
 
@@ -286,7 +270,7 @@ namespace DynamicDbQueryApi.Services
         }
 
         // Belirtilen tablo ve kolonlar için hedef veritabanında tabloyu ve eksik kolonları oluşturur
-        public async Task<string> IsTableAndColumnsExistAsync(IDbConnection connection, string dbType, string tableName, Dictionary<string, string> columnDataTypes, Dictionary<string, string> columnAliases)
+        public async Task<string> IsTableAndColumnsExistAsync(IDbConnection connection, string dbType, string tableName, Dictionary<string, string> columnDataTypes)
         {
             // Tablo var mı kontrolü
             bool tableExists = await _queryRepo.TableExistsAsync(connection, dbType, tableName);
@@ -294,7 +278,7 @@ namespace DynamicDbQueryApi.Services
             if (!tableExists)
             {
                 // Eğer tablo yoksa CREATE TABLE ile oluştur
-                return _sqlBuilderService.BuildCreateTableSql(tableName, columnDataTypes, columnAliases);
+                return _sqlBuilderService.BuildCreateTableSql(dbType, tableName, columnDataTypes);
             }
             else
             {
@@ -302,7 +286,7 @@ namespace DynamicDbQueryApi.Services
                 var sqlBuilder = new StringBuilder();
                 foreach (var col in columnDataTypes)
                 {
-                    string colName = columnAliases[col.Key];
+                    string colName = col.Key;
                     string colType = col.Value;
                     bool columnExists = await _queryRepo.ColumnExistsInTableAsync(connection, dbType, tableName, colName);
 
@@ -315,205 +299,325 @@ namespace DynamicDbQueryApi.Services
             }
         }
 
-        public async Task<Dictionary<string, string>> GetColumnDataTypesAsync(IDbConnection connection, string dbType, List<QueryColumnModel> columns)
+        public Dictionary<string, string> GetColumnDataTypes(string outputDbType, IEnumerable<dynamic> data)
         {
-            // column: datatype için dictionary
+            // Datayı listeye çevir
+            var dataList = data?.ToList() ?? new List<dynamic>();
+            var columnNames = new List<string>();
+            if (dataList.Count > 0)
+            {
+                // İlk satırı IDictionary gibi cast et
+                var firstRow = (IDictionary<string, object>)dataList[0];
+                columnNames = firstRow.Keys.ToList();
+            }
+
+            // Column - DataType dictionary al
             var columnDataTypes = new Dictionary<string, string>();
 
-            foreach (var col in columns)
+            foreach (string col in columnNames)
             {
-                string colName = col.Expression;
-                var parts = col.Expression.Split('.');
-                if (parts.Length == 2)
+                bool isBoolean = true;
+                for (int i = 0; i < dataList.Count; i++)
                 {
-                    var tableName = parts[0];
-                    var columnName = parts[1];
-
-                    var dataType = await _queryRepo.GetColumnDataTypeAsync(connection, dbType, tableName, columnName);
-
-                    if (dataType != null)
+                    var row = (IDictionary<string, object>)dataList[i];
+                    if (row.ContainsKey(col))
                     {
-                        columnDataTypes[colName] = dataType.ToString();
-                    }
-                    else
-                    {
-                        throw new Exception($"Could not determine data type for column {col} in table {tableName}");
-                    }
-                }
-
-                else if (parts.Length == 1)
-                {
-                    // COUNT, SUM, AVG, MIN, MAX gibi aggregate fonksiyonlar için
-                    var func = parts[0].ToUpper();
-                    if (func.Contains("COUNT"))
-                    {
-                        switch (dbType)
+                        // Eğer değer null ise atla
+                        if (row[col] == null)
                         {
-                            case "postgresql":
-                            case "mysql":
-                                columnDataTypes[colName] = "INTEGER";
-                                break;
-                            case "mssql":
-                                columnDataTypes[colName] = "INT";
-                                break;
-                            case "oracle":
-                                columnDataTypes[colName] = "NUMBER(10)";
-                                break;
-                            default:
-                                throw new NotSupportedException($"Unsupported DB type: {dbType}");
+                            continue;
+                        }
+
+                        // Eğer değer bool ise db'ye göre uygun tipe çevir
+                        if (row[col] is bool boolValue)
+                        {
+                            if (outputDbType == "postgres" || outputDbType == "postgresql")
+                            {
+                                columnDataTypes[col] = "BOOLEAN";
+                            }
+                            else if (outputDbType == "mssql" || outputDbType == "mssql")
+                            {
+                                columnDataTypes[col] = "BIT";
+                            }
+                            else if (outputDbType == "mysql" || outputDbType == "mysql")
+                            {
+                                columnDataTypes[col] = "TINYINT";
+                            }
+                            else if (outputDbType == "oracle" || outputDbType == "oracle")
+                            {
+                                columnDataTypes[col] = "NUMBER(1)";
+                            }
+                            else
+                            {
+                                columnDataTypes[col] = "BOOLEAN";
+                            }
+                            break;
+                        }
+
+                        // Eğer değer 1 veya 0 ise bool olarak değerlendir
+                        if (isBoolean && row[col] is int intValue && (intValue == 0 || intValue == 1))
+                        {
+                            if (i == dataList.Count - 1)
+                            {
+                                if (outputDbType == "postgres" || outputDbType == "postgresql")
+                                {
+                                    columnDataTypes[col] = "BOOLEAN";
+                                }
+                                else if (outputDbType == "mssql" || outputDbType == "mssql")
+                                {
+                                    columnDataTypes[col] = "BIT";
+                                }
+                                else if (outputDbType == "mysql" || outputDbType == "mysql")
+                                {
+                                    columnDataTypes[col] = "TINYINT";
+                                }
+                                else if (outputDbType == "oracle" || outputDbType == "oracle")
+                                {
+                                    columnDataTypes[col] = "NUMBER(1)";
+                                }
+                                else
+                                {
+                                    columnDataTypes[col] = "BOOLEAN";
+                                }
+                            }
+                            continue;
+                        }
+                        else
+                        {
+                            isBoolean = false;
+                        }
+
+                        // Eğer değer tam sayı ise db'ye göre uygun tipe çevir
+                        if (row[col] is int || row[col] is long || row[col] is short || row[col] is byte)
+                        {
+                            if (outputDbType == "postgres" || outputDbType == "postgresql")
+                            {
+                                columnDataTypes[col] = "BIGINT";
+                            }
+                            else if (outputDbType == "mssql" || outputDbType == "mssql")
+                            {
+                                columnDataTypes[col] = "BIGINT";
+                            }
+                            else if (outputDbType == "mysql" || outputDbType == "mysql")
+                            {
+                                columnDataTypes[col] = "BIGINT";
+                            }
+                            else if (outputDbType == "oracle" || outputDbType == "oracle")
+                            {
+                                columnDataTypes[col] = "NUMBER(19)";
+                            }
+                            else
+                            {
+                                columnDataTypes[col] = "INTEGER";
+                            }
+                            break;
+                        }
+
+                        // Eğer ondalıklı sayı ise db'ye göre uygun tipe çevir
+                        else if (row[col] is float || row[col] is double || row[col] is decimal)
+                        {
+                            if (outputDbType == "postgres" || outputDbType == "postgresql")
+                            {
+                                columnDataTypes[col] = "DOUBLE PRECISION";
+                            }
+                            else if (outputDbType == "mssql" || outputDbType == "mssql")
+                            {
+                                columnDataTypes[col] = "FLOAT(53)";
+                            }
+                            else if (outputDbType == "mysql" || outputDbType == "mysql")
+                            {
+                                columnDataTypes[col] = "DOUBLE";
+                            }
+                            else if (outputDbType == "oracle" || outputDbType == "oracle")
+                            {
+                                columnDataTypes[col] = "BINARY_DOUBLE";
+                            }
+                            else
+                            {
+                                columnDataTypes[col] = "DOUBLE";
+                            }
+                            break;
+                        }
+
+                        // Eğer timestamp ise db'ye göre uygun tipe çevir
+                        else if (row[col] is DateTime)
+                        {
+                            if (outputDbType == "postgres" || outputDbType == "postgresql")
+                            {
+                                columnDataTypes[col] = "TIMESTAMP";
+                            }
+                            else if (outputDbType == "mssql" || outputDbType == "mssql")
+                            {
+                                columnDataTypes[col] = "DATETIME2";
+                            }
+                            else if (outputDbType == "mysql" || outputDbType == "mysql")
+                            {
+                                columnDataTypes[col] = "DATETIME";
+                            }
+                            else if (outputDbType == "oracle" || outputDbType == "oracle")
+                            {
+                                columnDataTypes[col] = "TIMESTAMP";
+                            }
+                            else
+                            {
+                                columnDataTypes[col] = "TIMESTAMP";
+                            }
+                            break;
+                        }
+
+                        // Eğer saat ise db'ye göre uygun tipe çevir
+                        else if (row[col] is TimeSpan)
+                        {
+                            if (outputDbType == "postgres" || outputDbType == "postgresql")
+                            {
+                                columnDataTypes[col] = "TIME";
+                            }
+                            else if (outputDbType == "mssql" || outputDbType == "mssql")
+                            {
+                                columnDataTypes[col] = "TIME";
+                            }
+                            else if (outputDbType == "mysql" || outputDbType == "mysql")
+                            {
+                                columnDataTypes[col] = "TIME";
+                            }
+                            else if (outputDbType == "oracle" || outputDbType == "oracle")
+                            {
+                                columnDataTypes[col] = "INTERVAL DAY TO SECOND";
+                            }
+                            else
+                            {
+                                columnDataTypes[col] = "TIME";
+                            }
+                            break;
+                        }
+
+                        // Eğer json ise db'ye göre uygun tipe çevir
+                        else if (row[col] is JsonElement || row[col] is IDictionary<string, object> || row[col] is IList<object>)
+                        {
+                            if (outputDbType == "postgres" || outputDbType == "postgresql")
+                            {
+                                columnDataTypes[col] = "JSONB";
+                            }
+                            else if (outputDbType == "mssql" || outputDbType == "mssql")
+                            {
+                                columnDataTypes[col] = "NVARCHAR(MAX)";
+                            }
+                            else if (outputDbType == "mysql" || outputDbType == "mysql")
+                            {
+                                columnDataTypes[col] = "JSON";
+                            }
+                            else if (outputDbType == "oracle" || outputDbType == "oracle")
+                            {
+                                columnDataTypes[col] = "CLOB";
+                            }
+                            else
+                            {
+                                columnDataTypes[col] = "TEXT";
+                            }
+                            break;
+                        }
+
+                        // Eğer string ise db'ye göre uygun tipe çevir
+                        else
+                        {
+                            if (outputDbType == "postgres" || outputDbType == "postgresql")
+                            {
+                                columnDataTypes[col] = "TEXT";
+                            }
+                            else if (outputDbType == "mssql" || outputDbType == "mssql")
+                            {
+                                columnDataTypes[col] = "TEXT";
+                            }
+                            else if (outputDbType == "mysql" || outputDbType == "mysql")
+                            {
+                                columnDataTypes[col] = "TEXT";
+                            }
+                            else if (outputDbType == "oracle" || outputDbType == "oracle")
+                            {
+                                columnDataTypes[col] = "CLOB";
+                            }
+                            else
+                            {
+                                columnDataTypes[col] = "TEXT";
+                            }
                         }
                     }
-                    else if (func.Contains("SUM") || func.Contains("AVG") || func.Contains("MIN") || func.Contains("MAX"))
-                    {
-                        switch (dbType)
-                        {
-                            case "postgresql":
-                            case "mysql":
-                                columnDataTypes[colName] = "DECIMAL";
-                                break;
-                            case "mssql":
-                                columnDataTypes[colName] = "DECIMAL(18,2)";
-                                break;
-                            case "oracle":
-                                columnDataTypes[colName] = "NUMBER(18,2)";
-                                break;
-                            default:
-                                throw new NotSupportedException($"Unsupported DB type: {dbType}");
-                        }
-                    }
-                    else
-                    {
-                        throw new Exception($"Could not determine data type for aggregate function {colName}");
-                    }
-                }
-                else
-                {
-                    throw new Exception($"Invalid column format: {colName}");
                 }
             }
             return columnDataTypes;
         }
 
-        public Dictionary<string, string> ConvertColumnDataTypes(Dictionary<string, string> columnDataTypes, string toDbType)
+        public async Task SaveDataToOutputDb(string outputDbType, IDbConnection outputConnection, string outputTableName, IEnumerable<dynamic> data)
         {
-            var converted = new Dictionary<string, string>();
+            var columnDataTypes = GetColumnDataTypes(outputDbType, data);
 
-            foreach (var kvp in columnDataTypes)
+            // Log column data types
+            _logger.LogInformation("Column Data Types for Output DB: {ColumnDataTypes}", JsonSerializer.Serialize(columnDataTypes));
+
+            string ensureSql = await IsTableAndColumnsExistAsync(outputConnection,
+                outputDbType,
+                outputTableName,
+                columnDataTypes);
+
+            _logger.LogInformation("Ensure Table and Columns SQL: {Sql}", ensureSql);
+
+            // Eğer tablo yoksa oluştur
+            if (!string.IsNullOrEmpty(ensureSql))
             {
-                var col = kvp.Key;
-                var fromType = kvp.Value;
-                var toType = ConvertDataType(fromType, toDbType);
-                converted[col] = toType;
+                // Oracle: Tek komut yürütmede sondaki ; hata oluşturur
+                if (string.Equals(outputDbType, "oracle", StringComparison.OrdinalIgnoreCase))
+                {
+                    ensureSql = Regex.Replace(ensureSql, @";\s*$", "");
+                }
+                await outputConnection.ExecuteAsync(ensureSql);
             }
 
-            return converted;
-        }
+            var targetColumns = columnDataTypes.Keys.ToList();
 
-        public record ParsedType(string BaseType, int? Length, int? Precision, int? Scale);
+            string Param(int i) => string.Equals(outputDbType, "oracle", StringComparison.OrdinalIgnoreCase) ? $":p{i}" : $"@p{i}";
+            string Q(string name) => string.Equals(outputDbType, "oracle", StringComparison.OrdinalIgnoreCase) ? $"\"{name.ToUpperInvariant()}\"" : name;
 
-        private static ParsedType ParseType(string raw)
-        {
-            if (string.IsNullOrWhiteSpace(raw)) return new ParsedType(raw ?? "", null, null, null);
+            var columnsSql = string.Join(", ", targetColumns.Select(Q));
+            var valuesSql = string.Join(", ", targetColumns.Select((c, i) => Param(i)));
+            var insertSql = $"INSERT INTO {Q(outputTableName)} ({columnsSql}) VALUES ({valuesSql})";
 
-            var s = raw.Trim().ToLowerInvariant();
-            // match varchar(255) or numeric(10,2) or number(10,2)
-            var m = Regex.Match(s, @"^(?<base>[a-z0-9_ ]+?)(\s*\(\s*(?<p>\d+)(\s*,\s*(?<s>\d+))?\s*\))?$");
-            if (!m.Success) return new ParsedType(s, null, null, null);
+            _logger.LogInformation("Insert SQL: {Sql}", insertSql);
 
-            var baseType = m.Groups["base"].Value.Trim();
-            int? p = null, sc = null;
-            if (int.TryParse(m.Groups["p"].Value, out var pi)) p = pi;
-            if (int.TryParse(m.Groups["s"].Value, out var si)) sc = si;
-
-            // length vs precision: for varchar => Length = p, for numeric => Precision=p, Scale=sc
-            if (baseType.Contains("char") || baseType.Contains("text") || baseType.Contains("clob"))
-                return new ParsedType(baseType, p, null, null);
-            return new ParsedType(baseType, null, p, sc);
-        }
-
-        public string ConvertDataType(string dataType, string toDbType)
-        {
-            var parsed = ParseType(dataType);
-            var baseType = parsed.BaseType;
-            var precision = parsed.Precision;
-            var scale = parsed.Scale;
-            var length = parsed.Length;
-
-            string UseLen(int? len, int fallback) => len.HasValue && len.Value > 0 ? len.Value.ToString() : fallback.ToString();
-            string UsePrec(int? pr, int fallback) => pr.HasValue && pr.Value > 0 ? pr.Value.ToString() : fallback.ToString();
-            string UseScale(int? sc, int fallback) => sc.HasValue ? sc.Value.ToString() : fallback.ToString();
-
-            toDbType = toDbType.ToLowerInvariant();
-            baseType = baseType.ToLowerInvariant();
-
-            if (toDbType == "postgresql" || toDbType == "postgres")
+            // Datadaki her bir satırı insert et
+            foreach (IDictionary<string, object> row in data)
             {
-                if (baseType.Contains("int")) return "INTEGER";
-                if (baseType.Contains("bigint")) return "BIGINT";
-                if (baseType.Contains("smallint") || baseType.Contains("tinyint")) return "SMALLINT";
-                if (baseType.Contains("numeric") || baseType.Contains("decimal") || baseType.Contains("number"))
-                    return $"NUMERIC({UsePrec(precision, 18)},{UseScale(scale, 2)})";
-                if (baseType.Contains("float") || baseType.Contains("double")) return "DOUBLE PRECISION";
-                if (baseType.Contains("char") || baseType.Contains("varchar"))
-                    return $"VARCHAR({UseLen(length, 255)})";
-                if (baseType.Contains("text") || baseType.Contains("clob")) return "TEXT";
-                if (baseType.Contains("bool") || baseType.Contains("boolean")) return "BOOLEAN";
-                if (baseType.Contains("date") && baseType.Contains("time")) return "TIMESTAMP";
-                if (baseType.Contains("date")) return "DATE";
-                return "VARCHAR(255)";
+                var dp = new DynamicParameters();
+                for (int i = 0; i < targetColumns.Count; i++)
+                {
+                    var key = targetColumns[i];
+                    row.TryGetValue(key, out var val);
+
+                    // Oracle'da boolean için 1/0 kullan
+                    if (string.Equals(outputDbType, "oracle", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (val is bool b)
+                        {
+                            dp.Add($"p{i}", b ? 1 : 0);
+                        }
+                        else if (val is string s && (s.Equals("true", StringComparison.OrdinalIgnoreCase) || s.Equals("false", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            dp.Add($"p{i}", s.Equals("true", StringComparison.OrdinalIgnoreCase) ? 1 : 0);
+                        }
+                        else
+                        {
+                            dp.Add($"p{i}", val ?? DBNull.Value);
+                        }
+                    }
+                    else
+                    {
+                        dp.Add($"p{i}", val ?? DBNull.Value);
+                    }
+                }
+                await outputConnection.ExecuteAsync(insertSql, dp);
             }
-            else if (toDbType == "mssql")
-            {
-                if (baseType.Contains("int")) return "INT";
-                if (baseType.Contains("bigint")) return "BIGINT";
-                if (baseType.Contains("smallint") || baseType.Contains("tinyint")) return "SMALLINT";
-                if (baseType.Contains("numeric") || baseType.Contains("decimal") || baseType.Contains("number"))
-                    return $"DECIMAL({UsePrec(precision, 18)},{UseScale(scale, 2)})";
-                if (baseType.Contains("float") || baseType.Contains("double")) return "FLOAT";
-                if (baseType.Contains("char") || baseType.Contains("varchar"))
-                    return $"VARCHAR({UseLen(length, 255)})";
-                if (baseType.Contains("text") || baseType.Contains("clob")) return "NVARCHAR(MAX)";
-                if (baseType.Contains("bool") || baseType.Contains("boolean")) return "BIT";
-                if (baseType.Contains("date") && baseType.Contains("time")) return "DATETIME2";
-                if (baseType.Contains("date")) return "DATE";
-                return "NVARCHAR(255)";
-            }
-            else if (toDbType == "mysql")
-            {
-                if (baseType.Contains("int")) return "INT";
-                if (baseType.Contains("bigint")) return "BIGINT";
-                if (baseType.Contains("smallint") || baseType.Contains("tinyint")) return "SMALLINT";
-                if (baseType.Contains("numeric") || baseType.Contains("decimal") || baseType.Contains("number"))
-                    return $"DECIMAL({UsePrec(precision, 18)},{UseScale(scale, 2)})";
-                if (baseType.Contains("float") || baseType.Contains("double")) return "DOUBLE";
-                if (baseType.Contains("char") || baseType.Contains("varchar"))
-                    return $"VARCHAR({UseLen(length, 255)})";
-                if (baseType.Contains("text") || baseType.Contains("clob")) return "TEXT";
-                if (baseType.Contains("bool") || baseType.Contains("boolean")) return "TINYINT(1)";
-                if (baseType.Contains("date") && baseType.Contains("time")) return "DATETIME";
-                if (baseType.Contains("date")) return "DATE";
-                return "VARCHAR(255)";
-            }
-            else if (toDbType == "oracle")
-            {
-                if (baseType.Contains("int") || baseType.Contains("integer")) return "NUMBER(10)";
-                if (baseType.Contains("bigint")) return "NUMBER(19)";
-                if (baseType.Contains("smallint") || baseType.Contains("tinyint")) return "NUMBER(5)";
-                if (baseType.Contains("numeric") || baseType.Contains("decimal") || baseType.Contains("number"))
-                    return $"NUMBER({UsePrec(precision, 18)},{UseScale(scale, 2)})";
-                if (baseType.Contains("float") || baseType.Contains("double")) return "BINARY_FLOAT"; // or FLOAT(53)
-                if (baseType.Contains("char") || baseType.Contains("varchar"))
-                    return $"VARCHAR2({UseLen(length, 255)})";
-                if (baseType.Contains("text") || baseType.Contains("clob")) return "CLOB";
-                if (baseType.Contains("bool") || baseType.Contains("boolean")) return "NUMBER(1)";
-                if (baseType.Contains("date") && baseType.Contains("time")) return "TIMESTAMP";
-                if (baseType.Contains("date")) return "DATE";
-                return "VARCHAR2(255)";
-            }
-            else
-            {
-                throw new NotSupportedException($"Unsupported target DB type: {toDbType}");
-            }
+
+            // Bağlantıyı döngü dışında kapatın
+            outputConnection.Close();
         }
     }
 }

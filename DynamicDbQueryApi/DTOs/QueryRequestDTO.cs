@@ -15,6 +15,7 @@ namespace DynamicDbQueryApi.DTOs
         [Required]
         public string Query { get; set; } = "";
         // Output db
+        public bool WriteToOutputDb { get; set; } = false;
         public string? OutputDbType { get; set; }
         public string? OutputConnectionString { get; set; }
         public string? OutputTableName { get; set; }

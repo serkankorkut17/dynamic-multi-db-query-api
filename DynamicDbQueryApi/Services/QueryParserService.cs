@@ -33,7 +33,7 @@ namespace DynamicDbQueryApi.Services
             queryModel.Columns = ParseFetchColumns(queryString, queryModel.Table);
             List<string> aliasList = queryModel.Columns.Where(c => !string.IsNullOrWhiteSpace(c.Alias)).Select(c => c.Alias!).ToList();
 
-            // Alias - Kolon Dictionary
+            // Alias - Column Dictionary
             var aliasColumnDict = queryModel.Columns
                 .Where(c => !string.IsNullOrWhiteSpace(c.Alias))
                 .ToDictionary(c => c.Alias!, c => c.Expression);

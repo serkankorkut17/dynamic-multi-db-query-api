@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
@@ -1174,7 +1175,7 @@ namespace DynamicDbQueryApi.Services
         }
 
         // CREATE TABLE SQL sorgusu oluşturma
-        public string BuildCreateTableSql(string tableName, Dictionary<string, string> columnDataTypes, Dictionary<string, string> columnAliases)
+        public string BuildCreateTableSql(string dbType, string tableName, Dictionary<string, string> columnDataTypes)
         {
             var sqlBuilder = new StringBuilder();
 
@@ -1182,16 +1183,24 @@ namespace DynamicDbQueryApi.Services
             int i = 0;
             foreach (var col in columnDataTypes)
             {
-                string colName = columnAliases[col.Key];
+                string colName = col.Key;
                 string colType = col.Value;
-                sqlBuilder.Append($"    {colName} {colType} NULL");
+                if (dbType == "oracle")
+                {
+                    sqlBuilder.Append($"    {colName.ToUpperInvariant()} {colType.ToUpperInvariant()}");
+                }
+                else
+                {
+                    sqlBuilder.Append($"    {colName} {colType} NULL");
+                }
+
                 if (i < columnDataTypes.Count - 1)
                 {
                     sqlBuilder.Append(",\n");
                 }
                 i++;
             }
-            sqlBuilder.Append("\n);");
+            sqlBuilder.Append("\n)");
 
             return sqlBuilder.ToString();
         }

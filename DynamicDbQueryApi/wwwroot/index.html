@@ -27,15 +27,33 @@
       .badge { background:#444; color:#fff; padding:.15rem .45rem; border-radius:999px; font-size:.65rem; font-weight:600; letter-spacing:.05em; }
       .flex-end { display:flex; justify-content:flex-end; gap:.5rem; }
       hr { margin:2rem 0; border:none; border-top:1px solid #444; }
+      .mode-selector { display:flex; gap:.5rem; margin-bottom:1rem; }
+      .mode-btn { padding:.4rem .8rem; border:1px solid #666; background:#333; color:#fff; cursor:pointer; border-radius:4px; }
+      .mode-btn.active { background:#1e6bd6; border-color:#1e6bd6; }
+      .query-section { display:none; }
+      .query-section.active { display:block; }
+      .collapsible { cursor:pointer; user-select:none; }
+      .collapsible:hover { background:#f5f5f5; }
+      .collapsible-content { display:none; }
+      .collapsible-content.open { display:block; }
+      .checkbox-field { display:flex; align-items:center; gap:.5rem; margin:.5rem 0; }
+      .checkbox-field input[type="checkbox"] { width:auto; }
+      .data-table { width:100%; border-collapse:collapse; font-size:.8rem; margin-top:.5rem; }
+      .data-table th, .data-table td { border:1px solid #666; padding:.3rem .5rem; text-align:left; }
+      .data-table th { background:#333; color:#fff; font-weight:600; }
+      .data-table tbody tr:nth-child(even) { background:#1115; }
+      .status-badge { padding:.2rem .4rem; border-radius:3px; font-size:.7rem; font-weight:600; }
+      .status-success { background:#4CAF50; color:white; }
+      .status-info { background:#2196F3; color:white; }
     </style>
   </head>
   <body>
     <h1>Dynamic Query Console</h1>
-    <p>Ortak veritabanı bilgileriyle hem özel DSL sorgunu hem de ham SQL sorgunu çalıştır.</p>
+    <p>Veritabanı sorgularını çalıştırın, sonuçları karşılaştırın ve başka bir veritabanına kaydedin.</p>
 
     <form id="shared" onsubmit="return false;">
       <fieldset>
-        <legend>Bağlantı Bilgileri</legend>
+        <legend>Input Database</legend>
         <div class="row">
           <div class="col">
             <label for="dbType">DB Type</label>
@@ -49,201 +67,113 @@
         </div>
         <label for="conn">Connection String</label>
         <textarea id="conn" placeholder="Host=localhost;Port=5432;Database=querydb;Username=postgres;Password=postgres"></textarea>
+        <div class="toolbar">
+          <button type="button" id="inspectBtn">Database Yapısını İncele</button>
+        </div>
       </fieldset>
     </form>
 
-    <div class="row">
-      <div class="col">
-        <fieldset>
-          <legend>DSL Query <span class="badge">/api/query</span></legend>
-          <label for="dsl">Custom Sorgu</label>
-          <textarea id="dsl" placeholder="FETCH(id, name) FILTER(age > 18 AND status = 'A') INCLUDE(orders) FROM users"></textarea>
-          <div class="toolbar flex-end">
-            <button type="button" id="runDsl">Çalıştır</button>
-            <button type="button" class="secondary" id="clearDsl">Temizle</button>
-          </div>
-        </fieldset>
-      </div>
-      <div class="col">
-        <fieldset>
-          <legend>Raw SQL <span class="badge">/api/query/sql</span></legend>
-          <label for="sql">SQL Sorgusu</label>
-            <textarea id="sql" placeholder="SELECT id, name FROM users WHERE age > 18 ORDER BY id DESC LIMIT 20;"></textarea>
-          <div class="toolbar flex-end">
-            <button type="button" id="runSql">Çalıştır</button>
-            <button type="button" class="secondary" id="clearSql">Temizle</button>
-          </div>
-        </fieldset>
-      </div>
-    </div>
+    <fieldset id="inspectSection" style="display:none;">
+      <legend>Database Yapısı</legend>
+      <div id="inspectResult">(henüz incelenmedi)</div>
+    </fieldset>
 
-    <hr />
-    <div class="outputs">
-      <div class="panel">
-        <h3>DSL Sonuç</h3>
-        <pre id="outDsl">(henüz yok)</pre>
+    <fieldset>
+      <legend>Query Mode</legend>
+      <div class="mode-selector">
+        <button type="button" class="mode-btn active" data-mode="dsl">DSL Query</button>
+        <button type="button" class="mode-btn" data-mode="sql">Raw SQL</button>
       </div>
-      <div class="panel">
-        <h3>SQL Sonuç</h3>
-        <pre id="outSql">(henüz yok)</pre>
+      
+      <div class="query-section active" id="dslSection">
+        <label for="dsl">Custom DSL Sorgu</label>
+        <textarea id="dsl" placeholder="FETCH(id, name) FILTER(age > 18 AND status = 'A') FROM(users) INCLUDE(orders)"></textarea>
+        <small class="hint">Örnekler: FETCH(id, name) FROM users | FILTER(age > 18) | INCLUDE(orders INNER) | GROUPBY(status) HAVING(COUNT(*) > 5)</small>
       </div>
-    </div>
+      
+      <div class="query-section" id="sqlSection">
+        <label for="sql">Raw SQL Sorgu</label>
+        <textarea id="sql" placeholder="SELECT id, name FROM users LEFT JOIN orders ON users.id = orders.user_id WHERE age > 18 AND status = 'A';"></textarea>
+        <small class="hint">Ham SQL sorgunuzu yazın. Çoklu statement desteklenmez.</small>
+      </div>
+
+      <div class="checkbox-field">
+        <input type="checkbox" id="writeToOutput">
+        <label for="writeToOutput">Sonuçları başka bir veritabanına kaydet</label>
+      </div>
+
+      <div id="outputDbSection" style="display:none;">
+        <fieldset>
+          <legend>Output Database</legend>
+          <div class="row">
+            <div class="col">
+              <label for="outputDbType">Output DB Type</label>
+              <select id="outputDbType">
+                <option value="postgres">PostgreSQL</option>
+                <option value="mysql">MySQL</option>
+                <option value="mssql">SQL Server</option>
+                <option value="oracle">Oracle</option>
+              </select>
+            </div>
+            <div class="col">
+              <label for="outputTableName">Table Name</label>
+              <input type="text" id="outputTableName" placeholder="result_table">
+            </div>
+          </div>
+          <label for="outputConn">Output Connection String</label>
+          <textarea id="outputConn" placeholder="Output database connection string"></textarea>
+        </fieldset>
+      </div>
+
+      <div class="toolbar flex-end">
+        <button type="button" id="runQuery">Sorguyu Çalıştır</button>
+        <button type="button" class="secondary" id="clearQuery">Temizle</button>
+      </div>
+    </fieldset>
 
     <hr />
     <fieldset>
-      <legend>Karşılaştırma</legend>
-      <div class="toolbar">
-        <button type="button" id="compareBtn">Sonuçları Karşılaştır</button>
-        <button type="button" class="secondary" id="clearCompare">Temizle</button>
-      </div>
-      <small class="hint">Karşılaştırma; primitive değerleri, dizileri ve nesneleri yapısal olarak kıyaslar. Nesne/dizi sırasını yok saymak için kanonikleştirilmiş karşılaştırma yapılır.</small>
-      <pre id="outCompare">(henüz yok)</pre>
+      <legend>Query Sonuçları</legend>
+      <div id="queryStatus"></div>
+      <div id="queryResult">(henüz sorgu çalıştırılmadı)</div>
     </fieldset>
 
-    <script>
-      const el = id => document.getElementById(id);
-      const btnDsl = el('runDsl');
-      const btnSql = el('runSql');
-      const outDsl = el('outDsl');
-      const outSql = el('outSql');
-  const outCompare = el('outCompare');
-  const btnCompare = el('compareBtn');
-
-  let lastDslData = undefined;
-  let lastSqlData = undefined;
-
-      function buildPayload(query) {
-    return {
-          dbType: el('dbType').value.trim(),
-            connectionString: el('conn').value.trim(),
-      query: query
-        };
-      }
-
-      async function postJson(url, body) {
-        const res = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) });
-        const txt = await res.text();
-        let data;
-        try { data = JSON.parse(txt); } catch { data = txt; }
-        if (!res.ok) throw data;
-        return data;
-      }
-
-      function format(obj) {
-        if (obj == null) return 'null';
-        if (typeof obj === 'string') return obj;
-        return JSON.stringify(obj, null, 2);
-      }
-
-      async function run(kind) {
-        const isDsl = kind === 'dsl';
-        const btn = isDsl ? btnDsl : btnSql;
-        const area = isDsl ? el('dsl') : el('sql');
-        const out = isDsl ? outDsl : outSql;
-        const endpoint = isDsl ? '/api/query' : '/api/query/sql';
-        const q = area.value.trim();
-        if (!q) { out.textContent = 'Boş sorgu.'; return; }
-        const payload = buildPayload(q);
-        btn.disabled = true; out.textContent = 'Çalışıyor...';
-        try {
-          const data = await postJson(endpoint, payload);
-          out.classList.remove('bad');
-          if (isDsl && data && (data.sql || data.Sql)) {
-            const sql = data.sql || data.Sql;
-            const rows = data.data ?? data.Data;
-            out.textContent = 'Generated SQL:\n' + sql + '\n\nResult:\n' + format(rows);
-            lastDslData = rows;
-          } else {
-            out.textContent = format(data);
-            if (isDsl) lastDslData = data; else lastSqlData = data;
-          }
-        } catch (e) {
-          out.innerHTML = '' + format(e);
-          out.classList.add('bad');
-          if (isDsl) lastDslData = undefined; else lastSqlData = undefined;
-        } finally { btn.disabled = false; }
-      }
-
-      function canonical(value) {
-        if (value === null || typeof value !== 'object') return JSON.stringify(value);
-        if (Array.isArray(value)) {
-          // Array canonical: canonicalize each element then sort
-          const mapped = value.map(v => canonical(v));
-          mapped.sort();
-          return '[' + mapped.join(',') + ']';
-        }
-        // Object canonical: sort keys
-        const keys = Object.keys(value).sort();
-        return '{' + keys.map(k => JSON.stringify(k) + ':' + canonical(value[k])).join(',') + '}';
-      }
-
-      function shallowSummary(arr) {
-        if (!Array.isArray(arr)) return '';
-        if (arr.length === 0) return '[]';
-        const sample = arr[0];
-        if (sample && typeof sample === 'object') {
-          return 'rows=' + arr.length + ', cols={' + Object.keys(sample).join(',') + '}';
-        }
-        return 'items=' + arr.length;
-      }
-
-      function diffArrays(a, b) {
-        const report = [];
-        if (!Array.isArray(a) || !Array.isArray(b)) return report;
-        if (a.length !== b.length) report.push(`Farklı satır sayısı: DSL=${a.length} SQL=${b.length}`);
-        const len = Math.min(a.length, b.length);
-        for (let i = 0; i < len; i++) {
-          const ra = a[i];
-            const rb = b[i];
-            if (JSON.stringify(ra) !== JSON.stringify(rb)) {
-              report.push(`Satır ${i} farkı (ilk fark gösteriliyor)`);
-              report.push('DSL: ' + JSON.stringify(ra));
-              report.push('SQL: ' + JSON.stringify(rb));
-              break;
-            }
-        }
-        return report;
-      }
-
-      function compareResults() {
-        outCompare.classList.remove('bad');
-        if (lastDslData === undefined || lastSqlData === undefined) {
-          outCompare.textContent = 'Karşılaştırma için her iki sorguyu da önce çalıştır.';
-          return;
-        }
-        try {
-          const canonDsl = canonical(lastDslData);
-          const canonSql = canonical(lastSqlData);
-          const equal = canonDsl === canonSql;
-          let lines = [];
-          lines.push(equal ? 'SONUÇ: AYNI ✅' : 'SONUÇ: FARKLI ❌');
-          if (!equal) {
-            // Extra diagnostics for common shape (arrays of rows)
-            if (Array.isArray(lastDslData) && Array.isArray(lastSqlData)) {
-              lines.push('Özet DSL: ' + shallowSummary(lastDslData));
-              lines.push('Özet SQL: ' + shallowSummary(lastSqlData));
-              lines.push(...diffArrays(lastDslData, lastSqlData));
-            }
-          }
-          outCompare.textContent = lines.join('\n');
-        } catch (err) {
-          outCompare.classList.add('bad');
-          outCompare.textContent = 'Karşılaştırma hatası: ' + err;
-        }
-      }
-
-      btnCompare.addEventListener('click', compareResults);
-      el('clearCompare').addEventListener('click', () => { outCompare.textContent='(temizlendi)'; lastDslData = lastSqlData = undefined; });
-
-      btnDsl.addEventListener('click', () => run('dsl'));
-      btnSql.addEventListener('click', () => run('sql'));
-      el('clearDsl').addEventListener('click', () => { el('dsl').value=''; outDsl.textContent='(temizlendi)'; });
-      el('clearSql').addEventListener('click', () => { el('sql').value=''; outSql.textContent='(temizlendi)'; });
-
-      // Quick fill for demo
-      if(!el('conn').value) {
-        el('conn').value = 'Host=localhost;Port=5432;Database=querydb;Username=postgres;Password=postgres';
-      }
-    </script>
+    <hr />
+    <fieldset>
+      <legend class="collapsible" id="compareToggle">Karşılaştırma Aracı ▼</legend>
+      <div class="collapsible-content" id="compareContent">
+        <p>İki farklı sorgu sonucunu karşılaştırmak için bu bölümü kullanabilirsiniz.</p>
+        <div class="row">
+          <div class="col">
+            <fieldset>
+              <legend>DSL Query</legend>
+              <textarea id="compareDsl" placeholder="FETCH(id, name) FROM users"></textarea>
+              <div class="toolbar flex-end">
+                <button type="button" id="runCompareDsl">Çalıştır</button>
+                <button type="button" class="secondary" id="clearDsl">Temizle</button>
+              </div>
+              <pre id="outDsl">(sonuç yok)</pre>
+            </fieldset>
+          </div>
+          <div class="col">
+            <fieldset>
+              <legend>SQL Query</legend>
+              <textarea id="compareSql" placeholder="SELECT id, name FROM users"></textarea>
+              <div class="toolbar flex-end">
+                <button type="button" id="runCompareSql">Çalıştır</button>
+                <button type="button" class="secondary" id="clearSql">Temizle</button>
+              </div>
+              <pre id="outSql">(sonuç yok)</pre>
+            </fieldset>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button type="button" id="compareBtn">Sonuçları Karşılaştır</button>
+          <button type="button" class="secondary" id="clearCompare">Temizle</button>
+        </div>
+        <pre id="outCompare">(karşılaştırma sonucu)</pre>
+      </div>
+    </fieldset>
+    <script src="app.js"></script>
   </body>
 </html>

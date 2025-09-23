@@ -12,7 +12,7 @@ namespace DynamicDbQueryApi.Interfaces
     {
         string BuildSqlQuery(string dbType, QueryModel model);
         string ConvertFilterToSql(string dbType, FilterModel filter);
-        string BuildCreateTableSql(string tableName, Dictionary<string, string> columnDataTypes, Dictionary<string, string> columnAliases);
+        string BuildCreateTableSql(string dbType, string tableName, Dictionary<string, string> columnDataTypes);
         string BuildAlterTableAddColumnSql(string dbType, string tableName, string columnName, string dataType);
     }
 }
