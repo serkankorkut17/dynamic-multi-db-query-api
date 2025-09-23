@@ -2,8 +2,10 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 const https = require("https");
+const { log } = require("console");
+const { exit } = require("process");
 
-const baseUrl = "http://localhost:5177";
+const BASE_URL = "http://localhost:5177";
 
 function loadConfig() {
 	const file = path.join(__dirname, "query.json");
@@ -60,12 +62,12 @@ async function run() {
 	let hasDiff = false;
 
 	for (const db of cfg.databases) {
-    const dbResults = [];
+		const dbResults = [];
 		let dbType = db.dbType;
-    let isEmpty = false;
 		let connectionString = db.connectionString;
 		console.log(`\nTesting database: ${dbType}`);
 		for (const q of cfg.queries) {
+			let isEmpty = false;
 			const dslBody = {
 				query: q.dsl,
 				dbType: dbType,
@@ -79,17 +81,17 @@ async function run() {
 			try {
 				const dslResp = await requestJson(
 					"POST",
-					baseUrl + "/api/query",
+					BASE_URL + "/api/query",
 					dslBody
 				);
 				const sqlResp = await requestJson(
 					"POST",
-					baseUrl + "/api/query/sql",
+					BASE_URL + "/api/query/sql",
 					sqlBody
 				);
 
 				const normDsl = stableJson(dslResp).data;
-				const normSql = stableJson(sqlResp);
+				const normSql = stableJson(sqlResp).data;
 				const convertedSql = stableJson(dslResp).sql;
 
 				// if empty results, warn
@@ -98,6 +100,7 @@ async function run() {
 					(Array.isArray(normSql) && normSql.length === 0)
 				) {
 					isEmpty = true;
+					console.log("  Warning: One of the results is empty!");
 				}
 
 				// const same = JSON.stringify(normDsl) === JSON.stringify(normSql);
@@ -107,9 +110,9 @@ async function run() {
 				const same = JSON.stringify(dslValues) === JSON.stringify(sqlValues);
 				if (!same) hasDiff = true;
 
-        // first 5 normDsl
-        dsl5 = normDsl.slice(0, 5);
-        sql5 = normSql.slice(0, 5);
+				// first 5 normDsl
+				dsl5 = normDsl.slice(0, 5);
+				sql5 = normSql.slice(0, 5);
 
 				// if (!same) hasDiff = true;
 				dbResults.push({
@@ -119,21 +122,20 @@ async function run() {
 					convertedSql,
 					same,
 					isEmpty,
-					Example: same ? {Result: dsl5} : { dsl: dsl5, sql: sql5 },
+					Example: same ? { Result: dsl5 } : { dsl: dsl5, sql: sql5 },
 				});
-        let queryNo = cfg.queries.indexOf(q) + 1;
+				let queryNo = cfg.queries.indexOf(q) + 1;
 				console.log(`Query #${queryNo} DSL vs SQL -> ${same ? "OK" : "DIFF"}`);
 				if (isEmpty) {
 					console.warn("  Warning: One of the results is empty!");
 				}
 			} catch (err) {
 				hasDiff = true;
-				dbResults.push({dsl: q.dsl, error: err.message });
+				dbResults.push({ dsl: q.dsl, error: err.message });
 				console.error("Error executing query:", q.dsl, err.message);
 			}
 		}
-    results.push({ dbType, results: dbResults });
-
+		results.push({ dbType, results: dbResults });
 	}
 
 	const summaryPath = path.join(__dirname, "compare-result.json");

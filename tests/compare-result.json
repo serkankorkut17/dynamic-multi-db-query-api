@@ -418,7 +418,7 @@
             },
             {
               "age": 2,
-              "cnt": 56
+              "cnt": 57
             },
             {
               "age": 5,
@@ -655,9 +655,9 @@
       },
       {
         "id": 19,
-        "dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt) FROM enrollments FILTER(enrolled_at >= DATEADD(DAY, NOW(), -7)) GROUPBY(yr, mo, dy) ORDERBY(yr DESC, mo DESC, dy DESC)",
-        "sql": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, EXTRACT(DAY FROM enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= NOW() - INTERVAL '7 days' GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), EXTRACT(DAY FROM enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
-        "convertedSql": "SELECT EXTRACT(YEAR FROM enrollments.enrolled_at) AS yr, EXTRACT(MONTH FROM enrollments.enrolled_at) AS mo, EXTRACT(DAY FROM enrollments.enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrollments.enrolled_at >= (now() AT TIME ZONE 'UTC' + INTERVAL '-7 DAY') GROUP BY EXTRACT(YEAR FROM enrollments.enrolled_at), EXTRACT(MONTH FROM enrollments.enrolled_at), EXTRACT(DAY FROM enrollments.enrolled_at) ORDER BY EXTRACT(YEAR FROM enrollments.enrolled_at) DESC, EXTRACT(MONTH FROM enrollments.enrolled_at) DESC, EXTRACT(DAY FROM enrollments.enrolled_at) DESC",
+        "dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt) FROM enrollments FILTER(enrolled_at >= DATEADD(DAY, NOW(), -30)) GROUPBY(yr, mo, dy) ORDERBY(yr DESC, mo DESC, dy DESC)",
+        "sql": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, EXTRACT(DAY FROM enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= NOW() - INTERVAL '30 days' GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), EXTRACT(DAY FROM enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
+        "convertedSql": "SELECT EXTRACT(YEAR FROM enrollments.enrolled_at) AS yr, EXTRACT(MONTH FROM enrollments.enrolled_at) AS mo, EXTRACT(DAY FROM enrollments.enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrollments.enrolled_at >= (now() AT TIME ZONE 'UTC' + INTERVAL '-30 DAY') GROUP BY EXTRACT(YEAR FROM enrollments.enrolled_at), EXTRACT(MONTH FROM enrollments.enrolled_at), EXTRACT(DAY FROM enrollments.enrolled_at) ORDER BY EXTRACT(YEAR FROM enrollments.enrolled_at) DESC, EXTRACT(MONTH FROM enrollments.enrolled_at) DESC, EXTRACT(DAY FROM enrollments.enrolled_at) DESC",
         "same": true,
         "isEmpty": false,
         "Example": {
@@ -672,7 +672,25 @@
               "yr": 2025,
               "mo": 9,
               "dy": 15,
-              "cnt": 18
+              "cnt": 27
+            },
+            {
+              "yr": 2025,
+              "mo": 9,
+              "dy": 14,
+              "cnt": 28
+            },
+            {
+              "yr": 2025,
+              "mo": 9,
+              "dy": 13,
+              "cnt": 22
+            },
+            {
+              "yr": 2025,
+              "mo": 9,
+              "dy": 12,
+              "cnt": 22
             }
           ]
         }
@@ -1367,7 +1385,7 @@
             },
             {
               "age": 1,
-              "cnt": 60
+              "cnt": 59
             },
             {
               "age": 0,
@@ -1379,7 +1397,7 @@
             },
             {
               "age": 2,
-              "cnt": 51
+              "cnt": 52
             }
           ]
         }
@@ -1608,9 +1626,9 @@
       },
       {
         "id": 19,
-        "dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt) FROM enrollments FILTER(enrolled_at >= DATEADD(DAY, NOW(), -7)) GROUPBY(yr, mo, dy) ORDERBY(yr DESC, mo DESC, dy DESC)",
-        "sql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= DATEADD(DAY, -7, SYSDATETIME()) GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAY(enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
-        "convertedSql": "SELECT YEAR(enrollments.enrolled_at) AS yr, MONTH(enrollments.enrolled_at) AS mo, DAY(enrollments.enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrollments.enrolled_at >= DATEADD(DAY, -7, GETUTCDATE()) GROUP BY YEAR(enrollments.enrolled_at), MONTH(enrollments.enrolled_at), DAY(enrollments.enrolled_at) ORDER BY YEAR(enrollments.enrolled_at) DESC, MONTH(enrollments.enrolled_at) DESC, DAY(enrollments.enrolled_at) DESC",
+        "dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt) FROM enrollments FILTER(enrolled_at >= DATEADD(DAY, NOW(), -30)) GROUPBY(yr, mo, dy) ORDERBY(yr DESC, mo DESC, dy DESC)",
+        "sql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= DATEADD(DAY, -30, SYSDATETIME()) GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAY(enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
+        "convertedSql": "SELECT YEAR(enrollments.enrolled_at) AS yr, MONTH(enrollments.enrolled_at) AS mo, DAY(enrollments.enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrollments.enrolled_at >= DATEADD(DAY, -30, GETUTCDATE()) GROUP BY YEAR(enrollments.enrolled_at), MONTH(enrollments.enrolled_at), DAY(enrollments.enrolled_at) ORDER BY YEAR(enrollments.enrolled_at) DESC, MONTH(enrollments.enrolled_at) DESC, DAY(enrollments.enrolled_at) DESC",
         "same": true,
         "isEmpty": false,
         "Example": {
@@ -2546,9 +2564,9 @@
       },
       {
         "id": 19,
-        "dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt) FROM enrollments FILTER(enrolled_at >= DATEADD(DAY, NOW(), -7)) GROUPBY(yr, mo, dy) ORDERBY(yr DESC, mo DESC, dy DESC)",
-        "sql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= (NOW() - INTERVAL 7 DAY) GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAY(enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
-        "convertedSql": "SELECT YEAR(enrollments.enrolled_at) AS yr, MONTH(enrollments.enrolled_at) AS mo, DAY(enrollments.enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrollments.enrolled_at >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -7 DAY) GROUP BY YEAR(enrollments.enrolled_at), MONTH(enrollments.enrolled_at), DAY(enrollments.enrolled_at) ORDER BY YEAR(enrollments.enrolled_at) DESC, MONTH(enrollments.enrolled_at) DESC, DAY(enrollments.enrolled_at) DESC",
+        "dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt) FROM enrollments FILTER(enrolled_at >= DATEADD(DAY, NOW(), -30)) GROUPBY(yr, mo, dy) ORDERBY(yr DESC, mo DESC, dy DESC)",
+        "sql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= (NOW() - INTERVAL 30 DAY) GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAY(enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
+        "convertedSql": "SELECT YEAR(enrollments.enrolled_at) AS yr, MONTH(enrollments.enrolled_at) AS mo, DAY(enrollments.enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrollments.enrolled_at >= DATE_ADD(UTC_TIMESTAMP(), INTERVAL -30 DAY) GROUP BY YEAR(enrollments.enrolled_at), MONTH(enrollments.enrolled_at), DAY(enrollments.enrolled_at) ORDER BY YEAR(enrollments.enrolled_at) DESC, MONTH(enrollments.enrolled_at) DESC, DAY(enrollments.enrolled_at) DESC",
         "same": true,
         "isEmpty": false,
         "Example": {
@@ -3490,9 +3508,9 @@
       },
       {
         "id": 19,
-        "dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt) FROM enrollments FILTER(enrolled_at >= DATEADD(DAY, NOW(), -7)) GROUPBY(yr, mo, dy) ORDERBY(yr DESC, mo DESC, dy DESC)",
-        "sql": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, EXTRACT(DAY FROM enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= (SYSTIMESTAMP - INTERVAL '7' DAY) GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), EXTRACT(DAY FROM enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
-        "convertedSql": "SELECT EXTRACT(YEAR FROM enrollments.enrolled_at) AS yr, EXTRACT(MONTH FROM enrollments.enrolled_at) AS mo, EXTRACT(DAY FROM enrollments.enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrollments.enrolled_at >= (SYS_EXTRACT_UTC(SYSTIMESTAMP) + -7) GROUP BY EXTRACT(YEAR FROM enrollments.enrolled_at), EXTRACT(MONTH FROM enrollments.enrolled_at), EXTRACT(DAY FROM enrollments.enrolled_at) ORDER BY EXTRACT(YEAR FROM enrollments.enrolled_at) DESC, EXTRACT(MONTH FROM enrollments.enrolled_at) DESC, EXTRACT(DAY FROM enrollments.enrolled_at) DESC",
+        "dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt) FROM enrollments FILTER(enrolled_at >= DATEADD(DAY, NOW(), -30)) GROUPBY(yr, mo, dy) ORDERBY(yr DESC, mo DESC, dy DESC)",
+        "sql": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, EXTRACT(DAY FROM enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= (SYSTIMESTAMP - INTERVAL '30' DAY) GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), EXTRACT(DAY FROM enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
+        "convertedSql": "SELECT EXTRACT(YEAR FROM enrollments.enrolled_at) AS yr, EXTRACT(MONTH FROM enrollments.enrolled_at) AS mo, EXTRACT(DAY FROM enrollments.enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrollments.enrolled_at >= (SYS_EXTRACT_UTC(SYSTIMESTAMP) + -30) GROUP BY EXTRACT(YEAR FROM enrollments.enrolled_at), EXTRACT(MONTH FROM enrollments.enrolled_at), EXTRACT(DAY FROM enrollments.enrolled_at) ORDER BY EXTRACT(YEAR FROM enrollments.enrolled_at) DESC, EXTRACT(MONTH FROM enrollments.enrolled_at) DESC, EXTRACT(DAY FROM enrollments.enrolled_at) DESC",
         "same": true,
         "isEmpty": false,
         "Example": {

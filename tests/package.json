@@ -5,6 +5,7 @@
   "main": "compare.js",
   "scripts": {
     "compare": "node compare.js",
+    "db": "node db-save.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

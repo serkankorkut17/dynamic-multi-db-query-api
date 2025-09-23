@@ -6,7 +6,7 @@
 		},
 		{
 			"dbType": "mssql",
-			"connectionString": "Server=localhost,1433;Database=master;User ID=sa;Password=Merhaba123.;Encrypt=True;TrustServerCertificate=True"
+			"connectionString": "Server=localhost,1433;Database=test;User ID=sa;Password=Merhaba123.;Encrypt=True;TrustServerCertificate=True"
 		},
 		{
 			"dbType": "mysql",
@@ -164,11 +164,11 @@
 		},
 		{
 			"id": 19,
-			"dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt) FROM enrollments FILTER(enrolled_at >= DATEADD(DAY, NOW(), -7)) GROUPBY(yr, mo, dy) ORDERBY(yr DESC, mo DESC, dy DESC)",
-			"postgres": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, EXTRACT(DAY FROM enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= NOW() - INTERVAL '7 days' GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), EXTRACT(DAY FROM enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
-			"mysql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= (NOW() - INTERVAL 7 DAY) GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAY(enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
-			"mssql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= DATEADD(DAY, -7, SYSDATETIME()) GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAY(enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
-			"oracle": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, EXTRACT(DAY FROM enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= (SYSTIMESTAMP - INTERVAL '7' DAY) GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), EXTRACT(DAY FROM enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC"
+			"dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt) FROM enrollments FILTER(enrolled_at >= DATEADD(DAY, NOW(), -30)) GROUPBY(yr, mo, dy) ORDERBY(yr DESC, mo DESC, dy DESC)",
+			"postgres": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, EXTRACT(DAY FROM enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= NOW() - INTERVAL '30 days' GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), EXTRACT(DAY FROM enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
+			"mysql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= (NOW() - INTERVAL 30 DAY) GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAY(enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
+			"mssql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= DATEADD(DAY, -30, SYSDATETIME()) GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAY(enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC",
+			"oracle": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, EXTRACT(DAY FROM enrolled_at) AS dy, COUNT(*) AS cnt FROM enrollments WHERE enrolled_at >= (SYSTIMESTAMP - INTERVAL '30' DAY) GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), EXTRACT(DAY FROM enrolled_at) ORDER BY yr DESC, mo DESC, dy DESC"
 		},
 		{
 			"id": 20,

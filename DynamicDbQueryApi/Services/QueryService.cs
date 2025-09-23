@@ -413,6 +413,32 @@ namespace DynamicDbQueryApi.Services
                             break;
                         }
 
+                        // Eğer System.UInt32 ise db'ye göre uygun tipe çevir
+                        else if (row[col] is uint || row[col] is ulong || row[col] is ushort)
+                        {
+                            if (outputDbType == "postgres" || outputDbType == "postgresql")
+                            {
+                                columnDataTypes[col] = "BIGINT";
+                            }
+                            else if (outputDbType == "mssql" || outputDbType == "mssql")
+                            {
+                                columnDataTypes[col] = "BIGINT";
+                            }
+                            else if (outputDbType == "mysql" || outputDbType == "mysql")
+                            {
+                                columnDataTypes[col] = "BIGINT";
+                            }
+                            else if (outputDbType == "oracle" || outputDbType == "oracle")
+                            {
+                                columnDataTypes[col] = "NUMBER(19)";
+                            }
+                            else
+                            {
+                                columnDataTypes[col] = "INTEGER";
+                            }
+                            break;
+                        }
+
                         // Eğer ondalıklı sayı ise db'ye göre uygun tipe çevir
                         else if (row[col] is float || row[col] is double || row[col] is decimal)
                         {
@@ -516,7 +542,6 @@ namespace DynamicDbQueryApi.Services
                             }
                             break;
                         }
-
                         // Eğer string ise db'ye göre uygun tipe çevir
                         else
                         {
@@ -591,6 +616,12 @@ namespace DynamicDbQueryApi.Services
                 {
                     var key = targetColumns[i];
                     row.TryGetValue(key, out var val);
+
+                    // mysql uint tipleri için int64 kullan
+                    if (val is uint || val is ulong || val is ushort || val is byte)
+                    {
+                        val = Convert.ToInt64(val);
+                    }
 
                     // Oracle'da boolean için 1/0 kullan
                     if (string.Equals(outputDbType, "oracle", StringComparison.OrdinalIgnoreCase))
