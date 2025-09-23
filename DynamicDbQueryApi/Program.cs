@@ -45,11 +45,7 @@ app.UseAuthorization();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.MapGet("/", (IWebHostEnvironment env) =>
-    Results.File(Path.Combine(env.WebRootPath, "index.html"), "text/html"));
-
-app.MapGet("/compare", (IWebHostEnvironment env) =>
-    Results.File(Path.Combine(env.WebRootPath, "compare.html"), "text/html"));
+app.MapFallbackToFile("index.html");
 
 app.MapControllers();
 
