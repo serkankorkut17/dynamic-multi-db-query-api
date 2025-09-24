@@ -216,47 +216,42 @@ FETCH(
 > Examples: 'Turkey Standard Time', 'Eastern Standard Time', 'Tokyo Standard Time', 'UTC', 'GMT Standard Time', etc.
 
 - NOW() / GETDATE() / CURRENT_TIMESTAMP() => returns timestamp without time zone (UTC)
-> NOW() => "2025-09-19T22:37:44"
+> `NOW()` => "2025-09-19T22:37:44"
 
 - NOW(timezone) / GETDATE(timezone) / CURRENT_TIMESTAMP(timezone) => returns timestamp in specified timezone
-> NOW('Europe/Istanbul') => "2025-09-20T01:37:44" (UTC+3)
+> `NOW('Europe/Istanbul')` => "2025-09-20T01:37:44" (UTC+3)
 
 - TODAY() / CURRENT_DATE() => returns date (YYYY-MM-DD)
-> TODAY() => "2025-09-19"
+> `TODAY()` => "2025-09-19"
 
 - TODAY(timezone) / CURRENT_DATE(timezone) => returns date (YYYY-MM-DD) in specified timezone
-> TODAY('Europe/Istanbul') => "2025-09-20" (UTC+3)
+> `TODAY('Europe/Istanbul')` => "2025-09-20" (UTC+3)
 
 - TIME() / CURRENT_TIME() => returns time (HH:MM:SS) (as a string in most databases)
-> TIME() => "22:37:44"
+> `TIME()` => "22:37:44"
 
 - TIME(timezone) / CURRENT_TIME(timezone) => returns time (HH:MM:SS) in specified timezone 
-> TIME('Europe/Istanbul') => "01:37:44" (UTC+3)
+> `TIME('Europe/Istanbul')` => "01:37:44" (UTC+3)
 
 - TODAY() / CURRENT_DATE() => returns date (YYYY-MM-DD)
-> TODAY() => "2025-09-19"
+> `TODAY()` => "2025-09-19"
 
 - DATEADD: unit can be SECOND, MINUTE, HOUR, DAY, WEEK, MONTH, YEAR
-> DATEADD(HOUR,'2025-09-18T12:34:56',2) => 2025-09-18T14:34:56
-<br>
-> DATEADD(SECOND,'2025-01-12T00:00:00',5) => 2025-09-18T12:35:01
+> `DATEADD(HOUR,'2025-09-18T12:34:56',2)` => 2025-09-18T14:34:56
+> `DATEADD(SECOND,'2025-01-12T00:00:00',5)` => 2025-09-18T12:35:01
 
 - DATEDIFF: unit can be SECOND, MINUTE, HOUR, DAY, WEEK, MONTH, YEAR
-> DATEDIFF(DAY,'2025-09-03','2025-09-18') => 15
-<br>
-> DATEDIFF(YEAR,'2025-01-03','2026-01-02') => 0
+> `DATEDIFF(DAY,'2025-09-03','2025-09-18')` => 15
+> `DATEDIFF(YEAR,'2025-01-03','2026-01-02')` => 0
 
 - DAY / MONTH / YEAR
-> YEAR('2025-09-18') => 2025
-<br>
-> MONTH('2025-09-18') => 12
-<br>
-> DAY('2025-09-18') => 18
+> `YEAR('2025-09-18')` => 2025
+> `MONTH('2025-09-18')` => 12
+> `DAY('2025-09-18')` => 18
 
 - DATENAME: unit can be MONTH or DAY
-> DATENAME(MONTH, '2025-09-18') => 'SEPTEMBER' or 'September'
-<br>
-> DATENAME(DAY, '2025-09-18') => 'THURSDAY' or 'Thursday'
+> `DATENAME(MONTH, '2025-09-18')` => 'SEPTEMBER' or 'September'
+> `DATENAME(DAY, '2025-09-18')` => 'THURSDAY' or 'Thursday'
 
 
 ### 6. DSL → SQL Examples
