@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using DynamicDbQueryApi.DTOs;
 using DynamicDbQueryApi.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using Npgsql;
 
 namespace DynamicDbQueryApi.Controllers
 {
@@ -78,13 +77,6 @@ namespace DynamicDbQueryApi.Controllers
             {
                 return BadRequest(ex.Message);
             }
-        }
-
-        [HttpPost("clear-npgsql")]
-        public IActionResult ClearNpgsql()
-        {
-            NpgsqlConnection.ClearAllPools();
-            return Ok(new { ok = true });
         }
     }
 }
