@@ -24,7 +24,7 @@ Request body (QueryRequestDTO):
 	"DbType": "postgres",
 	"ConnectionString": "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb;SSL Mode=Disable;",
 	"Query": "FETCH(courses.name, COUNT(enrollments.id) AS enroll_cnt) FROM courses INCLUDE(enrollments) GROUPBY(courses.name) HAVING(enroll_cnt > 5) ORDERBY(enroll_cnt DESC)",
-	"WriteToOutputDb": true, // Optional, default is false
+  "WriteToOutputDb": true, // Optional, default is false
   "OutputDbType": "mysql", // Required if WriteToOutputDb is true
 	"OutputDbType": "oracle", // Required if WriteToOutputDb is true
 	"OutputConnectionString": "User Id=system;Password=oracle;Data Source=localhost/FREEPDB1;", // Required if WriteToOutputDb is true
@@ -57,6 +57,7 @@ Request body (InspectRequestDTO):
   "DbType": "postgres",
   "ConnectionString": "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb;SSL Mode=Disable;"
 }
+```
 
 Response body (InspectResponseDTO):
 ```json
