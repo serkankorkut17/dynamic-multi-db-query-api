@@ -11,6 +11,7 @@ using DynamicDbQueryApi.DTOs;
 using DynamicDbQueryApi.Entities;
 using DynamicDbQueryApi.Entities.Query;
 using DynamicDbQueryApi.Interfaces;
+using DynamicDbQueryApi.Helpers;
 
 namespace DynamicDbQueryApi.Services
 {
@@ -19,7 +20,7 @@ namespace DynamicDbQueryApi.Services
         // Ana parse metodu
         public QueryModel Parse(string queryString)
         {
-            if (!CheckIfParanthesesBalanced(queryString))
+            if (!StringHelpers.CheckIfParanthesesBalanced(queryString))
             {
                 throw new Exception("Query string has unbalanced parentheses.");
             }
@@ -92,7 +93,7 @@ namespace DynamicDbQueryApi.Services
             var fetchStart = m.Index + m.Length;
 
             // FETCH ifadesinin kapanış parantezini bul
-            int fetchEnd = FindClosingParenthesis(queryString, m.Index + m.Length - 1);
+            int fetchEnd = StringHelpers.FindClosingParenthesis(queryString, m.Index + m.Length - 1);
             if (fetchEnd == -1)
             {
                 throw new Exception("Could not find closing parenthesis for FETCH clause.");
@@ -106,7 +107,7 @@ namespace DynamicDbQueryApi.Services
                 return new List<QueryColumnModel> { new QueryColumnModel { Expression = "*", Alias = null } };
             }
 
-            List<string> columns = SplitByCommas(columnsPart);
+            List<string> columns = StringHelpers.SplitByCommas(columnsPart);
 
             List<QueryColumnModel> columnModels = new List<QueryColumnModel>();
 
@@ -133,7 +134,7 @@ namespace DynamicDbQueryApi.Services
                 else
                 {
                     var func = ExtractFunction(parts[0].Trim());
-                    if (IsDateOrTimestamp(expression))
+                    if (StringHelpers.IsDateOrTimestamp(expression))
                     {
                         alias = "date_" + i;
                     }
@@ -197,7 +198,7 @@ namespace DynamicDbQueryApi.Services
 
             var body = m.Groups[1].Value;
 
-            var includeTables = SplitByCommas(body);
+            var includeTables = StringHelpers.SplitByCommas(body);
 
             foreach (var include in includeTables)
             {
@@ -256,7 +257,7 @@ namespace DynamicDbQueryApi.Services
             // Parantez başlangıç indeksini ve kapanış indeksini bul
             int openIdx = start.Index + start.Length - 1;
             int bodyStart = openIdx + 1;
-            int closeIdx = FindClosingParenthesis(queryString, openIdx);
+            int closeIdx = StringHelpers.FindClosingParenthesis(queryString, openIdx);
             if (closeIdx == -1) return null;
 
             // FILTER(...) içindeki metni al
@@ -278,7 +279,7 @@ namespace DynamicDbQueryApi.Services
 
             var body = m.Groups[1].Value;
 
-            var groupByColumns = SplitByCommas(body);
+            var groupByColumns = StringHelpers.SplitByCommas(body);
 
             // Her column için tablo ismi ekle
             for (int i = 0; i < groupByColumns.Count; i++)
@@ -298,7 +299,7 @@ namespace DynamicDbQueryApi.Services
             // Parantez başlangıç indeksini ve kapanış indeksini bul
             int openIdx = start.Index + start.Length - 1;
             int bodyStart = openIdx + 1;
-            int closeIdx = FindClosingParenthesis(queryString, openIdx);
+            int closeIdx = StringHelpers.FindClosingParenthesis(queryString, openIdx);
             if (closeIdx == -1) return null;
 
             // HAVING(...) içindeki metni al
@@ -320,13 +321,13 @@ namespace DynamicDbQueryApi.Services
             // Parantez başlangıç indeksini ve kapanış indeksini bul
             int openIdx = start.Index + start.Length - 1;
             int bodyStart = openIdx + 1;
-            int closeIdx = FindClosingParenthesis(queryString, openIdx);
+            int closeIdx = StringHelpers.FindClosingParenthesis(queryString, openIdx);
             if (closeIdx == -1) return new List<OrderByModel>();
 
             var body = queryString.Substring(bodyStart, closeIdx - bodyStart).Trim();
 
             var orderByColumns = new List<OrderByModel>();
-            var columns = SplitByCommas(body);
+            var columns = StringHelpers.SplitByCommas(body);
 
             // Her column için tablo ismi ekle ve DESC kontrolü yap
             foreach (var column in columns)
@@ -394,21 +395,6 @@ namespace DynamicDbQueryApi.Services
             }
         }
 
-        // Parantezlerin dengeli olup olmadığını kontrol etme
-        public bool CheckIfParanthesesBalanced(string input)
-        {
-            int balance = 0;
-            foreach (char c in input)
-            {
-                if (c == '(') balance++;
-                else if (c == ')') balance--;
-
-                // Eğer kapanış parantezi açılış parantezinden önce gelirse
-                if (balance < 0) return false;
-            }
-            return balance == 0;
-        }
-
         // String eğer fonksiyon ise fonksiyon adını ve içini çıkarma
         private (string function, string inner)? ExtractFunction(string s)
         {
@@ -418,7 +404,7 @@ namespace DynamicDbQueryApi.Services
                 // Parantez başlangıç indeksini ve kapanış indeksini bul
                 int openIdx = start.Index + start.Length - 1;
                 int bodyStart = openIdx + 1;
-                int closeIdx = FindClosingParenthesis(s, openIdx);
+                int closeIdx = StringHelpers.FindClosingParenthesis(s, openIdx);
                 if (closeIdx == -1) throw new Exception("Could not find closing parenthesis for function in column.");
 
                 var body = s.Substring(bodyStart, closeIdx - bodyStart).Trim();
@@ -433,12 +419,6 @@ namespace DynamicDbQueryApi.Services
         // Fonksiyonları parse etme
         private string ParseFunction(string functionString, string inner, string tableName, Dictionary<string, string>? aliasColumnDict = null)
         {
-            // Eğer inner boşsa hata fırlat
-            // if (string.IsNullOrWhiteSpace(inner))
-            // {
-            //     throw new Exception($"Function {functionString} requires parameters.");
-            // }
-
             // Fonksiyon içindeki parametreleri ayır
             List<string> innerParams;
             if (string.IsNullOrWhiteSpace(inner))
@@ -447,7 +427,7 @@ namespace DynamicDbQueryApi.Services
             }
             else
             {
-                innerParams = SplitByCommas(inner);
+                innerParams = StringHelpers.SplitByCommas(inner);
             }
 
             if (innerParams.Count != 0)
@@ -717,8 +697,6 @@ namespace DynamicDbQueryApi.Services
                 }
             }
 
-
-
             // Eğer tanımlanamayan bir fonksiyon ise hata fırlat
             throw new Exception($"Unknown function: {functionString}");
 
@@ -805,42 +783,6 @@ namespace DynamicDbQueryApi.Services
             return column;
         }
 
-        // En dıştaki parantezin kapanışını bulma
-        private int FindClosingParenthesis(string str, int openIdx)
-        {
-            int depth = 0;
-            for (int i = openIdx; i < str.Length; i++)
-            {
-                if (str[i] == '(')
-                {
-                    depth++;
-                }
-                else if (str[i] == ')')
-                {
-                    depth--;
-                    if (depth == 0) return i;
-                }
-            }
-            return -1; // Not found
-        }
-
-        // Tek tırnaklı string sonunu bulma
-        private int FindClosingQuote(string str, int startIdx)
-        {
-            for (int i = startIdx + 1; i < str.Length; i++)
-            {
-                if (str[i] == '\'')
-                {
-                    // Eğer öncesinde \ yoksa kapatma tırnağıdır
-                    if (i == 0 || str[i - 1] != '\\')
-                    {
-                        return i;
-                    }
-                }
-            }
-            return -1; // Not found
-        }
-
         // FILTER ifadesini FilterModel yapısına dönüştürme
         private FilterModel? BuildFilterModel(string body, string tableName, Dictionary<string, string> aliasColumnDict)
         {
@@ -851,7 +793,7 @@ namespace DynamicDbQueryApi.Services
             }
 
             // ExpressionSplitter kullanarak en dıştaki operandları çıkar ve yerlerine $0, $1, ... koy
-            var exprList = ExpressionSplitter2.SimplerExtractTopLevelOperands(ref body, out var replacedBody);
+            var exprList = StringHelpers.ExtractTopLevelOperands(ref body, out var replacedBody);
 
             var finalExprList = exprList;
             var finalReplacedBody = replacedBody;
@@ -882,7 +824,7 @@ namespace DynamicDbQueryApi.Services
                 }
 
                 // ExpressionSplitter kullanarak yeniden en dıştaki operandları çıkar ve yerlerine $0, $1, ... koy
-                var multiExprList = ExpressionSplitter2.SimplerExtractTopLevelOperands(ref str, out var multiReplacedBody);
+                var multiExprList = StringHelpers.ExtractTopLevelOperands(ref str, out var multiReplacedBody);
 
                 finalExprList = multiExprList;
                 finalReplacedBody = multiReplacedBody;
@@ -993,20 +935,12 @@ namespace DynamicDbQueryApi.Services
             var op = m.Groups["op"].Value.ToUpperInvariant();
             var rhs = m.Groups["rhs"].Value.Trim();
 
-            // string Unquote(string v)
-            // {
-            //     v = v.Trim();
-            //     if (v.Length >= 2 && v[0] == '\'' && v[^1] == '\'')
-            //         return v.Substring(1, v.Length - 2).Replace("''", "'");
-            //     return v;
-            // }
-
-            // Value tek tırnaklıysa tırnakları kaldır
-            // string rhsValue = rhsRaw;
-            // if (rhsRaw.StartsWith("'") && rhsRaw.EndsWith("'"))
-            // {
-            //     rhsValue = Unquote(rhsRaw);
-            // }
+            // Eğer rhs parantez ile başlıyor ve bitiyorsa parantezleri kaldır
+            if (rhs.StartsWith("(") && rhs.EndsWith(")"))
+            {
+                rhs = rhs.Substring(1, rhs.Length - 2).Trim();
+            }
+            
 
             // Operator mapping kısmı
             ComparisonOperator comp;
@@ -1028,7 +962,6 @@ namespace DynamicDbQueryApi.Services
                 default: return null;
             }
 
-
             // Eğer comp != ve rhs == NULL ise IS NOT NULL yap
             if (comp == ComparisonOperator.Neq && rhs.Equals("NULL", StringComparison.OrdinalIgnoreCase))
             {
@@ -1039,7 +972,6 @@ namespace DynamicDbQueryApi.Services
                 comp = ComparisonOperator.IsNull;
             }
 
-
             col = AddTablePrefixToColumn(col, tableName, aliasColumnDict);
             rhs = AddTablePrefixToColumn(rhs, tableName, aliasColumnDict);
 
@@ -1049,66 +981,6 @@ namespace DynamicDbQueryApi.Services
                 Operator = comp,
                 Value = rhs
             };
-        }
-
-        // , lerden bölme (parantez içi ve string içi değilse)
-        private List<string> SplitByCommas(string input)
-        {
-            List<string> result = new List<string>();
-            for (int i = 0; i < input.Length; i++)
-            {
-                if (input[i] == '(')
-                {
-                    // Parantez içindeki virgülleri yok say
-                    int closeIdx = FindClosingParenthesis(input, i);
-                    if (closeIdx == -1)
-                    {
-                        throw new Exception("Could not find closing parenthesis in FETCH columns.");
-                    }
-                    i = closeIdx;
-                }
-
-                else if (input[i] == '\'')
-                {
-                    // String içindeki virgülleri yok say
-                    int closeIdx = FindClosingQuote(input, i);
-                    if (closeIdx == -1)
-                    {
-                        throw new Exception("Could not find closing quote in FETCH columns.");
-                    }
-                    i = closeIdx;
-                }
-
-                else if (input[i] == ',')
-                {
-                    // Virgül bulundu, böl
-                    result.Add(input.Substring(0, i).Trim());
-                    input = input.Substring(i + 1).Trim();
-                    i = -1;
-                }
-            }
-            // Son parçayı ekle
-            if (!string.IsNullOrWhiteSpace(input))
-            {
-                result.Add(input.Trim());
-            }
-
-            return result;
-        }
-
-        private static bool IsDateOrTimestamp(string s)
-        {
-            if (string.IsNullOrWhiteSpace(s)) return false;
-            s = s.Trim();
-
-            // 'YYYY-MM-DD' ya da YYYY-MM-DD
-            var dateOnly = new Regex(@"^'?(\d{4}-\d{2}-\d{2})'?$", RegexOptions.Compiled);
-
-            // 'YYYY-MM-DD HH:MM:SS' ya da 'YYYY-MM-DDTHH:MM:SS' ya da YYYY-MM-DD HH:MM:SS ya da YYYY-MM-DDTHH:MM:SS
-            var tsSpace = new Regex(@"^'?(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})(\.\d{1,3})?'?$", RegexOptions.Compiled);
-            var tsIso = new Regex(@"^'?(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{1,3})?(Z|[+\-]\d{2}:\d{2})?'?$", RegexOptions.Compiled);
-
-            return dateOnly.IsMatch(s) || tsSpace.IsMatch(s) || tsIso.IsMatch(s);
         }
     }
 }

@@ -225,10 +225,10 @@ FETCH(
 - TODAY(timezone) / CURRENT_DATE(timezone) => returns date (YYYY-MM-DD) in specified timezone
 > TODAY('Europe/Istanbul') => "2025-09-20" (UTC+3)
 
-- TIME() / CURRENT_TIME() => returns time (HH:MM:SS)
+- TIME() / CURRENT_TIME() => returns time (HH:MM:SS) (as a string in most databases)
 > TIME() => "22:37:44"
 
-- TIME(timezone) / CURRENT_TIME(timezone) => returns time (HH:MM:SS) in specified timezone
+- TIME(timezone) / CURRENT_TIME(timezone) => returns time (HH:MM:SS) in specified timezone 
 > TIME('Europe/Istanbul') => "01:37:44" (UTC+3)
 
 - TODAY() / CURRENT_DATE() => returns date (YYYY-MM-DD)
@@ -250,14 +250,6 @@ FETCH(
 - DATENAME: unit can be MONTH or DAY
 > DATENAME(MONTH, '2025-09-18') => 'SEPTEMBER' or 'September'
 > DATENAME(DAY, '2025-09-18') => 'THURSDAY' or 'Thursday'
-
-### Notes
-- SUBSTRING/SUBSTR start index is 0 in my Query Language; adjusted to 1-based in SQL.
-- INDEXOF returns 0-based by subtracting 1 from function result.
-- LOG(x, base) emulation on SQL Server uses division of natural logs.
-- CONCAT applies NULL safety on MySQL via COALESCE; Oracle uses || and leaves NULLs (standard Oracle concatenation).
-- Boolean literal adaptations occur inside [`SqlBuilderService.ConvertFilterToSql`](DynamicDbQueryApi/Services/SqlBuilderService.cs) (e.g., PostgreSQL TRUE/FALSE, MySQL 1/0, Oracle 1/0, SQL Server 1/0).
-- Nested function arguments are recursively resolved.
 
 
 ### 6. DSL → SQL Example

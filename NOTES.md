@@ -1,14 +1,3 @@
-# dynamic-multi-db-query-api
-
-expression splitter düzenle
-mathematical expression parser yapılacak
-TIME() bozuk olabilir işlemler için - + ve de save datatype kısmına bak
-
-save için test yaz ayrı
--- once kaydet sonra o tabloyu cek select * from table
--- karsılaştır --> eğer bool ise 1/0 durumuna da bak dbler arası
-
-
 # POSTGRESQL
 Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb;SSL Mode=Disable;
 

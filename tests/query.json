@@ -36,7 +36,7 @@
 		},
 		{
 			"id": 3,
-			"dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
+			"dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses INNER) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
 			"postgres": "SELECT c.name, ROUND(AVG(e.progress_percent)::numeric,2) avg_progress, COUNT(*) enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
 			"mysql": "SELECT c.name, ROUND(AVG(e.progress_percent),2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
 			"mssql": "SELECT c.name, ROUND(AVG(CAST(e.progress_percent AS FLOAT)),2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
@@ -180,7 +180,7 @@
 		},
 		{
 			"id": 21,
-			"dsl": "FETCH(courses.name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count) FROM courses INCLUDE(enrollments.grades) GROUPBY(courses.name) HAVING(grade_count >= 10) ORDERBY(avg_grade DESC) LIMIT(10)",
+			"dsl": "FETCH(courses.name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count) FROM courses INCLUDE(enrollments.grades INNER) GROUPBY(courses.name) HAVING(grade_count >= 10) ORDERBY(avg_grade DESC) LIMIT(10)",
 			"postgres": "SELECT c.name, AVG(g.grade) AS avg_grade, COUNT(g.id) AS grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC LIMIT 10",
 			"mysql": "SELECT c.name, AVG(g.grade) AS avg_grade, COUNT(g.id) AS grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC LIMIT 10",
 			"mssql": "SELECT TOP 10 c.name, AVG(g.grade) AS avg_grade, COUNT(g.id) AS grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC",

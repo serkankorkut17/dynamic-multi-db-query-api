@@ -56,9 +56,9 @@
       },
       {
         "id": 3,
-        "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
+        "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses INNER) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
         "sql": "SELECT c.name, ROUND(AVG(e.progress_percent)::numeric,2) avg_progress, COUNT(*) enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
-        "convertedSql": "SELECT courses.name AS courses_name, ROUND(AVG(enrollments.progress_percent)::numeric, 2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments LEFT JOIN courses ON enrollments.course_id = courses.id GROUP BY courses.name HAVING COUNT(*) > 30 ORDER BY ROUND(AVG(enrollments.progress_percent)::numeric, 2) DESC",
+        "convertedSql": "SELECT courses.name AS courses_name, ROUND(AVG(enrollments.progress_percent)::numeric, 2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments INNER JOIN courses ON enrollments.course_id = courses.id GROUP BY courses.name HAVING COUNT(*) > 30 ORDER BY ROUND(AVG(enrollments.progress_percent)::numeric, 2) DESC",
         "same": true,
         "isEmpty": false,
         "Example": {
@@ -729,9 +729,9 @@
       },
       {
         "id": 21,
-        "dsl": "FETCH(courses.name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count) FROM courses INCLUDE(enrollments.grades) GROUPBY(courses.name) HAVING(grade_count >= 10) ORDERBY(avg_grade DESC) LIMIT(10)",
+        "dsl": "FETCH(courses.name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count) FROM courses INCLUDE(enrollments.grades INNER) GROUPBY(courses.name) HAVING(grade_count >= 10) ORDERBY(avg_grade DESC) LIMIT(10)",
         "sql": "SELECT c.name, AVG(g.grade) AS avg_grade, COUNT(g.id) AS grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC LIMIT 10",
-        "convertedSql": "SELECT courses.name AS courses_name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count FROM courses LEFT JOIN enrollments ON courses.id = enrollments.course_id LEFT JOIN grades ON enrollments.id = grades.enrollment_id GROUP BY courses.name HAVING COUNT(grades.id) >= 10 ORDER BY AVG(grades.grade) DESC LIMIT 10 OFFSET 0",
+        "convertedSql": "SELECT courses.name AS courses_name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count FROM courses INNER JOIN enrollments ON courses.id = enrollments.course_id INNER JOIN grades ON enrollments.id = grades.enrollment_id GROUP BY courses.name HAVING COUNT(grades.id) >= 10 ORDER BY AVG(grades.grade) DESC LIMIT 10 OFFSET 0",
         "same": true,
         "isEmpty": false,
         "Example": {
@@ -991,12 +991,8 @@
         "Example": {
           "Result": [
             {
-              "first_name": "Ahmet",
-              "count": 31
-            },
-            {
-              "first_name": "Emre",
-              "count": 26
+              "first_name": "Fatma",
+              "count": 25
             }
           ]
         }
@@ -1011,61 +1007,61 @@
         "Example": {
           "Result": [
             {
-              "first_name": "Ahmet",
-              "count": 31
-            },
-            {
-              "first_name": "Emre",
-              "count": 26
+              "first_name": "Fatma",
+              "count": 25
             },
             {
               "first_name": "Mehmet",
               "count": 24
             },
             {
-              "first_name": "Fatma",
+              "first_name": "Merve",
               "count": 23
             },
             {
-              "first_name": "Sinem",
-              "count": 23
+              "first_name": "Gamze",
+              "count": 22
+            },
+            {
+              "first_name": "Ahmet",
+              "count": 21
             }
           ]
         }
       },
       {
         "id": 3,
-        "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
+        "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses INNER) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
         "sql": "SELECT c.name, ROUND(AVG(CAST(e.progress_percent AS FLOAT)),2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
-        "convertedSql": "SELECT courses.name AS courses_name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments LEFT JOIN courses ON enrollments.course_id = courses.id GROUP BY courses.name HAVING COUNT(*) > 30 ORDER BY ROUND(AVG(enrollments.progress_percent), 2) DESC",
+        "convertedSql": "SELECT courses.name AS courses_name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments INNER JOIN courses ON enrollments.course_id = courses.id GROUP BY courses.name HAVING COUNT(*) > 30 ORDER BY ROUND(AVG(enrollments.progress_percent), 2) DESC",
         "same": true,
         "isEmpty": false,
         "Example": {
           "Result": [
             {
-              "courses_name": "Felsefe",
-              "avg_progress": 54.97,
-              "enrolls": 92
+              "courses_name": "Fizik",
+              "avg_progress": 52.14,
+              "enrolls": 123
             },
             {
-              "courses_name": "Kimya",
-              "avg_progress": 54.54,
-              "enrolls": 94
+              "courses_name": "Matematik",
+              "avg_progress": 52.13,
+              "enrolls": 150
+            },
+            {
+              "courses_name": "Coğrafya",
+              "avg_progress": 51.11,
+              "enrolls": 191
             },
             {
               "courses_name": "Almanca",
-              "avg_progress": 54,
-              "enrolls": 175
-            },
-            {
-              "courses_name": "Din Kültürü",
-              "avg_progress": 52.08,
-              "enrolls": 253
+              "avg_progress": 51,
+              "enrolls": 208
             },
             {
               "courses_name": "Tarih",
-              "avg_progress": 51.98,
-              "enrolls": 133
+              "avg_progress": 50.69,
+              "enrolls": 142
             }
           ]
         }
@@ -1080,34 +1076,34 @@
         "Example": {
           "Result": [
             {
-              "id": 275,
-              "student_id": 69,
-              "course_id": 16,
-              "progress_percent": 40
-            },
-            {
-              "id": 494,
-              "student_id": 124,
-              "course_id": 15,
-              "progress_percent": 40
-            },
-            {
-              "id": 1196,
-              "student_id": 299,
-              "course_id": 1,
-              "progress_percent": 40
-            },
-            {
-              "id": 1738,
-              "student_id": 435,
-              "course_id": 46,
-              "progress_percent": 40
-            },
-            {
-              "id": 1025,
-              "student_id": 257,
-              "course_id": 42,
+              "id": 328,
+              "student_id": 82,
+              "course_id": 14,
               "progress_percent": 40.1
+            },
+            {
+              "id": 1506,
+              "student_id": 377,
+              "course_id": 50,
+              "progress_percent": 40.1
+            },
+            {
+              "id": 31,
+              "student_id": 8,
+              "course_id": 13,
+              "progress_percent": 40.2
+            },
+            {
+              "id": 1620,
+              "student_id": 405,
+              "course_id": 50,
+              "progress_percent": 40.2
+            },
+            {
+              "id": 2064,
+              "student_id": 516,
+              "course_id": 48,
+              "progress_percent": 40.2
             }
           ]
         }
@@ -1123,28 +1119,28 @@
           "Result": [
             {
               "id": 1,
-              "first_name": "Merve",
-              "last_name": "Demir"
+              "first_name": "Can",
+              "last_name": "Kurt"
             },
             {
               "id": 2,
-              "first_name": "Kerem",
-              "last_name": "Doğan"
+              "first_name": "Onur",
+              "last_name": "Çetin"
             },
             {
               "id": 3,
-              "first_name": "Can",
-              "last_name": "Aydın"
+              "first_name": "Gamze",
+              "last_name": "Kurt"
             },
             {
               "id": 4,
-              "first_name": "Mehmet",
-              "last_name": "Işık"
+              "first_name": "Ece",
+              "last_name": "Yıldırım"
             },
             {
               "id": 5,
-              "first_name": "Yusuf",
-              "last_name": "Güneş"
+              "first_name": "Zeynep",
+              "last_name": "Işık"
             }
           ]
         }
@@ -1159,34 +1155,34 @@
         "Example": {
           "Result": [
             {
-              "id": 98,
-              "first_name": "Ece",
-              "last_name": "Koç",
-              "gpa": 3.99
-            },
-            {
-              "id": 106,
-              "first_name": "Deniz",
-              "last_name": "Yılmaz",
-              "gpa": 3.99
-            },
-            {
-              "id": 266,
-              "first_name": "Emre",
+              "id": 97,
+              "first_name": "Cem",
               "last_name": "Avcı",
-              "gpa": 3.99
+              "gpa": 3.98
             },
             {
-              "id": 295,
-              "first_name": "Gamze",
-              "last_name": "Demir",
-              "gpa": 3.99
+              "id": 135,
+              "first_name": "Mehmet",
+              "last_name": "Aksoy",
+              "gpa": 3.98
             },
             {
-              "id": 424,
-              "first_name": "Hakan",
-              "last_name": "Aydın",
-              "gpa": 3.99
+              "id": 177,
+              "first_name": "Rabia",
+              "last_name": "Arslan",
+              "gpa": 3.98
+            },
+            {
+              "id": 200,
+              "first_name": "Murat",
+              "last_name": "Öztürk",
+              "gpa": 3.98
+            },
+            {
+              "id": 385,
+              "first_name": "Mehmet",
+              "last_name": "Polat",
+              "gpa": 3.98
             }
           ]
         }
@@ -1201,34 +1197,34 @@
         "Example": {
           "Result": [
             {
-              "school_id": 5,
-              "avg_salary": 56145.91875,
-              "min_salary": 45310.23,
-              "max_salary": 66481.36
-            },
-            {
               "school_id": 4,
-              "avg_salary": 54827.165,
-              "min_salary": 40421.69,
-              "max_salary": 66736.17
+              "avg_salary": 60455.9625,
+              "min_salary": 53395.69,
+              "max_salary": 69785.67
             },
             {
               "school_id": 2,
-              "avg_salary": 54768.53875,
-              "min_salary": 41633.18,
-              "max_salary": 69924.92
+              "avg_salary": 59014.06625,
+              "min_salary": 51100.57,
+              "max_salary": 66778.93
             },
             {
-              "school_id": 1,
-              "avg_salary": 53707.13,
-              "min_salary": 40880.23,
-              "max_salary": 67051.59
+              "school_id": 5,
+              "avg_salary": 54489.7175,
+              "min_salary": 41124.61,
+              "max_salary": 67519.66
             },
             {
               "school_id": 3,
-              "avg_salary": 51540.485,
-              "min_salary": 40847.05,
-              "max_salary": 62354.43
+              "avg_salary": 54033.04375,
+              "min_salary": 41191.6,
+              "max_salary": 67535.92
+            },
+            {
+              "school_id": 1,
+              "avg_salary": 53856.20125,
+              "min_salary": 43210.78,
+              "max_salary": 65006.16
             }
           ]
         }
@@ -1244,27 +1240,27 @@
           "Result": [
             {
               "id": 1,
-              "name": "4-G Sınıfı",
+              "name": "6-C Sınıfı",
               "student_count": 20
             },
             {
               "id": 2,
-              "name": "4-D Sınıfı",
+              "name": "11-D Sınıfı",
               "student_count": 20
             },
             {
               "id": 3,
-              "name": "1-G Sınıfı",
+              "name": "6-D Sınıfı",
               "student_count": 20
             },
             {
               "id": 4,
-              "name": "4-E Sınıfı",
+              "name": "3-D Sınıfı",
               "student_count": 20
             },
             {
               "id": 5,
-              "name": "12-G Sınıfı",
+              "name": "3-F Sınıfı",
               "student_count": 20
             }
           ]
@@ -1280,34 +1276,34 @@
         "Example": {
           "Result": [
             {
-              "id": 538,
-              "first_name": "Ahmet",
+              "id": 10,
+              "first_name": "Burak",
               "last_name": "Aksoy",
-              "email": "ahmet.aksoy@ogrenci.k12.tr"
+              "email": "burak.aksoy@ogrenci.k12.tr"
             },
             {
-              "id": 519,
-              "first_name": "Berk",
+              "id": 206,
+              "first_name": "Cem",
               "last_name": "Aksoy",
-              "email": "berk.aksoy.3@ogrenci.k12.tr"
+              "email": "cem.aksoy@ogrenci.k12.tr"
             },
             {
-              "id": 328,
-              "first_name": "Berk",
+              "id": 20,
+              "first_name": "Deniz",
               "last_name": "Aksoy",
-              "email": "berk.aksoy@ogrenci.k12.tr"
+              "email": "deniz.aksoy@ogrenci.k12.tr"
             },
             {
-              "id": 342,
-              "first_name": "Berk",
+              "id": 436,
+              "first_name": "Derya",
               "last_name": "Aksoy",
-              "email": "berk.aksoy.2@ogrenci.k12.tr"
+              "email": "derya.aksoy@ogrenci.k12.tr"
             },
             {
-              "id": 492,
-              "first_name": "Can",
+              "id": 481,
+              "first_name": "Gamze",
               "last_name": "Aksoy",
-              "email": "can.aksoy@ogrenci.k12.tr"
+              "email": "gamze.aksoy.2@ogrenci.k12.tr"
             }
           ]
         }
@@ -1322,34 +1318,34 @@
         "Example": {
           "Result": [
             {
-              "id": 1885,
-              "student_id": 472,
+              "id": 703,
+              "student_id": 176,
               "course_id": 35,
               "progress_percent": 100
             },
             {
-              "id": 2015,
-              "student_id": 504,
-              "course_id": 13,
-              "progress_percent": 100
-            },
-            {
-              "id": 369,
-              "student_id": 93,
-              "course_id": 6,
+              "id": 652,
+              "student_id": 163,
+              "course_id": 42,
               "progress_percent": 99.9
             },
             {
-              "id": 2061,
-              "student_id": 516,
-              "course_id": 16,
+              "id": 926,
+              "student_id": 232,
+              "course_id": 42,
               "progress_percent": 99.9
             },
             {
-              "id": 647,
-              "student_id": 162,
-              "course_id": 28,
-              "progress_percent": 99.8
+              "id": 1120,
+              "student_id": 280,
+              "course_id": 29,
+              "progress_percent": 99.9
+            },
+            {
+              "id": 1424,
+              "student_id": 356,
+              "course_id": 2,
+              "progress_percent": 99.9
             }
           ]
         }
@@ -1364,8 +1360,12 @@
         "Example": {
           "Result": [
             {
-              "name": "ahmet-ERDEM",
+              "name": "mehmet-ERDOĞAN",
               "total": 4
+            },
+            {
+              "name": "mehmet-AVCI",
+              "total": 3
             }
           ]
         }
@@ -1380,24 +1380,24 @@
         "Example": {
           "Result": [
             {
-              "age": 5,
+              "age": 3,
               "cnt": 68
             },
             {
               "age": 1,
-              "cnt": 59
-            },
-            {
-              "age": 0,
-              "cnt": 58
+              "cnt": 64
             },
             {
               "age": 4,
-              "cnt": 57
+              "cnt": 58
+            },
+            {
+              "age": 5,
+              "cnt": 55
             },
             {
               "age": 2,
-              "cnt": 52
+              "cnt": 54
             }
           ]
         }
@@ -1412,29 +1412,29 @@
         "Example": {
           "Result": [
             {
-              "courses_name": "Din Kültürü",
-              "avg_grade": 72,
-              "grade_count": 215
+              "courses_name": "Müzik",
+              "avg_grade": 71,
+              "grade_count": 190
             },
             {
-              "courses_name": "Almanca",
+              "courses_name": "Fizik",
               "avg_grade": 71,
-              "grade_count": 140
+              "grade_count": 103
             },
             {
               "courses_name": "Resim",
               "avg_grade": 71,
-              "grade_count": 160
+              "grade_count": 92
+            },
+            {
+              "courses_name": "Tarih",
+              "avg_grade": 70,
+              "grade_count": 116
             },
             {
               "courses_name": "Felsefe",
-              "avg_grade": 71,
-              "grade_count": 79
-            },
-            {
-              "courses_name": "Biyoloji",
-              "avg_grade": 71,
-              "grade_count": 182
+              "avg_grade": 70,
+              "grade_count": 179
             }
           ]
         }
@@ -1450,27 +1450,27 @@
           "Result": [
             {
               "students_id": 1,
-              "students_first_name": "Merve",
-              "enrolls": 4
-            },
-            {
-              "students_id": 2,
-              "students_first_name": "Kerem",
-              "enrolls": 4
-            },
-            {
-              "students_id": 3,
               "students_first_name": "Can",
               "enrolls": 4
             },
             {
+              "students_id": 2,
+              "students_first_name": "Onur",
+              "enrolls": 4
+            },
+            {
+              "students_id": 3,
+              "students_first_name": "Gamze",
+              "enrolls": 4
+            },
+            {
               "students_id": 4,
-              "students_first_name": "Mehmet",
+              "students_first_name": "Ece",
               "enrolls": 4
             },
             {
               "students_id": 5,
-              "students_first_name": "Yusuf",
+              "students_first_name": "Zeynep",
               "enrolls": 4
             }
           ]
@@ -1490,11 +1490,11 @@
               "cnt": 120
             },
             {
-              "schools_city": "Malatya",
+              "schools_city": "Sakarya",
               "cnt": 120
             },
             {
-              "schools_city": "İzmir",
+              "schools_city": "Malatya",
               "cnt": 120
             },
             {
@@ -1502,7 +1502,7 @@
               "cnt": 120
             },
             {
-              "schools_city": "Eskişehir",
+              "schools_city": "Balıkesir",
               "cnt": 120
             }
           ]
@@ -1518,29 +1518,29 @@
         "Example": {
           "Result": [
             {
+              "id": 25,
+              "name": "8-E Sınıfı",
+              "created_at": "2025-09-23T12:37:00.0068082"
+            },
+            {
+              "id": 26,
+              "name": "4-A Sınıfı",
+              "created_at": "2025-09-23T12:37:00.0068082"
+            },
+            {
               "id": 27,
-              "name": "2-G Sınıfı",
-              "created_at": "2025-09-16T08:49:44.6368637"
+              "name": "3-C Sınıfı",
+              "created_at": "2025-09-23T12:37:00.0068082"
             },
             {
               "id": 28,
-              "name": "12-F Sınıfı",
-              "created_at": "2025-09-16T08:49:44.6368637"
+              "name": "10-D Sınıfı",
+              "created_at": "2025-09-23T12:37:00.0068082"
             },
             {
               "id": 29,
-              "name": "1-B Sınıfı",
-              "created_at": "2025-09-16T08:49:44.6368637"
-            },
-            {
-              "id": 30,
-              "name": "5-B Sınıfı",
-              "created_at": "2025-09-16T08:49:44.6368637"
-            },
-            {
-              "id": 25,
-              "name": "9-E Sınıfı",
-              "created_at": "2025-09-16T08:49:44.6318757"
+              "name": "6-D Sınıfı",
+              "created_at": "2025-09-23T12:37:00.0068082"
             }
           ]
         }
@@ -1555,34 +1555,34 @@
         "Example": {
           "Result": [
             {
-              "teachers_id": 4,
-              "teachers_first_name": "Fatma",
-              "teachers_last_name": "Işık",
-              "teachers_salary": 67051.59
-            },
-            {
-              "teachers_id": 29,
-              "teachers_first_name": "Burak",
+              "teachers_id": 35,
+              "teachers_first_name": "Onur",
               "teachers_last_name": "Avcı",
-              "teachers_salary": 66736.17
+              "teachers_salary": 67519.66
             },
             {
-              "teachers_id": 1,
-              "teachers_first_name": "Berk",
-              "teachers_last_name": "Yılmaz",
-              "teachers_salary": 66402.49
+              "teachers_id": 38,
+              "teachers_first_name": "Gamze",
+              "teachers_last_name": "Taş",
+              "teachers_salary": 67175.05
             },
             {
-              "teachers_id": 25,
+              "teachers_id": 9,
+              "teachers_first_name": "Kerem",
+              "teachers_last_name": "Avcı",
+              "teachers_salary": 66778.93
+            },
+            {
+              "teachers_id": 15,
+              "teachers_first_name": "Can",
+              "teachers_last_name": "Korkmaz",
+              "teachers_salary": 65876.15
+            },
+            {
+              "teachers_id": 4,
               "teachers_first_name": "Ayşe",
-              "teachers_last_name": "Polat",
-              "teachers_salary": 62030.17
-            },
-            {
-              "teachers_id": 32,
-              "teachers_first_name": "Şevval",
-              "teachers_last_name": "Kaplan",
-              "teachers_salary": 59286.23
+              "teachers_last_name": "Çelik",
+              "teachers_salary": 65006.16
             }
           ]
         }
@@ -1598,27 +1598,27 @@
           "Result": [
             {
               "students_id": 1,
-              "students_first_name": "Merve",
-              "enrolls": 4
-            },
-            {
-              "students_id": 2,
-              "students_first_name": "Kerem",
-              "enrolls": 4
-            },
-            {
-              "students_id": 3,
               "students_first_name": "Can",
               "enrolls": 4
             },
             {
+              "students_id": 2,
+              "students_first_name": "Onur",
+              "enrolls": 4
+            },
+            {
+              "students_id": 3,
+              "students_first_name": "Gamze",
+              "enrolls": 4
+            },
+            {
               "students_id": 4,
-              "students_first_name": "Mehmet",
+              "students_first_name": "Ece",
               "enrolls": 4
             },
             {
               "students_id": 5,
-              "students_first_name": "Yusuf",
+              "students_first_name": "Zeynep",
               "enrolls": 4
             }
           ]
@@ -1636,7 +1636,7 @@
             {
               "yr": 2025,
               "mo": 9,
-              "dy": 16,
+              "dy": 23,
               "cnt": 2400
             }
           ]
@@ -1652,18 +1652,23 @@
         "Example": {
           "Result": [
             {
-              "id": 3,
-              "name": "İstanbul Fatih Fen Lisesi",
-              "established_year": 1958
+              "id": 2,
+              "name": "Malatya Hacı Bektaş Veli Anadolu Lisesi",
+              "established_year": 1965
             },
             {
-              "id": 2,
-              "name": "Malatya Şehitler Lisesi",
+              "id": 1,
+              "name": "Balıkesir Şehitler Lisesi",
               "established_year": 1980
             },
             {
+              "id": 3,
+              "name": "Samsun Yunus Emre Ortaokulu",
+              "established_year": 1995
+            },
+            {
               "id": 5,
-              "name": "Eskişehir Cumhuriyet İlkokulu",
+              "name": "Sakarya İnönü Anadolu Lisesi",
               "established_year": 2000
             }
           ]
@@ -1671,37 +1676,37 @@
       },
       {
         "id": 21,
-        "dsl": "FETCH(courses.name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count) FROM courses INCLUDE(enrollments.grades) GROUPBY(courses.name) HAVING(grade_count >= 10) ORDERBY(avg_grade DESC) LIMIT(10)",
+        "dsl": "FETCH(courses.name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count) FROM courses INCLUDE(enrollments.grades INNER) GROUPBY(courses.name) HAVING(grade_count >= 10) ORDERBY(avg_grade DESC) LIMIT(10)",
         "sql": "SELECT TOP 10 c.name, AVG(g.grade) AS avg_grade, COUNT(g.id) AS grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC",
-        "convertedSql": "SELECT courses.name AS courses_name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count FROM courses LEFT JOIN enrollments ON courses.id = enrollments.course_id LEFT JOIN grades ON enrollments.id = grades.enrollment_id GROUP BY courses.name HAVING COUNT(grades.id) >= 10 ORDER BY AVG(grades.grade) DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY",
+        "convertedSql": "SELECT courses.name AS courses_name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count FROM courses INNER JOIN enrollments ON courses.id = enrollments.course_id INNER JOIN grades ON enrollments.id = grades.enrollment_id GROUP BY courses.name HAVING COUNT(grades.id) >= 10 ORDER BY AVG(grades.grade) DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY",
         "same": true,
         "isEmpty": false,
         "Example": {
           "Result": [
             {
-              "courses_name": "Din Kültürü",
-              "avg_grade": 72,
-              "grade_count": 215
+              "courses_name": "Müzik",
+              "avg_grade": 71,
+              "grade_count": 190
             },
             {
-              "courses_name": "Almanca",
+              "courses_name": "Fizik",
               "avg_grade": 71,
-              "grade_count": 140
+              "grade_count": 103
             },
             {
               "courses_name": "Resim",
               "avg_grade": 71,
-              "grade_count": 160
+              "grade_count": 92
+            },
+            {
+              "courses_name": "Tarih",
+              "avg_grade": 70,
+              "grade_count": 116
             },
             {
               "courses_name": "Felsefe",
-              "avg_grade": 71,
-              "grade_count": 79
-            },
-            {
-              "courses_name": "Biyoloji",
-              "avg_grade": 71,
-              "grade_count": 182
+              "avg_grade": 70,
+              "grade_count": 179
             }
           ]
         }
@@ -1716,28 +1721,28 @@
         "Example": {
           "Result": [
             {
-              "students_id": 99,
-              "students_first_name": "Kerem",
+              "students_id": 10,
+              "students_first_name": "Burak",
               "gpa_band": "A"
             },
             {
-              "students_id": 141,
-              "students_first_name": "Ceren",
+              "students_id": 135,
+              "students_first_name": "Mehmet",
               "gpa_band": "A"
             },
             {
-              "students_id": 240,
-              "students_first_name": "Sinem",
+              "students_id": 206,
+              "students_first_name": "Cem",
               "gpa_band": "A"
             },
             {
-              "students_id": 492,
-              "students_first_name": "Can",
+              "students_id": 308,
+              "students_first_name": "Hakan",
               "gpa_band": "A"
             },
             {
-              "students_id": 598,
-              "students_first_name": "Can",
+              "students_id": 6,
+              "students_first_name": "Seda",
               "gpa_band": "A"
             }
           ]
@@ -1753,24 +1758,24 @@
         "Example": {
           "Result": [
             {
-              "courses_name": "Din Kültürü",
-              "enroll_cnt": 253
+              "courses_name": "Beden Eğitimi",
+              "enroll_cnt": 214
+            },
+            {
+              "courses_name": "Felsefe",
+              "enroll_cnt": 212
             },
             {
               "courses_name": "Müzik",
-              "enroll_cnt": 241
+              "enroll_cnt": 212
             },
             {
-              "courses_name": "Biyoloji",
-              "enroll_cnt": 207
+              "courses_name": "Almanca",
+              "enroll_cnt": 208
             },
             {
-              "courses_name": "Türk Dili ve Edebiyatı",
-              "enroll_cnt": 204
-            },
-            {
-              "courses_name": "İngilizce",
-              "enroll_cnt": 203
+              "courses_name": "Coğrafya",
+              "enroll_cnt": 191
             }
           ]
         }
@@ -1785,29 +1790,29 @@
         "Example": {
           "Result": [
             {
-              "id": 4,
-              "first_name": "Mehmet",
+              "id": 3,
+              "first_name": "Gamze",
+              "last_name": "Kurt"
+            },
+            {
+              "id": 5,
+              "first_name": "Zeynep",
               "last_name": "Işık"
             },
             {
               "id": 11,
-              "first_name": "Derya",
-              "last_name": "Kaya"
+              "first_name": "Hakan",
+              "last_name": "Koç"
             },
             {
               "id": 15,
-              "first_name": "Sinem",
-              "last_name": "Kaya"
+              "first_name": "Ceren",
+              "last_name": "Işık"
             },
             {
-              "id": 19,
-              "first_name": "Zeynep",
-              "last_name": "Taş"
-            },
-            {
-              "id": 26,
-              "first_name": "Kerem",
-              "last_name": "Taş"
+              "id": 22,
+              "first_name": "Mehmet",
+              "last_name": "Aslan"
             }
           ]
         }
@@ -1839,29 +1844,29 @@
         "Example": {
           "Result": [
             {
-              "first_name": "Oğuz",
+              "first_name": "Ahsen",
               "last_name": "Erdem",
-              "hire_date": "2025-09-06T00:00:00"
+              "hire_date": "2025-08-12T00:00:00"
             },
             {
-              "first_name": "Ece",
-              "last_name": "Arslan",
-              "hire_date": "2025-05-07T00:00:00"
+              "first_name": "Merve",
+              "last_name": "Korkmaz",
+              "hire_date": "2025-07-22T00:00:00"
             },
             {
-              "first_name": "Rabia",
-              "last_name": "Şahin",
-              "hire_date": "2025-05-01T00:00:00"
+              "first_name": "Derya",
+              "last_name": "Korkmaz",
+              "hire_date": "2025-07-05T00:00:00"
             },
             {
-              "first_name": "Berk",
-              "last_name": "Koç",
-              "hire_date": "2025-04-19T00:00:00"
+              "first_name": "Gamze",
+              "last_name": "Korkmaz",
+              "hire_date": "2025-06-07T00:00:00"
             },
             {
-              "first_name": "Ayşe",
-              "last_name": "Polat",
-              "hire_date": "2024-11-15T00:00:00"
+              "first_name": "Gamze",
+              "last_name": "Taş",
+              "hire_date": "2025-05-27T00:00:00"
             }
           ]
         }
@@ -1876,23 +1881,23 @@
         "Example": {
           "Result": [
             {
-              "id": 211,
+              "id": 230,
               "first_name": "Ahmet"
             },
             {
-              "id": 224,
+              "id": 158,
               "first_name": "Ahmet"
             },
             {
-              "id": 181,
+              "id": 58,
               "first_name": "Ahmet"
             },
             {
-              "id": 89,
+              "id": 46,
               "first_name": "Ahmet"
             },
             {
-              "id": 134,
+              "id": 44,
               "first_name": "Ahmet"
             }
           ]
@@ -1957,9 +1962,9 @@
       },
       {
         "id": 3,
-        "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
+        "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses INNER) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
         "sql": "SELECT c.name, ROUND(AVG(e.progress_percent),2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
-        "convertedSql": "SELECT courses.name AS courses_name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments LEFT JOIN courses ON enrollments.course_id = courses.id GROUP BY courses.name HAVING COUNT(*) > 30 ORDER BY ROUND(AVG(enrollments.progress_percent), 2) DESC",
+        "convertedSql": "SELECT courses.name AS courses_name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments INNER JOIN courses ON enrollments.course_id = courses.id GROUP BY courses.name HAVING COUNT(*) > 30 ORDER BY ROUND(AVG(enrollments.progress_percent), 2) DESC",
         "same": true,
         "isEmpty": false,
         "Example": {
@@ -2619,9 +2624,9 @@
       },
       {
         "id": 21,
-        "dsl": "FETCH(courses.name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count) FROM courses INCLUDE(enrollments.grades) GROUPBY(courses.name) HAVING(grade_count >= 10) ORDERBY(avg_grade DESC) LIMIT(10)",
+        "dsl": "FETCH(courses.name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count) FROM courses INCLUDE(enrollments.grades INNER) GROUPBY(courses.name) HAVING(grade_count >= 10) ORDERBY(avg_grade DESC) LIMIT(10)",
         "sql": "SELECT c.name, AVG(g.grade) AS avg_grade, COUNT(g.id) AS grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC LIMIT 10",
-        "convertedSql": "SELECT courses.name AS courses_name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count FROM courses LEFT JOIN enrollments ON courses.id = enrollments.course_id LEFT JOIN grades ON enrollments.id = grades.enrollment_id GROUP BY courses.name HAVING COUNT(grades.id) >= 10 ORDER BY AVG(grades.grade) DESC LIMIT 10 OFFSET 0",
+        "convertedSql": "SELECT courses.name AS courses_name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count FROM courses INNER JOIN enrollments ON courses.id = enrollments.course_id INNER JOIN grades ON enrollments.id = grades.enrollment_id GROUP BY courses.name HAVING COUNT(grades.id) >= 10 ORDER BY AVG(grades.grade) DESC LIMIT 10 OFFSET 0",
         "same": true,
         "isEmpty": false,
         "Example": {
@@ -2905,9 +2910,9 @@
       },
       {
         "id": 3,
-        "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
+        "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses INNER) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
         "sql": "SELECT c.name, ROUND(AVG(e.progress_percent),2) avg_progress, COUNT(*) enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
-        "convertedSql": "SELECT courses.name AS courses_name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments LEFT JOIN courses ON enrollments.COURSE_ID = courses.ID GROUP BY courses.name HAVING COUNT(*) > 30 ORDER BY ROUND(AVG(enrollments.progress_percent), 2) DESC",
+        "convertedSql": "SELECT courses.name AS courses_name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls FROM enrollments INNER JOIN courses ON enrollments.COURSE_ID = courses.ID GROUP BY courses.name HAVING COUNT(*) > 30 ORDER BY ROUND(AVG(enrollments.progress_percent), 2) DESC",
         "same": true,
         "isEmpty": false,
         "Example": {
@@ -3267,7 +3272,7 @@
           "Result": [
             {
               "AGE": 1,
-              "CNT": 69
+              "CNT": 70
             },
             {
               "AGE": 5,
@@ -3275,7 +3280,7 @@
             },
             {
               "AGE": 3,
-              "CNT": 60
+              "CNT": 59
             },
             {
               "AGE": 2,
@@ -3283,7 +3288,7 @@
             },
             {
               "AGE": 4,
-              "CNT": 53
+              "CNT": 54
             }
           ]
         }
@@ -3558,9 +3563,9 @@
       },
       {
         "id": 21,
-        "dsl": "FETCH(courses.name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count) FROM courses INCLUDE(enrollments.grades) GROUPBY(courses.name) HAVING(grade_count >= 10) ORDERBY(avg_grade DESC) LIMIT(10)",
+        "dsl": "FETCH(courses.name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count) FROM courses INCLUDE(enrollments.grades INNER) GROUPBY(courses.name) HAVING(grade_count >= 10) ORDERBY(avg_grade DESC) LIMIT(10)",
         "sql": "SELECT c.name, AVG(g.grade) avg_grade, COUNT(g.id) grade_count FROM courses c JOIN enrollments e ON e.course_id = c.id JOIN grades g ON g.enrollment_id = e.id GROUP BY c.name HAVING COUNT(g.id) >= 10 ORDER BY avg_grade DESC FETCH FIRST 10 ROWS ONLY",
-        "convertedSql": "SELECT courses.name AS courses_name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count FROM courses LEFT JOIN enrollments ON courses.ID = enrollments.COURSE_ID LEFT JOIN grades ON enrollments.ID = grades.ENROLLMENT_ID GROUP BY courses.name HAVING COUNT(grades.id) >= 10 ORDER BY AVG(grades.grade) DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY",
+        "convertedSql": "SELECT courses.name AS courses_name, AVG(grades.grade) AS avg_grade, COUNT(grades.id) AS grade_count FROM courses INNER JOIN enrollments ON courses.ID = enrollments.COURSE_ID INNER JOIN grades ON enrollments.ID = grades.ENROLLMENT_ID GROUP BY courses.name HAVING COUNT(grades.id) >= 10 ORDER BY AVG(grades.grade) DESC OFFSET 0 ROWS FETCH NEXT 10 ROWS ONLY",
         "same": true,
         "isEmpty": false,
         "Example": {

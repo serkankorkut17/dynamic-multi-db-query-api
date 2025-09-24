@@ -17,3 +17,4 @@ bld/
 # nodejs
 node_modules
 .DS_Store
+.fake

@@ -10,6 +10,7 @@ using DynamicDbQueryApi.DTOs;
 using DynamicDbQueryApi.Entities;
 using DynamicDbQueryApi.Entities.Query;
 using DynamicDbQueryApi.Interfaces;
+using DynamicDbQueryApi.Helpers;
 
 namespace DynamicDbQueryApi.Services
 {
@@ -133,24 +134,6 @@ namespace DynamicDbQueryApi.Services
             return sql;
         }
 
-        public int FindClosingParenthesis(string str, int openIdx)
-        {
-            int depth = 0;
-            for (int i = openIdx; i < str.Length; i++)
-            {
-                if (str[i] == '(')
-                {
-                    depth++;
-                }
-                else if (str[i] == ')')
-                {
-                    depth--;
-                    if (depth == 0) return i;
-                }
-            }
-            return -1; // Not found
-        }
-
         // Kolonun bir fonksiyon olup olmadığını kontrol etme (örneğin COUNT(*), SUM(col) vb.)
         public (string funcName, string inner)? GetFunction(string column)
         {
@@ -160,7 +143,7 @@ namespace DynamicDbQueryApi.Services
                 // Parantez başlangıç indeksini ve kapanış indeksini bul
                 int openIdx = start.Index + start.Length - 1;
                 int bodyStart = openIdx + 1;
-                int closeIdx = FindClosingParenthesis(column, openIdx);
+                int closeIdx = StringHelpers.FindClosingParenthesis(column, openIdx);
                 if (closeIdx == -1) throw new Exception("Could not find closing parenthesis for function in column.");
 
                 var body = column.Substring(bodyStart, closeIdx - bodyStart).Trim();
@@ -181,7 +164,7 @@ namespace DynamicDbQueryApi.Services
                 var funcName = funcInfo.Value.funcName;
                 var inner = funcInfo.Value.inner;
 
-                var args = SplitByCommas(inner);
+                var args = StringHelpers.SplitByCommas(inner);
 
                 // Fonksiyonu oluştur
                 var funcSql = BuildFunction(dbType, funcName, args);
@@ -221,7 +204,7 @@ namespace DynamicDbQueryApi.Services
             {
                 var funcName = funcInfo.Value.funcName;
                 var inner = funcInfo.Value.inner;
-                var args = SplitByCommas(inner);
+                var args = StringHelpers.SplitByCommas(inner);
                 var funcSql = BuildFunction(dbType, funcName, args);
                 return funcSql;
             }
@@ -239,7 +222,7 @@ namespace DynamicDbQueryApi.Services
             {
                 var funcName = funcInfo.Value.funcName;
                 var inner = funcInfo.Value.inner;
-                var args = SplitByCommas(inner);
+                var args = StringHelpers.SplitByCommas(inner);
                 var funcSql = BuildFunction(dbType, funcName, args);
                 return $"{funcSql} {(orderBy.Desc ? "DESC" : "ASC")}";
             }
@@ -271,7 +254,7 @@ namespace DynamicDbQueryApi.Services
                 {
                     var funcName = funcInfo.Value.funcName;
                     var inner = funcInfo.Value.inner;
-                    var innerArgs = SplitByCommas(inner);
+                    var innerArgs = StringHelpers.SplitByCommas(inner);
                     var funcSql = BuildFunction(dbType, funcName, innerArgs);
                     args[i] = funcSql;
                 }
@@ -1022,7 +1005,7 @@ namespace DynamicDbQueryApi.Services
                     }
                     else
                     {
-                        args = SplitByCommas(inner);
+                        args = StringHelpers.SplitByCommas(inner);
                     }
                     columnName = BuildFunction(dbType, funcName, args);
                 }
@@ -1033,7 +1016,7 @@ namespace DynamicDbQueryApi.Services
                 {
                     var funcName = funcValueInfo.Value.funcName;
                     var inner = funcValueInfo.Value.inner;
-                    var args = SplitByCommas(inner);
+                    var args = StringHelpers.SplitByCommas(inner);
                     value = BuildFunction(dbType, funcName, args);
                 }
 
@@ -1126,15 +1109,6 @@ namespace DynamicDbQueryApi.Services
                     }
 
                     return $"{columnName} {sqlOperator} {value}";
-                    // değer sayısal ise tırnak kullanma
-                    // if (double.TryParse(value, out _))
-                    // {
-                    //     return $"{columnName} {sqlOperator} {value}";
-                    // }
-                    // else
-                    // {
-                    //     return $"{columnName} {sqlOperator} '{value}'";
-                    // }
                 }
             }
             else if (filter is LogicalFilterModel logical)
@@ -1203,90 +1177,6 @@ namespace DynamicDbQueryApi.Services
             sqlBuilder.Append("\n)");
 
             return sqlBuilder.ToString();
-        }
-
-        // , lerden bölme (parantez içi ve string içi değilse)
-        private List<string> SplitByCommas(string input)
-        {
-            List<string> result = new List<string>();
-            for (int i = 0; i < input.Length; i++)
-            {
-                if (input[i] == '(')
-                {
-                    // Parantez içindeki virgülleri yok say
-                    int closeIdx = FindClosingParenthesis(input, i);
-                    if (closeIdx == -1)
-                    {
-                        throw new Exception("Could not find closing parenthesis in FETCH columns.");
-                    }
-                    i = closeIdx;
-                }
-
-                else if (input[i] == '\'')
-                {
-                    // String içindeki virgülleri yok say
-                    int closeIdx = FindClosingQuote(input, i);
-                    if (closeIdx == -1)
-                    {
-                        throw new Exception("Could not find closing quote in FETCH columns.");
-                    }
-                    i = closeIdx;
-                }
-
-                else if (input[i] == '{')
-                {
-                    // Süslü parantez içindeki virgülleri yok say
-                    int closeIdx = FindClosingBracket(input, i);
-                    if (closeIdx == -1)
-                    {
-                        throw new Exception("Could not find closing bracket in FETCH columns.");
-                    }
-                    i = closeIdx;
-                }
-
-                else if (input[i] == ',')
-                {
-                    // Virgül bulundu, böl
-                    result.Add(input.Substring(0, i).Trim());
-                    input = input.Substring(i + 1).Trim();
-                    i = -1;
-                }
-            }
-            // Son parçayı ekle
-            if (!string.IsNullOrWhiteSpace(input))
-            {
-                result.Add(input.Trim());
-            }
-
-            return result;
-        }
-
-        private int FindClosingQuote(string str, int startIdx)
-        {
-            for (int i = startIdx + 1; i < str.Length; i++)
-            {
-                if (str[i] == '\'')
-                {
-                    // Eğer öncesinde \ yoksa kapatma tırnağıdır
-                    if (i == 0 || str[i - 1] != '\\')
-                    {
-                        return i;
-                    }
-                }
-            }
-            return -1; // Not found
-        }
-
-        private int FindClosingBracket(string str, int startIdx)
-        {
-            for (int i = startIdx + 1; i < str.Length; i++)
-            {
-                if (str[i] == '}')
-                {
-                    return i;
-                }
-            }
-            return -1; // Not found
         }
     }
 }
