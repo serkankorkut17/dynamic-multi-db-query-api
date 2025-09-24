@@ -45,6 +45,7 @@ async function withClient(fn) { const client = new Client(config); await client.
 async function dropSchema(client) {
   await client.query(`
     DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'course_prerequisites') THEN DROP TABLE course_prerequisites; END IF;
       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'grades') THEN DROP TABLE grades; END IF;
       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'enrollments') THEN DROP TABLE enrollments; END IF;
       IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'students') THEN DROP TABLE students; END IF;
@@ -102,6 +103,13 @@ async function createSchema(client) {
       name TEXT NOT NULL,
       credit_hours SMALLINT,
       is_elective BOOLEAN
+    );
+    CREATE TABLE IF NOT EXISTS course_prerequisites (
+      id SERIAL PRIMARY KEY,
+      course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+      prerequisite_course_id INTEGER NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+      CONSTRAINT uq_course_prereq UNIQUE(course_id, prerequisite_course_id),
+      CONSTRAINT chk_course_prereq_not_self CHECK (course_id <> prerequisite_course_id)
     );
     CREATE TABLE IF NOT EXISTS enrollments (
       id SERIAL PRIMARY KEY,
@@ -228,6 +236,19 @@ async function seedData(client) {
         thisSchoolCourses.push(rows[0].id);
       }
       allCourses.push(...thisSchoolCourses);
+      // Seed course prerequisites within the same school: for each course, pick up to 2 earlier courses as prerequisites
+      for (let i = 0; i < thisSchoolCourses.length; i++) {
+        const courseId = thisSchoolCourses[i];
+        const potential = thisSchoolCourses.slice(0, i);
+        if (potential.length === 0) continue;
+        const selectedPrereqs = pickRandom(potential, Math.min(2, potential.length));
+        for (const prereqId of selectedPrereqs) {
+          await client.query(
+            'INSERT INTO course_prerequisites(course_id, prerequisite_course_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+            [courseId, prereqId]
+          );
+        }
+      }
       for (const classId of thisSchoolClasses) {
         for (let st = 0; st < COUNTS.STUDENTS_PER_CLASS; st++) {
           const first = randChoice(TR_FIRST_NAMES); const last = randChoice(TR_LAST_NAMES);

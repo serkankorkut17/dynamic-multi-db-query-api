@@ -12,12 +12,12 @@
         "Example": {
           "Result": [
             {
-              "first_name": "Fatma",
-              "count": 25
+              "first_name": "Sinem",
+              "count": 28
             },
             {
-              "first_name": "Kerem",
-              "count": 30
+              "first_name": "Umut",
+              "count": 26
             }
           ]
         }
@@ -32,24 +32,24 @@
         "Example": {
           "Result": [
             {
-              "first_name": "Kerem",
-              "count": 30
-            },
-            {
-              "first_name": "Fatma",
-              "count": 25
-            },
-            {
-              "first_name": "Emre",
-              "count": 21
-            },
-            {
-              "first_name": "Merve",
-              "count": 21
+              "first_name": "Sinem",
+              "count": 28
             },
             {
               "first_name": "Umut",
-              "count": 20
+              "count": 26
+            },
+            {
+              "first_name": "Kerem",
+              "count": 24
+            },
+            {
+              "first_name": "Cem",
+              "count": 23
+            },
+            {
+              "first_name": "Melisa",
+              "count": 22
             }
           ]
         }
@@ -64,29 +64,29 @@
         "Example": {
           "Result": [
             {
-              "courses_name": "Biyoloji",
-              "avg_progress": 55.12,
-              "enrolls": 101
+              "courses_name": "Kimya",
+              "avg_progress": 54.65,
+              "enrolls": 170
             },
             {
-              "courses_name": "Bilgisayar Bilimi",
-              "avg_progress": 53.04,
-              "enrolls": 123
+              "courses_name": "Resim",
+              "avg_progress": 52.38,
+              "enrolls": 218
+            },
+            {
+              "courses_name": "Matematik",
+              "avg_progress": 51.84,
+              "enrolls": 149
             },
             {
               "courses_name": "Müzik",
-              "avg_progress": 52.9,
-              "enrolls": 144
+              "avg_progress": 50.84,
+              "enrolls": 200
             },
             {
-              "courses_name": "Din Kültürü",
-              "avg_progress": 51.75,
-              "enrolls": 150
-            },
-            {
-              "courses_name": "Coğrafya",
-              "avg_progress": 50.85,
-              "enrolls": 187
+              "courses_name": "Türk Dili ve Edebiyatı",
+              "avg_progress": 50.83,
+              "enrolls": 184
             }
           ]
         }
@@ -101,34 +101,34 @@
         "Example": {
           "Result": [
             {
-              "id": 1109,
-              "student_id": 278,
-              "course_id": 20,
+              "id": 420,
+              "student_id": 105,
+              "course_id": 10,
               "progress_percent": 40
             },
             {
-              "id": 1039,
-              "student_id": 260,
-              "course_id": 17,
-              "progress_percent": 40
-            },
-            {
-              "id": 1132,
-              "student_id": 283,
-              "course_id": 41,
+              "id": 1397,
+              "student_id": 350,
+              "course_id": 42,
               "progress_percent": 40.1
             },
             {
-              "id": 1348,
-              "student_id": 337,
-              "course_id": 34,
+              "id": 1135,
+              "student_id": 284,
+              "course_id": 26,
               "progress_percent": 40.1
             },
             {
-              "id": 1965,
-              "student_id": 492,
-              "course_id": 20,
-              "progress_percent": 40.2
+              "id": 1221,
+              "student_id": 306,
+              "course_id": 36,
+              "progress_percent": 40.1
+            },
+            {
+              "id": 1052,
+              "student_id": 263,
+              "course_id": 32,
+              "progress_percent": 40.1
             }
           ]
         }
@@ -144,28 +144,28 @@
           "Result": [
             {
               "id": 1,
-              "first_name": "Hakan",
-              "last_name": "Avcı"
+              "first_name": "Melisa",
+              "last_name": "Bulut"
             },
             {
               "id": 2,
-              "first_name": "Seda",
-              "last_name": "Özdemir"
+              "first_name": "Zeynep",
+              "last_name": "Yıldız"
             },
             {
               "id": 3,
-              "first_name": "Hakan",
-              "last_name": "Bozkurt"
+              "first_name": "Kerem",
+              "last_name": "Öztürk"
             },
             {
               "id": 4,
-              "first_name": "Şevval",
-              "last_name": "Avcı"
+              "first_name": "Ceren",
+              "last_name": "Özdemir"
             },
             {
               "id": 5,
-              "first_name": "Umut",
-              "last_name": "Çelik"
+              "first_name": "Ece",
+              "last_name": "Çetin"
             }
           ]
         }
@@ -180,34 +180,34 @@
         "Example": {
           "Result": [
             {
-              "id": 375,
-              "first_name": "Fatma",
-              "last_name": "Işık",
+              "id": 323,
+              "first_name": "Oğuz",
+              "last_name": "Kaplan",
               "gpa": 4
             },
             {
-              "id": 186,
+              "id": 254,
+              "first_name": "Oğuz",
+              "last_name": "Avcı",
+              "gpa": 4
+            },
+            {
+              "id": 219,
               "first_name": "Fatma",
-              "last_name": "Turan",
+              "last_name": "Işık",
               "gpa": 3.99
             },
             {
-              "id": 533,
-              "first_name": "Ece",
-              "last_name": "Kaya",
+              "id": 557,
+              "first_name": "Sinem",
+              "last_name": "Bozkurt",
               "gpa": 3.99
             },
             {
-              "id": 206,
-              "first_name": "Mehmet",
-              "last_name": "Demir",
-              "gpa": 3.98
-            },
-            {
-              "id": 510,
-              "first_name": "Murat",
-              "last_name": "Yıldırım",
-              "gpa": 3.98
+              "id": 53,
+              "first_name": "Zeynep",
+              "last_name": "Erdoğan",
+              "gpa": 3.99
             }
           ]
         }
@@ -222,34 +222,34 @@
         "Example": {
           "Result": [
             {
-              "school_id": 4,
-              "avg_salary": 59895.575,
-              "min_salary": 41957.93,
-              "max_salary": 69429.73
-            },
-            {
               "school_id": 5,
-              "avg_salary": 54607.42375,
-              "min_salary": 42135.23,
-              "max_salary": 69337.12
+              "avg_salary": 57711.0975,
+              "min_salary": 40784.98,
+              "max_salary": 66292.76
             },
             {
               "school_id": 2,
-              "avg_salary": 50597.155,
-              "min_salary": 40300.21,
-              "max_salary": 60082.03
+              "avg_salary": 56953.6375,
+              "min_salary": 48791.48,
+              "max_salary": 68240.1
             },
             {
               "school_id": 1,
-              "avg_salary": 50337.19875,
-              "min_salary": 40088.43,
-              "max_salary": 61580.36
+              "avg_salary": 56720.07625,
+              "min_salary": 42754.5,
+              "max_salary": 69715.91
             },
             {
               "school_id": 3,
-              "avg_salary": 49572.31625,
-              "min_salary": 41656.65,
-              "max_salary": 56480.27
+              "avg_salary": 54829.48,
+              "min_salary": 41873.86,
+              "max_salary": 66139.57
+            },
+            {
+              "school_id": 4,
+              "avg_salary": 51796.2775,
+              "min_salary": 40717.32,
+              "max_salary": 64326
             }
           ]
         }
@@ -265,27 +265,27 @@
           "Result": [
             {
               "id": 22,
-              "name": "5-B Sınıfı",
+              "name": "3-B Sınıfı",
               "student_count": 20
             },
             {
               "id": 19,
-              "name": "9-A Sınıfı",
+              "name": "7-B Sınıfı",
               "student_count": 20
             },
             {
               "id": 10,
-              "name": "10-F Sınıfı",
+              "name": "4-B Sınıfı",
               "student_count": 20
             },
             {
               "id": 13,
-              "name": "6-G Sınıfı",
+              "name": "5-E Sınıfı",
               "student_count": 20
             },
             {
               "id": 2,
-              "name": "7-E Sınıfı",
+              "name": "9-A Sınıfı",
               "student_count": 20
             }
           ]
@@ -301,34 +301,34 @@
         "Example": {
           "Result": [
             {
-              "id": 245,
+              "id": 188,
               "first_name": "Ahmet",
               "last_name": "Aksoy",
               "email": "ahmet.aksoy@ogrenci.k12.tr"
             },
             {
-              "id": 576,
-              "first_name": "Ahmet",
-              "last_name": "Aksoy",
-              "email": "ahmet.aksoy.2@ogrenci.k12.tr"
-            },
-            {
-              "id": 39,
+              "id": 392,
               "first_name": "Ahsen",
               "last_name": "Aksoy",
               "email": "ahsen.aksoy@ogrenci.k12.tr"
             },
             {
-              "id": 376,
-              "first_name": "Berk",
+              "id": 526,
+              "first_name": "Ayşe",
               "last_name": "Aksoy",
-              "email": "berk.aksoy@ogrenci.k12.tr"
+              "email": "ayse.aksoy@ogrenci.k12.tr"
             },
             {
-              "id": 475,
-              "first_name": "Burak",
+              "id": 301,
+              "first_name": "Deniz",
               "last_name": "Aksoy",
-              "email": "burak.aksoy@ogrenci.k12.tr"
+              "email": "deniz.aksoy@ogrenci.k12.tr"
+            },
+            {
+              "id": 214,
+              "first_name": "Elif",
+              "last_name": "Aksoy",
+              "email": "elif.aksoy@ogrenci.k12.tr"
             }
           ]
         }
@@ -343,34 +343,34 @@
         "Example": {
           "Result": [
             {
-              "id": 2025,
-              "student_id": 507,
-              "course_id": 26,
+              "id": 1430,
+              "student_id": 358,
+              "course_id": 32,
               "progress_percent": 100
             },
             {
-              "id": 577,
-              "student_id": 145,
-              "course_id": 40,
+              "id": 1229,
+              "student_id": 308,
+              "course_id": 33,
               "progress_percent": 99.9
             },
             {
-              "id": 632,
-              "student_id": 158,
-              "course_id": 41,
+              "id": 681,
+              "student_id": 171,
+              "course_id": 18,
               "progress_percent": 99.9
             },
             {
-              "id": 461,
-              "student_id": 116,
-              "course_id": 27,
+              "id": 1476,
+              "student_id": 369,
+              "course_id": 17,
               "progress_percent": 99.9
             },
             {
-              "id": 325,
-              "student_id": 82,
-              "course_id": 50,
-              "progress_percent": 99.9
+              "id": 904,
+              "student_id": 226,
+              "course_id": 36,
+              "progress_percent": 99.8
             }
           ]
         }
@@ -385,15 +385,15 @@
         "Example": {
           "Result": [
             {
-              "name": "umut-ÖZDEMIR",
-              "total": 3
+              "name": "fatma-AKSOY",
+              "total": 4
             },
             {
-              "name": "ahmet-POLAT",
-              "total": 3
+              "name": "umut-KAPLAN",
+              "total": 4
             },
             {
-              "name": "fatma-ASLAN",
+              "name": "umut-ÖZTÜRK",
               "total": 3
             }
           ]
@@ -409,24 +409,24 @@
         "Example": {
           "Result": [
             {
-              "age": 0,
-              "cnt": 60
+              "age": 4,
+              "cnt": 62
             },
             {
-              "age": 4,
-              "cnt": 59
+              "age": 3,
+              "cnt": 57
+            },
+            {
+              "age": 1,
+              "cnt": 57
             },
             {
               "age": 2,
               "cnt": 57
             },
             {
-              "age": 5,
-              "cnt": 53
-            },
-            {
-              "age": 3,
-              "cnt": 50
+              "age": 0,
+              "cnt": 57
             }
           ]
         }
@@ -441,29 +441,29 @@
         "Example": {
           "Result": [
             {
-              "courses_name": "Bilgisayar Bilimi",
-              "avg_grade": 71.875,
-              "grade_count": 104
+              "courses_name": "Biyoloji",
+              "avg_grade": 72.94354838709677,
+              "grade_count": 124
             },
             {
-              "courses_name": "Müzik",
-              "avg_grade": 71.70689655172414,
-              "grade_count": 116
-            },
-            {
-              "courses_name": "Din Kültürü",
-              "avg_grade": 71.43511450381679,
-              "grade_count": 131
-            },
-            {
-              "courses_name": "Almanca",
-              "avg_grade": 70.81521739130434,
-              "grade_count": 92
-            },
-            {
-              "courses_name": "Tarih",
-              "avg_grade": 70.5625,
+              "courses_name": "Matematik",
+              "avg_grade": 72.1328125,
               "grade_count": 128
+            },
+            {
+              "courses_name": "Coğrafya",
+              "avg_grade": 70.76315789473684,
+              "grade_count": 76
+            },
+            {
+              "courses_name": "İngilizce",
+              "avg_grade": 70.61666666666666,
+              "grade_count": 180
+            },
+            {
+              "courses_name": "Fizik",
+              "avg_grade": 70.53554502369668,
+              "grade_count": 211
             }
           ]
         }
@@ -479,27 +479,27 @@
           "Result": [
             {
               "students_id": 1,
-              "students_first_name": "Hakan",
+              "students_first_name": "Melisa",
               "enrolls": 4
             },
             {
               "students_id": 2,
-              "students_first_name": "Seda",
+              "students_first_name": "Zeynep",
               "enrolls": 4
             },
             {
               "students_id": 3,
-              "students_first_name": "Hakan",
+              "students_first_name": "Kerem",
               "enrolls": 4
             },
             {
               "students_id": 4,
-              "students_first_name": "Şevval",
+              "students_first_name": "Ceren",
               "enrolls": 4
             },
             {
               "students_id": 5,
-              "students_first_name": "Umut",
+              "students_first_name": "Ece",
               "enrolls": 4
             }
           ]
@@ -515,19 +515,19 @@
         "Example": {
           "Result": [
             {
-              "schools_city": "Adana",
+              "schools_city": "Ankara",
+              "cnt": 120
+            },
+            {
+              "schools_city": "Sakarya",
+              "cnt": 120
+            },
+            {
+              "schools_city": "Eskişehir",
               "cnt": 120
             },
             {
               "schools_city": "Kayseri",
-              "cnt": 120
-            },
-            {
-              "schools_city": "Gaziantep",
-              "cnt": 120
-            },
-            {
-              "schools_city": "İstanbul",
               "cnt": 120
             },
             {
@@ -548,28 +548,28 @@
           "Result": [
             {
               "id": 1,
-              "name": "1-F Sınıfı",
-              "created_at": "2025-09-16T08:38:18.517428Z"
+              "name": "4-A Sınıfı",
+              "created_at": "2025-09-24T10:52:31.761985Z"
             },
             {
               "id": 2,
-              "name": "7-E Sınıfı",
-              "created_at": "2025-09-16T08:38:18.517428Z"
+              "name": "9-A Sınıfı",
+              "created_at": "2025-09-24T10:52:31.761985Z"
             },
             {
               "id": 3,
-              "name": "7-D Sınıfı",
-              "created_at": "2025-09-16T08:38:18.517428Z"
+              "name": "6-B Sınıfı",
+              "created_at": "2025-09-24T10:52:31.761985Z"
             },
             {
               "id": 4,
-              "name": "9-C Sınıfı",
-              "created_at": "2025-09-16T08:38:18.517428Z"
+              "name": "1-G Sınıfı",
+              "created_at": "2025-09-24T10:52:31.761985Z"
             },
             {
               "id": 5,
-              "name": "11-F Sınıfı",
-              "created_at": "2025-09-16T08:38:18.517428Z"
+              "name": "12-A Sınıfı",
+              "created_at": "2025-09-24T10:52:31.761985Z"
             }
           ]
         }
@@ -584,34 +584,34 @@
         "Example": {
           "Result": [
             {
-              "teachers_id": 31,
-              "teachers_first_name": "Emre",
-              "teachers_last_name": "Güneş",
-              "teachers_salary": 69429.73
+              "teachers_id": 8,
+              "teachers_first_name": "Kerem",
+              "teachers_last_name": "Korkmaz",
+              "teachers_salary": 69715.91
             },
             {
-              "teachers_id": 38,
-              "teachers_first_name": "Hakan",
-              "teachers_last_name": "Aydın",
-              "teachers_salary": 69337.12
+              "teachers_id": 12,
+              "teachers_first_name": "Sinem",
+              "teachers_last_name": "Bulut",
+              "teachers_salary": 68240.1
             },
             {
-              "teachers_id": 29,
-              "teachers_first_name": "Berk",
-              "teachers_last_name": "Aydın",
-              "teachers_salary": 66474.58
+              "teachers_id": 37,
+              "teachers_first_name": "Ceren",
+              "teachers_last_name": "Çetin",
+              "teachers_salary": 66292.76
             },
             {
-              "teachers_id": 36,
-              "teachers_first_name": "Ece",
-              "teachers_last_name": "Kaplan",
-              "teachers_salary": 65188.79
+              "teachers_id": 19,
+              "teachers_first_name": "Deniz",
+              "teachers_last_name": "Aslan",
+              "teachers_salary": 66139.57
             },
             {
-              "teachers_id": 27,
-              "teachers_first_name": "Şevval",
-              "teachers_last_name": "Yıldız",
-              "teachers_salary": 62641.92
+              "teachers_id": 1,
+              "teachers_first_name": "Seda",
+              "teachers_last_name": "Şahin",
+              "teachers_salary": 65894.84
             }
           ]
         }
@@ -627,27 +627,27 @@
           "Result": [
             {
               "students_id": 1,
-              "students_first_name": "Hakan",
+              "students_first_name": "Melisa",
               "enrolls": 4
             },
             {
               "students_id": 2,
-              "students_first_name": "Seda",
+              "students_first_name": "Zeynep",
               "enrolls": 4
             },
             {
               "students_id": 3,
-              "students_first_name": "Hakan",
+              "students_first_name": "Kerem",
               "enrolls": 4
             },
             {
               "students_id": 4,
-              "students_first_name": "Şevval",
+              "students_first_name": "Ceren",
               "enrolls": 4
             },
             {
               "students_id": 5,
-              "students_first_name": "Umut",
+              "students_first_name": "Ece",
               "enrolls": 4
             }
           ]
@@ -665,32 +665,32 @@
             {
               "yr": 2025,
               "mo": 9,
-              "dy": 16,
-              "cnt": 6
+              "dy": 24,
+              "cnt": 4
             },
             {
               "yr": 2025,
               "mo": 9,
-              "dy": 15,
-              "cnt": 27
+              "dy": 23,
+              "cnt": 18
             },
             {
               "yr": 2025,
               "mo": 9,
-              "dy": 14,
-              "cnt": 28
+              "dy": 22,
+              "cnt": 18
             },
             {
               "yr": 2025,
               "mo": 9,
-              "dy": 13,
-              "cnt": 22
+              "dy": 21,
+              "cnt": 19
             },
             {
               "yr": 2025,
               "mo": 9,
-              "dy": 12,
-              "cnt": 22
+              "dy": 20,
+              "cnt": 14
             }
           ]
         }
@@ -706,23 +706,28 @@
           "Result": [
             {
               "id": 5,
-              "name": "Van Şehitler Lisesi",
-              "established_year": 1951
-            },
-            {
-              "id": 1,
-              "name": "Gaziantep Gazi İlkokulu",
-              "established_year": 1955
-            },
-            {
-              "id": 2,
-              "name": "Kayseri Hacı Bektaş Veli Anadolu Lisesi",
-              "established_year": 1974
+              "name": "Eskişehir Fatih Fen Lisesi",
+              "established_year": 1968
             },
             {
               "id": 4,
-              "name": "İstanbul Hacı Bektaş Veli Anadolu Lisesi",
-              "established_year": 1994
+              "name": "Sakarya Gazi İlkokulu",
+              "established_year": 1972
+            },
+            {
+              "id": 3,
+              "name": "Van Gazi İlkokulu",
+              "established_year": 1972
+            },
+            {
+              "id": 2,
+              "name": "Ankara Hacı Bektaş Veli Anadolu Lisesi",
+              "established_year": 1982
+            },
+            {
+              "id": 1,
+              "name": "Kayseri Barbaros MTAL",
+              "established_year": 1998
             }
           ]
         }
@@ -737,29 +742,29 @@
         "Example": {
           "Result": [
             {
-              "courses_name": "Bilgisayar Bilimi",
-              "avg_grade": 71.875,
-              "grade_count": 104
+              "courses_name": "Biyoloji",
+              "avg_grade": 72.94354838709677,
+              "grade_count": 124
             },
             {
-              "courses_name": "Müzik",
-              "avg_grade": 71.70689655172414,
-              "grade_count": 116
-            },
-            {
-              "courses_name": "Din Kültürü",
-              "avg_grade": 71.43511450381679,
-              "grade_count": 131
-            },
-            {
-              "courses_name": "Almanca",
-              "avg_grade": 70.81521739130434,
-              "grade_count": 92
-            },
-            {
-              "courses_name": "Tarih",
-              "avg_grade": 70.5625,
+              "courses_name": "Matematik",
+              "avg_grade": 72.1328125,
               "grade_count": 128
+            },
+            {
+              "courses_name": "Coğrafya",
+              "avg_grade": 70.76315789473684,
+              "grade_count": 76
+            },
+            {
+              "courses_name": "İngilizce",
+              "avg_grade": 70.61666666666666,
+              "grade_count": 180
+            },
+            {
+              "courses_name": "Fizik",
+              "avg_grade": 70.53554502369668,
+              "grade_count": 211
             }
           ]
         }
@@ -774,28 +779,28 @@
         "Example": {
           "Result": [
             {
-              "students_id": 437,
-              "students_first_name": "Derya",
+              "students_id": 94,
+              "students_first_name": "Onur",
               "gpa_band": "A"
             },
             {
-              "students_id": 473,
-              "students_first_name": "Gamze",
+              "students_id": 151,
+              "students_first_name": "Rabia",
               "gpa_band": "A"
             },
             {
-              "students_id": 39,
-              "students_first_name": "Ahsen",
+              "students_id": 526,
+              "students_first_name": "Ayşe",
               "gpa_band": "A"
             },
             {
-              "students_id": 115,
-              "students_first_name": "Elif",
+              "students_id": 179,
+              "students_first_name": "Melisa",
               "gpa_band": "A"
             },
             {
-              "students_id": 566,
-              "students_first_name": "Oğuz",
+              "students_id": 428,
+              "students_first_name": "Melisa",
               "gpa_band": "A"
             }
           ]
@@ -811,24 +816,24 @@
         "Example": {
           "Result": [
             {
-              "courses_name": "İngilizce",
-              "enroll_cnt": 257
-            },
-            {
               "courses_name": "Fizik",
-              "enroll_cnt": 221
+              "enroll_cnt": 250
             },
             {
               "courses_name": "Resim",
               "enroll_cnt": 218
             },
             {
-              "courses_name": "Kimya",
-              "enroll_cnt": 197
+              "courses_name": "İngilizce",
+              "enroll_cnt": 207
             },
             {
-              "courses_name": "Coğrafya",
-              "enroll_cnt": 187
+              "courses_name": "Müzik",
+              "enroll_cnt": 200
+            },
+            {
+              "courses_name": "Türk Dili ve Edebiyatı",
+              "enroll_cnt": 184
             }
           ]
         }
@@ -844,28 +849,28 @@
           "Result": [
             {
               "id": 1,
+              "first_name": "Melisa",
+              "last_name": "Bulut"
+            },
+            {
+              "id": 10,
               "first_name": "Hakan",
+              "last_name": "Taş"
+            },
+            {
+              "id": 11,
+              "first_name": "Merve",
               "last_name": "Avcı"
             },
             {
-              "id": 4,
+              "id": 16,
               "first_name": "Şevval",
               "last_name": "Avcı"
             },
             {
-              "id": 6,
-              "first_name": "Şevval",
-              "last_name": "Çelik"
-            },
-            {
-              "id": 13,
-              "first_name": "Hakan",
-              "last_name": "Kaya"
-            },
-            {
-              "id": 14,
+              "id": 19,
               "first_name": "Mehmet",
-              "last_name": "Işık"
+              "last_name": "Avcı"
             }
           ]
         }
@@ -882,27 +887,27 @@
             {
               "yr": 2025,
               "mo": 9,
-              "cnt": 341
+              "cnt": 454
             },
             {
               "yr": 2025,
               "mo": 8,
-              "cnt": 574
+              "cnt": 604
             },
             {
               "yr": 2025,
               "mo": 7,
-              "cnt": 607
+              "cnt": 639
             },
             {
               "yr": 2025,
               "mo": 6,
-              "cnt": 613
+              "cnt": 617
             },
             {
               "yr": 2025,
               "mo": 5,
-              "cnt": 265
+              "cnt": 86
             }
           ]
         }
@@ -917,29 +922,29 @@
         "Example": {
           "Result": [
             {
-              "first_name": "Ahsen",
-              "last_name": "Erdoğan",
-              "hire_date": "2025-07-06T00:00:00"
+              "first_name": "Ceren",
+              "last_name": "Aksoy",
+              "hire_date": "2025-09-12T00:00:00"
             },
             {
-              "first_name": "Hakan",
-              "last_name": "Kaya",
-              "hire_date": "2025-05-08T00:00:00"
+              "first_name": "Oğuz",
+              "last_name": "Özdemir",
+              "hire_date": "2025-07-07T00:00:00"
             },
             {
-              "first_name": "Seda",
-              "last_name": "Koç",
-              "hire_date": "2025-03-01T00:00:00"
+              "first_name": "Derya",
+              "last_name": "Turan",
+              "hire_date": "2025-04-28T00:00:00"
             },
             {
-              "first_name": "Ece",
-              "last_name": "Kaplan",
-              "hire_date": "2025-02-17T00:00:00"
+              "first_name": "Cem",
+              "last_name": "Şahin",
+              "hire_date": "2025-04-15T00:00:00"
             },
             {
-              "first_name": "Yusuf",
-              "last_name": "Yılmaz",
-              "hire_date": "2025-01-07T00:00:00"
+              "first_name": "Gamze",
+              "last_name": "Aksoy",
+              "hire_date": "2025-04-11T00:00:00"
             }
           ]
         }
@@ -954,23 +959,23 @@
         "Example": {
           "Result": [
             {
-              "id": 512,
+              "id": 235,
               "first_name": "Ahmet"
             },
             {
-              "id": 157,
+              "id": 269,
               "first_name": "Ahmet"
             },
             {
-              "id": 461,
+              "id": 337,
               "first_name": "Ahmet"
             },
             {
-              "id": 498,
+              "id": 111,
               "first_name": "Ahmet"
             },
             {
-              "id": 523,
+              "id": 253,
               "first_name": "Ahmet"
             }
           ]

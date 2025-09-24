@@ -72,6 +72,70 @@ namespace DynamicDbQueryApi.Repositories
             }
         }
 
+        // DB türüne göre foreign key sorgusu oluşturma
+        public string GetIncludeQueryWithKeys(string dbType, string fromTable, string fromColumn, string includeTable, string includeColumn)
+        {
+            var type = dbType.ToLower();
+            if (type == "postgresql" || type == "postgres")
+            {
+                return $@"
+                    SELECT kcu.column_name AS fk_column, ccu.column_name AS referenced_column
+                    FROM information_schema.table_constraints AS tc
+                    JOIN information_schema.key_column_usage AS kcu
+                        ON tc.constraint_name = kcu.constraint_name
+                    JOIN information_schema.constraint_column_usage AS ccu
+                        ON ccu.constraint_name = tc.constraint_name
+                    WHERE tc.constraint_type = 'FOREIGN KEY'
+                    AND tc.table_name = '{fromTable}'
+                    AND kcu.column_name = '{fromColumn}'
+                    AND ccu.table_name = '{includeTable}'
+                    AND ccu.column_name = '{includeColumn}'";
+            }
+            else if (type == "mssql" || type == "sqlserver")
+            {
+                return $@"
+                    SELECT cp.name AS fk_column, cr.name AS referenced_column
+                    FROM sys.foreign_keys AS fk
+                    INNER JOIN sys.foreign_key_columns AS fkc ON fk.object_id = fkc.constraint_object_id
+                    INNER JOIN sys.tables AS tp ON fkc.parent_object_id = tp.object_id
+                    INNER JOIN sys.columns AS cp ON fkc.parent_object_id = cp.object_id AND fkc.parent_column_id = cp.column_id
+                    INNER JOIN sys.tables AS tr ON fkc.referenced_object_id = tr.object_id
+                    INNER JOIN sys.columns AS cr ON fkc.referenced_object_id = cr.object_id AND fkc.referenced_column_id = cr.column_id
+                    WHERE tp.name = '{fromTable}' 
+                    AND cp.name = '{fromColumn}'
+                    AND tr.name = '{includeTable}' 
+                    AND cr.name = '{includeColumn}'";
+            }
+            else if (type == "mysql")
+            {
+                return $@"
+                    SELECT k.COLUMN_NAME AS fk_column, k.REFERENCED_COLUMN_NAME AS referenced_column
+                    FROM information_schema.KEY_COLUMN_USAGE k
+                    WHERE k.TABLE_NAME = '{fromTable}'
+                    AND k.COLUMN_NAME = '{fromColumn}'
+                    AND k.REFERENCED_TABLE_NAME = '{includeTable}'
+                    AND k.REFERENCED_COLUMN_NAME = '{includeColumn}'";
+            }
+            else if (type == "oracle")
+            {
+                return $@"
+                    SELECT a.column_name AS fk_column, c_pk.column_name AS referenced_column
+                    FROM user_cons_columns a
+                    JOIN user_constraints c ON a.constraint_name = c.constraint_name
+                    JOIN user_cons_columns c_pk ON c.r_constraint_name = c_pk.constraint_name
+                    WHERE c.constraint_type = 'R'
+                    AND a.table_name = '{fromTable.ToUpper()}'
+                    AND a.column_name = '{fromColumn.ToUpper()}'
+                    AND c_pk.table_name = '{includeTable.ToUpper()}'
+                    AND c_pk.column_name = '{includeColumn.ToUpper()}'";
+            }
+            else
+            {
+                throw new NotSupportedException($"Database type is not supported for INCLUDE queries.");
+            }
+
+        }
+
         // DB türüne göre tablo isimlerini alma sorgusu oluşturma
         public string GetTablesQuery(string dbType)
         {

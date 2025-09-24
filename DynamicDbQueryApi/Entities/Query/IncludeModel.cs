@@ -9,10 +9,10 @@ namespace DynamicDbQueryApi.Entities.Query
     {
         // 
         public string Table { get; set; } = "";
-        public string TableKey { get; set; } = "";
+        public string? TableKey { get; set; } = null;
 
         public string IncludeTable { get; set; } = "";
-        public string IncludeKey { get; set; } = "";
+        public string? IncludeKey { get; set; } = null;
 
         public string JoinType { get; set; } = "LEFT";
     }

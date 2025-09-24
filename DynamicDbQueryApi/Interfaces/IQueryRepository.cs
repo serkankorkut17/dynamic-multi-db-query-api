@@ -10,7 +10,7 @@ namespace DynamicDbQueryApi.Interfaces
 {
     public interface IQueryRepository
     {
-        Task<ForeignKeyPair?> GetForeignKeyPairAsync(IDbConnection conn, string dbType, string fromTable, string includeTable);
+        Task<ForeignKeyPair?> GetForeignKeyPairAsync(IDbConnection conn, string dbType, string fromTable, string includeTable, string? fromColumn = null, string? includeColumn = null);
         Task<string?> GetColumnDataTypeAsync(IDbConnection connection, string dbType, string tableName, string columnName);
         Task<List<TableModel>> GetTablesAndColumnsAsync(IDbConnection connection, string dbType);
         Task<List<RelationshipModel>> GetRelationshipsAsync(IDbConnection connection, string dbType);

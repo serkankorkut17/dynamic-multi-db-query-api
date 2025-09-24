@@ -193,10 +193,18 @@ namespace DynamicDbQueryApi.Services
         private List<IncludeModel> ParseIncludes(string queryString, string table)
         {
             var includes = new List<IncludeModel>();
-            var m = Regex.Match(queryString, @"\bINCLUDE\s*\(\s*(.*?)\s*\)", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            if (!m.Success) return includes;
+            var start = Regex.Match(queryString, @"\bINCLUDE\s*\(", RegexOptions.IgnoreCase);
+            if (!start.Success) return includes;
 
-            var body = m.Groups[1].Value;
+            // Parantez başlangıç indeksini ve kapanış indeksini bul
+            int openIdx = start.Index + start.Length - 1;
+            int bodyStart = openIdx + 1;
+            int closeIdx = StringHelpers.FindClosingParenthesis(queryString, openIdx);
+            if (closeIdx == -1) return includes;
+
+            // INCLUDE(...) içindeki metni al
+            var body = queryString.Substring(bodyStart, closeIdx - bodyStart).Trim();
+            if (string.IsNullOrWhiteSpace(body)) return includes;
 
             var includeTables = StringHelpers.SplitByCommas(body);
 
@@ -216,14 +224,9 @@ namespace DynamicDbQueryApi.Services
                 // Eğer birden fazla tablo varsa hepsini ayır (orders.items.details)
                 var parts = includeTable.Split('.');
 
-                includes.Add(new IncludeModel
-                {
-                    Table = table,
-                    TableKey = "Key", // Varsayılan anahtar
-                    IncludeTable = parts[0],
-                    IncludeKey = "Key", // Varsayılan include table anahtarı
-                    JoinType = joinType
-                });
+                // ilk tabloyu ana tablo ile ilişkilendir
+                var firstInclude = GetIncludeModel(table, parts[0], joinType);
+                includes.Add(firstInclude);
 
                 // Ara tabloları ilişkilendir
                 if (parts.Length > 1)
@@ -233,19 +236,64 @@ namespace DynamicDbQueryApi.Services
                         var parentTable = parts[i - 1];
                         var childTable = parts[i];
 
-                        includes.Add(new IncludeModel
-                        {
-                            Table = parentTable,
-                            TableKey = "Key", // Varsayılan anahtar
-                            IncludeTable = childTable,
-                            IncludeKey = "Key", // Varsayılan include table anahtarı
-                            JoinType = joinType
-                        });
+                        var includeModel = GetIncludeModel(parentTable, childTable, joinType);
+                        includes.Add(includeModel);
                     }
                 }
             }
 
             return includes;
+        }
+
+        public IncludeModel GetIncludeModel(string fromTable, string include, string joinType = "LEFT")
+        {
+            // table (column1, column2) şeklinde include varsa tablo ismini ve kolonları ayır
+            if (include.Contains('(') && include.Contains(')'))
+            {
+                var tablePart = include;
+                var tableName = tablePart.Substring(0, tablePart.IndexOf('(')).Trim();
+                var columnsPart = tablePart.Substring(tablePart.IndexOf('(') + 1, tablePart.IndexOf(')') - tablePart.IndexOf('(') - 1);
+                var columns = StringHelpers.SplitByCommas(columnsPart);
+
+                // Eğer kolonlar 2 tane değilse hata fırlat
+                if (columns.Count != 2)
+                {
+                    throw new Exception("Include with columns must have exactly two columns: table(column1, column2)");
+                }
+
+                string col1 = columns[0].Trim();
+                string col2 = columns[1].Trim();
+                // kolonlar table.column şeklindeyse sadece column kısmını al
+                if (columns[0].Contains('.'))
+                {
+                    col1 = columns[0].Substring(columns[0].IndexOf('.') + 1).Trim();
+                }
+                if (columns[1].Contains('.'))
+                {
+                    col2 = columns[1].Substring(columns[1].IndexOf('.') + 1).Trim();
+                }
+
+                return new IncludeModel
+                {
+                    Table = fromTable,
+                    TableKey = col1,
+                    IncludeTable = tableName,
+                    IncludeKey = col2,
+                    JoinType = joinType
+                };
+            }
+            else
+            {
+                // Normal include ise tablo ismi olarak al
+                return new IncludeModel
+                {
+                    Table = fromTable,
+                    TableKey = null, // Varsayılan anahtar
+                    IncludeTable = include,
+                    IncludeKey = null, // Varsayılan include table anahtarı
+                    JoinType = joinType
+                };
+            }
         }
 
         // FILTER(...) kısmını parse etme
@@ -646,7 +694,7 @@ namespace DynamicDbQueryApi.Services
             }
 
             // Tarih fonksiyonlarını yakala (NOW, CURRENT_DATE, CURRENT_TIME, CURRENT_TIMESTAMP, DATEADD, DATEDIFF, DATENAME, DATEPART, DAY, MONTH, YEAR)
-            var dateFuncs = new[] { "NOW", "GETDATE", "CURRENT_TIMESTAMP", "CURRENT_DATE", "TODAY", "CURRENT_TIME", "TIME","DATEADD", "DATEDIFF", "DATENAME", "TO_CHAR", "DAY", "MONTH", "YEAR" };
+            var dateFuncs = new[] { "NOW", "GETDATE", "CURRENT_TIMESTAMP", "CURRENT_DATE", "TODAY", "CURRENT_TIME", "TIME", "DATEADD", "DATEDIFF", "DATENAME", "TO_CHAR", "DAY", "MONTH", "YEAR" };
             if (dateFuncs.Contains(functionString))
             {
                 if (functionString == "NOW" || functionString == "GETDATE" || functionString == "CURRENT_TIMESTAMP" || functionString == "CURRENT_DATE" || functionString == "TODAY" || functionString == "CURRENT_TIME" || functionString == "TIME")
@@ -940,7 +988,7 @@ namespace DynamicDbQueryApi.Services
             {
                 rhs = rhs.Substring(1, rhs.Length - 2).Trim();
             }
-            
+
 
             // Operator mapping kısmı
             ComparisonOperator comp;

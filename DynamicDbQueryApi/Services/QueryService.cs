@@ -115,6 +115,12 @@ namespace DynamicDbQueryApi.Services
 
             foreach (var include in model.Includes)
             {
+                // Eğer queryde tablo anahtarları belirtilmişse atla
+                if (include.TableKey != null && include.IncludeKey != null)
+                {
+                    continue;
+                }
+                
                 var updatedInclude = await UpdateIncludeModel(connection, dbType, include);
                 // _logger.LogInformation("Updated Include: {Include}", JsonSerializer.Serialize(updatedInclude));
 

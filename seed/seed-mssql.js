@@ -104,7 +104,7 @@ async function dropSchema(pool) {
 	await pool
 		.request()
 		.batch(
-			`IF OBJECT_ID('dbo.grades','U') IS NOT NULL DROP TABLE dbo.grades; IF OBJECT_ID('dbo.enrollments','U') IS NOT NULL DROP TABLE dbo.enrollments; IF OBJECT_ID('dbo.students','U') IS NOT NULL DROP TABLE dbo.students; IF OBJECT_ID('dbo.classes','U') IS NOT NULL DROP TABLE dbo.classes; IF OBJECT_ID('dbo.teachers','U') IS NOT NULL DROP TABLE dbo.teachers; IF OBJECT_ID('dbo.courses','U') IS NOT NULL DROP TABLE dbo.courses; IF OBJECT_ID('dbo.schools','U') IS NOT NULL DROP TABLE dbo.schools;`
+			`IF OBJECT_ID('dbo.course_prerequisites','U') IS NOT NULL DROP TABLE dbo.course_prerequisites; IF OBJECT_ID('dbo.grades','U') IS NOT NULL DROP TABLE dbo.grades; IF OBJECT_ID('dbo.enrollments','U') IS NOT NULL DROP TABLE dbo.enrollments; IF OBJECT_ID('dbo.students','U') IS NOT NULL DROP TABLE dbo.students; IF OBJECT_ID('dbo.classes','U') IS NOT NULL DROP TABLE dbo.classes; IF OBJECT_ID('dbo.teachers','U') IS NOT NULL DROP TABLE dbo.teachers; IF OBJECT_ID('dbo.courses','U') IS NOT NULL DROP TABLE dbo.courses; IF OBJECT_ID('dbo.schools','U') IS NOT NULL DROP TABLE dbo.schools;`
 		);
 }
 async function createSchema(pool) {
@@ -156,6 +156,13 @@ async function createSchema(pool) {
 				name NVARCHAR(200) NOT NULL,
 				credit_hours SMALLINT NULL,
 				is_elective BIT NULL
+			);
+			IF OBJECT_ID('dbo.course_prerequisites','U') IS NULL CREATE TABLE dbo.course_prerequisites(
+				id INT IDENTITY(1,1) PRIMARY KEY,
+				course_id INT NOT NULL FOREIGN KEY REFERENCES dbo.courses(id) ON DELETE CASCADE,
+				prerequisite_course_id INT NOT NULL FOREIGN KEY REFERENCES dbo.courses(id) ON DELETE CASCADE,
+				CONSTRAINT UQ_course_prereq UNIQUE(course_id, prerequisite_course_id),
+				CONSTRAINT CK_course_prereq_not_self CHECK (course_id <> prerequisite_course_id)
 			);
 			IF OBJECT_ID('dbo.enrollments','U') IS NULL CREATE TABLE dbo.enrollments(
 				id INT IDENTITY(1,1) PRIMARY KEY,
@@ -221,6 +228,17 @@ async function seedData(pool) {
 				courseIds.push(res.recordset[0].id);
 			}
 			allCourseIds.push(...courseIds);
+			// Seed prerequisites for this school's courses
+			for (let i=0; i<courseIds.length; i++){
+				const courseId = courseIds[i];
+				const potential = courseIds.slice(0, i);
+				if (!potential.length) continue;
+				const selected = pickRandom(potential, Math.min(2, potential.length));
+				for (const prereqId of selected){
+					await tr.request()
+						.query`IF NOT EXISTS (SELECT 1 FROM dbo.course_prerequisites WHERE course_id=${courseId} AND prerequisite_course_id=${prereqId}) INSERT INTO dbo.course_prerequisites(course_id, prerequisite_course_id) VALUES (${courseId}, ${prereqId})`;
+				}
+			}
 			for (const classId of classIds) {
 				for (let st = 0; st < COUNTS.STUDENTS_PER_CLASS; st++) {
 					const first = randChoice(TR_FIRST_NAMES);

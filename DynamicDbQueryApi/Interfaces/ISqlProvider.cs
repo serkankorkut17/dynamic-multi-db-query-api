@@ -10,6 +10,7 @@ namespace DynamicDbQueryApi.Interfaces
     public interface ISqlProvider
     {
         string GetIncludeQuery(string dbType, string fromTable, string includeTable);
+        string GetIncludeQueryWithKeys(string dbType, string fromTable, string fromColumn, string includeTable, string includeColumn);
         string GetTablesQuery(string dbType);
         string GetColumnsQuery(string dbType, string tableName);
         string GetRelationshipsQuery(string dbType);

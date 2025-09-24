@@ -104,7 +104,7 @@ function randBool(p=0.5){ return Math.random() < p; }
 function randArrayChoices(src, maxCount=3){ const n=Math.max(1, Math.min(maxCount, Math.floor(Math.random()*maxCount)+1)); const copy=[...src]; const out=[]; for(let i=0;i<n && copy.length;i++){ const idx=Math.floor(Math.random()*copy.length); out.push(copy.splice(idx,1)[0]); } return out; }
 async function dropSchema(conn) {
 	await conn.query(
-		`SET FOREIGN_KEY_CHECKS=0; DROP TABLE IF EXISTS grades; DROP TABLE IF EXISTS enrollments; DROP TABLE IF EXISTS students; DROP TABLE IF EXISTS classes; DROP TABLE IF EXISTS teachers; DROP TABLE IF EXISTS courses; DROP TABLE IF EXISTS schools; SET FOREIGN_KEY_CHECKS=1;`
+		`SET FOREIGN_KEY_CHECKS=0; DROP TABLE IF EXISTS course_prerequisites; DROP TABLE IF EXISTS grades; DROP TABLE IF EXISTS enrollments; DROP TABLE IF EXISTS students; DROP TABLE IF EXISTS classes; DROP TABLE IF EXISTS teachers; DROP TABLE IF EXISTS courses; DROP TABLE IF EXISTS schools; SET FOREIGN_KEY_CHECKS=1;`
 	);
 }
 async function createSchema(conn) {
@@ -158,6 +158,15 @@ async function createSchema(conn) {
 			credit_hours SMALLINT NULL,
 			is_elective TINYINT(1) NULL,
 			FOREIGN KEY (school_id) REFERENCES schools(id) ON DELETE CASCADE
+		) ENGINE=InnoDB;
+		CREATE TABLE IF NOT EXISTS course_prerequisites(
+			id INT AUTO_INCREMENT PRIMARY KEY,
+			course_id INT NOT NULL,
+			prerequisite_course_id INT NOT NULL,
+			UNIQUE KEY uq_course_prereq (course_id, prerequisite_course_id),
+			CONSTRAINT chk_course_prereq_not_self CHECK (course_id <> prerequisite_course_id),
+			FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE,
+			FOREIGN KEY (prerequisite_course_id) REFERENCES courses(id) ON DELETE CASCADE
 		) ENGINE=InnoDB;
 		CREATE TABLE IF NOT EXISTS enrollments(
 			id INT AUTO_INCREMENT PRIMARY KEY,
@@ -233,6 +242,19 @@ async function seedData(conn) {
 					courseIds.push(res.insertId);
 				}
 			allCourseIds.push(...courseIds);
+				// Seed prerequisites for this school's courses
+				for (let i=0; i<courseIds.length; i++){
+					const courseId = courseIds[i];
+					const potential = courseIds.slice(0, i);
+					if (!potential.length) continue;
+					const selected = pickRandom(potential, Math.min(2, potential.length));
+					for (const prereqId of selected){
+						await conn.execute(
+							"INSERT IGNORE INTO course_prerequisites(course_id, prerequisite_course_id) VALUES (?,?)",
+							[courseId, prereqId]
+						);
+					}
+				}
 			for (const classId of classIds) {
 				for (let st = 0; st < COUNTS.STUDENTS_PER_CLASS; st++) {
 					const first = randChoice(TR_FIRST_NAMES);

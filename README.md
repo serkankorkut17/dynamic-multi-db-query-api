@@ -99,6 +99,7 @@ Response body (InspectResponseDTO):
 | JOIN          | [joinType] JOIN table2 ... | INCLUDE (table2) (left join)     |
 | INNER JOIN    | INNER JOIN table2 ...      | INCLUDE (table2 INNER)           |
 | JOIN CHAINING | ... JOIN table3 ...        | INCLUDE (table2.table3)          |
+| JOIN with keys| ... JOIN table3 ...        | INCLUDE (table2(table1.col, table2.col))   |
 | SELECT (JOIN) | SELECT table2.id           | FETCH (name, surname, table2.id) |
 | WHERE         | WHERE age >= 18            | FILTER (age >= 18)               |
 | GROUP BY      | GROUP BY name              | GROUPBY (name)                   |
@@ -147,6 +148,8 @@ LIMIT  10;
 - For INNER JOIN use `INCLUDE(table2 INNER)`.
 - For RIGHT JOIN use `INCLUDE(table2 RIGHT)`.
 - For FULL JOIN use `INCLUDE(table2 FULL)`.
+- For JOIN chaining use dot notation: `INCLUDE(table2.table3)`.
+- For JOIN with custom keys use: `INCLUDE(table2(table1.col, table2.col))`.
 
 ## Arithmetic Operators
 

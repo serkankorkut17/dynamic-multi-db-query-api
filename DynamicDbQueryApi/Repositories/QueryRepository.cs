@@ -78,11 +78,21 @@ namespace DynamicDbQueryApi.Repositories
         }
 
         // Belirtilen tablolara ait foreign key çiftini döner
-        public async Task<ForeignKeyPair?> GetForeignKeyPairAsync(IDbConnection connection, string dbType, string fromTable, string includeTable)
+        public async Task<ForeignKeyPair?> GetForeignKeyPairAsync(IDbConnection connection, string dbType, string fromTable, string includeTable, string? fromColumn = null, string? includeColumn = null)
         {
-            var includeSql = _sqlProvider.GetIncludeQuery(dbType, fromTable, includeTable);
+            string includeSql;
+            if (!string.IsNullOrEmpty(fromColumn) && !string.IsNullOrEmpty(includeColumn))
+            {
+                includeSql = _sqlProvider.GetIncludeQueryWithKeys(dbType, fromTable, fromColumn, includeTable, includeColumn);
+            }
+            else
+            {
+                includeSql = _sqlProvider.GetIncludeQuery(dbType, fromTable, includeTable);
+            }
 
             var includeResult = await connection.QueryFirstOrDefaultAsync(includeSql);
+            Console.WriteLine($"Include Result: {JsonSerializer.Serialize(includeResult as object)}");
+            
             _logger.LogInformation("Include Query Result: {Result}", JsonSerializer.Serialize(includeResult as object));
 
             if (includeResult != null)
