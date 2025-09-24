@@ -365,7 +365,29 @@ GROUP BY slug
 ORDER BY total DESC
 ```
 
-#### 2. JOIN with FILTER
+#### 2. Filter with AND/OR
+
+My Query:
+
+```sql
+FETCH(id, first_name, last_name, gpa) 
+FROM students 
+FILTER(is_active = TRUE AND gpa >= 3.5) 
+ORDERBY(gpa DESC) 
+LIMIT(15)
+```
+
+PostgreSQL:
+
+```sql
+SELECT id, first_name, last_name, gpa 
+FROM students 
+WHERE is_active = TRUE AND gpa >= 3.5 
+ORDER BY gpa DESC 
+LIMIT 15
+```
+
+#### 3. JOIN with Having Filter
 
 My Query:
 
@@ -388,7 +410,7 @@ HAVING COUNT(e.id) > 5
 ORDER BY enroll_cnt DESC
 ```
 
-##### 3. Conditional Logic
+#### 4. Conditional Logic
 
 My Query:
 
@@ -412,7 +434,7 @@ ORDER BY gpa_band, st.last_name
 LIMIT 30
 ```
 
-#### 4. Date Functions
+#### 5. Date Functions
 
 My Query:
 
