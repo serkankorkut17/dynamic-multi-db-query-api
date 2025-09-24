@@ -17,7 +17,7 @@
 ## API Endpoints
 
 ### POST /api/query
-Purpose: Execute a DSL query (the custom “My Query Language”).
+Purpose: Execute a DSL query (the custom “My Query Language”).<br>
 Request body (QueryRequestDTO):
 ```json
 {
@@ -45,12 +45,12 @@ Response body (QueryResultDTO):
 ```
 
 ### POST /api/query/sql
-Purpose: Execute raw SQL as-is.
-Request body (QueryRequestDTO), same shape as above; Query contains SQL.
+Purpose: Execute raw SQL as-is.<br>
+Request body (QueryRequestDTO), same shape as above; Query contains SQL.<br>
 Response body (QueryResultDTO), same shape as above.
 
 ### POST /api/query/inspect
-Purpose: Inspect schema: tables, columns, and relationships in the input DB.
+Purpose: Inspect schema: tables, columns, and relationships in the input DB.<br>
 Request body (InspectRequestDTO):
 ```json
 {
