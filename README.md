@@ -87,6 +87,7 @@ LIMIT  10;
 
 - Usage: column OPERATOR 'value', column OPERATOR('...')
 > name CONTAINS('Serkan')
+<br>
 > LOWER(name) CONTAINS('serkan')
 
   
@@ -109,6 +110,7 @@ LIMIT  10;
 |OR															|   3 (Low)  			 			    |
 
 Example: FILTER(a = 1 OR b = 2 AND c = 3)
+<br>
 Internal: a = 1 OR (b = 2 AND c = 3)
 
 
@@ -236,23 +238,30 @@ FETCH(
 
 - DATEADD: unit can be SECOND, MINUTE, HOUR, DAY, WEEK, MONTH, YEAR
 > DATEADD(HOUR,'2025-09-18T12:34:56',2) => 2025-09-18T14:34:56
+<br>
 > DATEADD(SECOND,'2025-01-12T00:00:00',5) => 2025-09-18T12:35:01
 
 - DATEDIFF: unit can be SECOND, MINUTE, HOUR, DAY, WEEK, MONTH, YEAR
 > DATEDIFF(DAY,'2025-09-03','2025-09-18') => 15
+<br>
 > DATEDIFF(YEAR,'2025-01-03','2026-01-02') => 0
 
 - DAY / MONTH / YEAR
 > YEAR('2025-09-18') => 2025
+<br>
 > MONTH('2025-09-18') => 12
+<br>
 > DAY('2025-09-18') => 18
 
 - DATENAME: unit can be MONTH or DAY
 > DATENAME(MONTH, '2025-09-18') => 'SEPTEMBER' or 'September'
+<br>
 > DATENAME(DAY, '2025-09-18') => 'THURSDAY' or 'Thursday'
 
 
-### 6. DSL → SQL Example
+### 6. DSL → SQL Examples
+
+#### 1. Simple Query
 My Query:
 ```sql
 FETCH(CONCAT(LOWER(person.Name), '-', YEAR(person.CreatedAt)) AS slug, COUNT(*) AS total)
@@ -266,4 +275,63 @@ SELECT CONCAT(LOWER(p.Name), '-', EXTRACT(YEAR FROM p.CreatedAt)) AS slug, COUNT
 FROM Person p
 GROUP BY slug
 ORDER BY total DESC
+```
+
+#### 2. JOIN with FILTER
+My Query:
+```sql
+FETCH(courses.name, COUNT(enrollments.id) AS enroll_cnt) 
+FROM courses 
+INCLUDE(enrollments) 
+GROUPBY(courses.name) 
+HAVING(enroll_cnt > 5) 
+ORDERBY(enroll_cnt DESC)
+```
+PostgreSQL:
+```sql
+SELECT c.name, COUNT(e.id) AS enroll_cnt 
+FROM courses c LEFT JOIN enrollments e ON e.course_id = c.id 
+GROUP BY c.name 
+HAVING COUNT(e.id) > 5 
+ORDER BY enroll_cnt DESC
+```
+
+##### 3. Conditional Logic
+My Query:
+```sql
+FETCH(students.id, students.first_name, IFS(students.gpa >= 3.5, 'A', students.gpa >= 3.0, 'B', students.gpa >= 2.5, 'C', 'D') AS gpa_band) 
+FROM students 
+ORDERBY(gpa_band ASC, students.last_name ASC) 
+LIMIT(30)
+```
+PostgreSQL:
+```sql
+SELECT st.id, st.first_name, 
+  CASE WHEN st.gpa >= 3.5 THEN 'A' 
+       WHEN st.gpa >= 3.0 THEN 'B'
+       WHEN st.gpa >= 2.5 THEN 'C' 
+       ELSE 'D' END AS gpa_band 
+FROM students st 
+ORDER BY gpa_band, st.last_name 
+LIMIT 30
+```
+
+#### 4. Date Functions
+My Query:
+```sql
+FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAY(enrolled_at) AS dy, COUNT(*) AS cnt) 
+FROM enrollments 
+FILTER(enrolled_at >= DATEADD(DAY, NOW(), -30)) GROUPBY(yr, mo, dy) 
+ORDERBY(yr DESC, mo DESC, dy DESC)
+```
+PostgreSQL:
+```sql
+SELECT EXTRACT(YEAR FROM enrolled_at) AS yr,
+       EXTRACT(MONTH FROM enrolled_at) AS mo,
+       EXTRACT(DAY FROM enrolled_at) AS dy,
+       COUNT(*) AS cnt 
+FROM enrollments 
+WHERE enrolled_at >= NOW() - INTERVAL '30 days' 
+GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), EXTRACT(DAY FROM enrolled_at) 
+ORDER BY yr DESC, mo DESC, dy DESC
 ```
