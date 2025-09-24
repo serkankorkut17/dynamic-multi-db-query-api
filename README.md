@@ -457,3 +457,23 @@ WHERE enrolled_at >= NOW() - INTERVAL '30 days'
 GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), EXTRACT(DAY FROM enrolled_at)
 ORDER BY yr DESC, mo DESC, dy DESC
 ```
+
+#### 6. Aggregate Functions with HAVING
+
+My Query:
+
+```sql
+FETCH(school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary) 
+FROM teachers GROUPBY(school_id) 
+HAVING(COUNT(*) > 2) 
+ORDERBY(avg_salary DESC)
+```
+
+PostgreSQL:
+```sql
+SELECT school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary 
+FROM teachers 
+GROUP BY school_id 
+HAVING COUNT(*) > 2 
+ORDER BY avg_salary DESC
+```
