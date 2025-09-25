@@ -24,7 +24,11 @@ namespace DynamicDbQueryApi.Entities.Query
         BeginsWith, // BEGINSWITH -> val%
         EndsWith,   // ENDSWITH -> %val
         IsNull,     // IS NULL
-        IsNotNull   // IS NOT NULL
+        IsNotNull,  // IS NOT NULL
+        In,         // IN (val1, val2, ...)
+        NotIn,      // NOT IN (val1, val2, ...)
+        Between,    // BETWEEN (val1 AND val2)
+        NotBetween, // NOT BETWEEN (val1 AND val2)
     }
 
     // Mantıksal operator

@@ -35,6 +35,14 @@
 			"oracle": "SELECT s.first_name, COUNT(*) cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC"
 		},
 		{
+			"id": 2.1,
+			"dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS ('m')) GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
+			"postgres": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+			"mysql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+			"mssql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+			"oracle": "SELECT s.first_name, COUNT(*) cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC"
+		},
+		{
 			"id": 3,
 			"dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses INNER) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
 			"postgres": "SELECT c.name, ROUND(AVG(e.progress_percent)::numeric,2) avg_progress, COUNT(*) enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
@@ -53,6 +61,14 @@
 		{
 			"id": 5,
 			"dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email != NULL) ORDERBY(id ASC) LIMIT(20)",
+			"postgres": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC LIMIT 20",
+			"mysql": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC LIMIT 20",
+			"mssql": "SELECT TOP 20 id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC",
+			"oracle": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 5.1,
+			"dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email IS NOT NULL) ORDERBY(id ASC) LIMIT(20)",
 			"postgres": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC LIMIT 20",
 			"mysql": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC LIMIT 20",
 			"mssql": "SELECT TOP 20 id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC",
@@ -101,6 +117,14 @@
 		{
 			"id": 11,
 			"dsl": "FETCH(CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total) FROM students FILTER(ISNULL(first_name, 'noname') CONTAINS LOWER('T')) GROUPBY(name) HAVING(total > 2) ORDERBY(total DESC)",
+			"postgres": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING COUNT(*) > 2 ORDER BY total DESC",
+			"mysql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING total > 2 ORDER BY total DESC",
+			"mssql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY CONCAT(LOWER(first_name), '-', UPPER(last_name)) HAVING COUNT(*) > 2 ORDER BY total DESC",
+			"oracle": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING total > 2 ORDER BY total DESC"
+		},
+		{
+			"id": 11.1,
+			"dsl": "FETCH(CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total) FROM students FILTER(ISNULL(first_name, 'noname') CONTAINS(LOWER('T'))) GROUPBY(name) HAVING(total > 2) ORDERBY(total DESC)",
 			"postgres": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING COUNT(*) > 2 ORDER BY total DESC",
 			"mysql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING total > 2 ORDER BY total DESC",
 			"mssql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY CONCAT(LOWER(first_name), '-', UPPER(last_name)) HAVING COUNT(*) > 2 ORDER BY total DESC",
@@ -233,6 +257,46 @@
 			"mysql": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name LIMIT 20",
 			"mssql": "SELECT TOP 20 id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name",
 			"oracle": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 27.1,
+			"dsl": "FETCH(id, first_name) FROM students FILTER(first_name STARTSWITH('A')) ORDERBY(first_name ASC) LIMIT(20)",
+			"postgres": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name LIMIT 20",
+			"mysql": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name LIMIT 20",
+			"mssql": "SELECT TOP 20 id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name",
+			"oracle": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 28,
+			"dsl": "FETCH(name, city) FROM schools FILTER(city IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya')) ORDERBY(city ASC, name ASC) LIMIT(20)",
+			"postgres": "SELECT name, city FROM schools WHERE city IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name LIMIT 20",
+			"mysql": "SELECT name, city FROM schools WHERE city IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name LIMIT 20",
+			"mssql": "SELECT TOP 20 name, city FROM schools WHERE city IN (N'İstanbul', N'Ankara', N'İzmir', N'Bursa', N'Eskişehir', N'Konya') ORDER BY city, name",
+			"oracle": "SELECT name, city FROM schools WHERE city IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 28.1,
+			"dsl": "FETCH(name, city) FROM schools FILTER(city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya')) ORDERBY(city ASC, name ASC) LIMIT(20)",
+			"postgres": "SELECT name, city FROM schools WHERE city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name LIMIT 20",
+			"mysql": "SELECT name, city FROM schools WHERE city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name LIMIT 20",
+			"mssql": "SELECT TOP 20 name, city FROM schools WHERE city NOT IN (N'İstanbul', N'Ankara', N'İzmir', N'Bursa', N'Eskişehir', N'Konya') ORDER BY city, name",
+			"oracle": "SELECT name, city FROM schools WHERE city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 29,
+			"dsl": "FETCH(enrollments.id, grades.grade) FROM enrollments INCLUDE(grades INNER) FILTER(grades.grade BETWEEN(50,70)) ORDERBY(grades.grade DESC) LIMIT(20)",
+			"postgres": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade BETWEEN 50 AND 70 ORDER BY g.grade DESC LIMIT 20",
+			"mysql": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade BETWEEN 50 AND 70 ORDER BY g.grade DESC LIMIT 20",
+			"mssql": "SELECT TOP 20 e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade BETWEEN 50 AND 70 ORDER BY g.grade DESC",
+			"oracle": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade BETWEEN 50 AND 70 ORDER BY g.grade DESC FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 29.1,
+			"dsl": "FETCH(enrollments.id, grades.grade) FROM enrollments INCLUDE(grades INNER) FILTER(grades.grade NOT BETWEEN(50,70)) ORDERBY(grades.grade DESC) LIMIT(20)",
+			"postgres": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade NOT BETWEEN 50 AND 70 ORDER BY g.grade DESC LIMIT 20",
+			"mysql": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade NOT BETWEEN 50 AND 70 ORDER BY g.grade DESC LIMIT 20",
+			"mssql": "SELECT TOP 20 e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade NOT BETWEEN 50 AND 70 ORDER BY g.grade DESC",
+			"oracle": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade NOT BETWEEN 50 AND 70 ORDER BY g.grade DESC FETCH FIRST 20 ROWS ONLY"
 		}
 	]
 }

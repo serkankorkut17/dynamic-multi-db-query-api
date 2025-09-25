@@ -211,12 +211,12 @@ namespace DynamicDbQueryApi.Services
             foreach (var include in includeTables)
             {
                 // Join type için boşlukla ayır
-                var partsWithJoin = include.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                var partsWithJoin = StringHelpers.SplitByWhitespaces(include);
                 var includeTable = partsWithJoin[0];
                 var joinType = "LEFT";
 
                 // Eğer bir join tipi belirtilmişse al
-                if (partsWithJoin.Length > 1)
+                if (partsWithJoin.Count > 1)
                 {
                     joinType = partsWithJoin[1].ToUpperInvariant();
                 }
@@ -382,14 +382,14 @@ namespace DynamicDbQueryApi.Services
             {
                 if (!string.IsNullOrWhiteSpace(column))
                 {
-                    var parts = column.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length > 0)
+                    var parts = StringHelpers.SplitByWhitespaces(column);
+                    if (parts.Count > 0)
                     {
                         var columnWithPrefix = AddTablePrefixToColumn(parts[0], tableName, aliasColumnDict);
                         var orderByModel = new OrderByModel
                         {
                             Column = columnWithPrefix,
-                            Desc = parts.Length > 1 && parts[1].Equals("DESC", StringComparison.OrdinalIgnoreCase)
+                            Desc = parts.Count > 1 && parts[1].Equals("DESC", StringComparison.OrdinalIgnoreCase)
                         };
                         orderByColumns.Add(orderByModel);
                     }
@@ -969,26 +969,45 @@ namespace DynamicDbQueryApi.Services
 
             var s = expr.Trim();
 
-            // Genel operatorler (>=, <=, !=, <>, ==, =, >, <, CONTAINS, STARTSWITH, BEGINSWITH, ENDSWITH, LIKE)
-            var m = Regex.Match(s,
-                @"^\s*(?<col>[\w\.\-\(\)\*\s,']+?)\s*(?<op>>=|<=|!=|<>|==|=|>|<|LIKE|CONTAINS|STARTSWITH|BEGINSWITH|ENDSWITH)\s*(?<rhs>.+?)\s*$",
-                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            var exprParts = StringHelpers.SplitByWhitespaces(s);
+            string col = exprParts[0];
+
+            s = exprParts.Count > 1 ? string.Join(' ', exprParts.Skip(1)) : "";
+
+            var pattern = @"^\s*
+                    (?<op>
+                        >=|<=|!=|<>|==|=|>|<
+                        |IS\s+NOT|IS
+                        |NOT\s+IN|IN
+                        |NOT\s+BETWEEN|BETWEEN
+                        |LIKE|CONTAINS|STARTSWITH|BEGINSWITH|ENDSWITH
+                    )
+                    \s*
+                    (?:\(\s*(?<rhs>.*?)\s*\)|(?<rhs>.+?))?
+                    \s*$";
+
+            var m = Regex.Match(s, pattern, RegexOptions.IgnoreCase | RegexOptions.Singleline | RegexOptions.IgnorePatternWhitespace);
 
             if (!m.Success)
-            {
                 throw new Exception($"Could not parse condition filter expression: {expr}");
-            }
 
-            var col = m.Groups["col"].Value;
-            var op = m.Groups["op"].Value.ToUpperInvariant();
-            var rhs = m.Groups["rhs"].Value.Trim();
+            string op = m.Groups["op"].Value.ToUpperInvariant();
+            string rhs = m.Groups["rhs"].Value.Trim();
+
+            // Genel operatorler (>=, <=, !=, <>, ==, =, >, <, CONTAINS, STARTSWITH, BEGINSWITH, ENDSWITH, LIKE)
+            // var m = Regex.Match(s,
+            //     @"^\s*(?<col>[\w\.\-\(\)\*\s,']+?)\s*(?<op1>>=|<=|!=|<>|==|=|>|<|LIKE|CONTAINS|STARTSWITH|BEGINSWITH|ENDSWITH|IN|BETWEEN)\s*(?<rhs>.+?)\s*$",
+            //     RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            // var m = Regex.Match(s,
+            //     @"^\s*(?<col>[\w\.\-\(\)\*']+)\s*(?<op1>>=|<=|!=|<>|==|=|>|<|\bBETWEEN\b|\bSTARTSWITH\b|\bBEGINSWITH\b|\bENDSWITH\b|\bCONTAINS\b|\bLIKE\b|\bIS\b|\bIN\b)\s*(?<rhs>.+?)\s*$",
+            //     RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             // Eğer rhs parantez ile başlıyor ve bitiyorsa parantezleri kaldır
             if (rhs.StartsWith("(") && rhs.EndsWith(")"))
             {
                 rhs = rhs.Substring(1, rhs.Length - 2).Trim();
             }
-
 
             // Operator mapping kısmı
             ComparisonOperator comp;
@@ -1007,6 +1026,12 @@ namespace DynamicDbQueryApi.Services
                 case "BEGINSWITH": comp = ComparisonOperator.BeginsWith; break;
                 case "ENDSWITH": comp = ComparisonOperator.EndsWith; break;
                 case "LIKE": comp = ComparisonOperator.Like; break;
+                case "IS": comp = ComparisonOperator.IsNull; break;
+                case "IS NOT": comp = ComparisonOperator.IsNotNull; break;
+                case "IN": comp = ComparisonOperator.In; break;
+                case "NOT IN": comp = ComparisonOperator.NotIn; break;
+                case "BETWEEN": comp = ComparisonOperator.Between; break;
+                case "NOT BETWEEN": comp = ComparisonOperator.NotBetween; break;
                 default: return null;
             }
 
@@ -1021,7 +1046,32 @@ namespace DynamicDbQueryApi.Services
             }
 
             col = AddTablePrefixToColumn(col, tableName, aliasColumnDict);
-            rhs = AddTablePrefixToColumn(rhs, tableName, aliasColumnDict);
+            // RHS eğer liste ise her bir elemanına tablo ismi ekle
+            if (comp == ComparisonOperator.In || comp == ComparisonOperator.NotIn)
+            {
+                var items = StringHelpers.SplitByCommas(rhs);
+                for (int i = 0; i < items.Count; i++)
+                {
+                    items[i] = AddTablePrefixToColumn(items[i], tableName, aliasColumnDict);
+                }
+                rhs = string.Join(", ", items);
+            }
+            // RHS eğer BETWEEN ise iki tarafına tablo ismi ekle
+            else if (comp == ComparisonOperator.Between || comp == ComparisonOperator.NotBetween)
+            {
+                var parts = StringHelpers.SplitByCommas(rhs);
+                if (parts.Count != 2)
+                {
+                    throw new Exception("BETWEEN operator requires two values separated by a comma.");
+                }
+                var left = AddTablePrefixToColumn(parts[0], tableName, aliasColumnDict);
+                var right = AddTablePrefixToColumn(parts[1], tableName, aliasColumnDict);
+                rhs = $"{left}, {right}";
+            }
+            else
+            {
+                rhs = AddTablePrefixToColumn(rhs, tableName, aliasColumnDict);
+            }
 
             return new ConditionFilterModel
             {

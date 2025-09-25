@@ -55,6 +55,38 @@
         }
       },
       {
+        "id": 2.1,
+        "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS ('m')) GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
+        "sql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+        "convertedSql": "SELECT students.first_name AS first_name, COUNT(*) AS count FROM students WHERE LOWER(students.first_name) LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 20 ORDER BY COUNT(*) DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "first_name": "Sinem",
+              "count": 28
+            },
+            {
+              "first_name": "Umut",
+              "count": 26
+            },
+            {
+              "first_name": "Kerem",
+              "count": 24
+            },
+            {
+              "first_name": "Cem",
+              "count": 23
+            },
+            {
+              "first_name": "Melisa",
+              "count": 22
+            }
+          ]
+        }
+      },
+      {
         "id": 3,
         "dsl": "FETCH(courses.name, ROUND(AVG(enrollments.progress_percent), 2) AS avg_progress, COUNT(*) AS enrolls) FROM enrollments INCLUDE (courses INNER) GROUPBY(courses.name) HAVING(COUNT(*) > 30) ORDERBY(avg_progress DESC)",
         "sql": "SELECT c.name, ROUND(AVG(e.progress_percent)::numeric,2) avg_progress, COUNT(*) enrolls FROM enrollments e JOIN courses c ON c.id = e.course_id GROUP BY c.name HAVING COUNT(*) > 30 ORDER BY avg_progress DESC",
@@ -136,6 +168,43 @@
       {
         "id": 5,
         "dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email != NULL) ORDERBY(id ASC) LIMIT(20)",
+        "sql": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC LIMIT 20",
+        "convertedSql": "SELECT students.id AS id, students.first_name AS first_name, students.last_name AS last_name FROM students WHERE students.email IS NOT NULL ORDER BY students.id ASC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "id": 1,
+              "first_name": "Melisa",
+              "last_name": "Bulut"
+            },
+            {
+              "id": 2,
+              "first_name": "Zeynep",
+              "last_name": "Yıldız"
+            },
+            {
+              "id": 3,
+              "first_name": "Kerem",
+              "last_name": "Öztürk"
+            },
+            {
+              "id": 4,
+              "first_name": "Ceren",
+              "last_name": "Özdemir"
+            },
+            {
+              "id": 5,
+              "first_name": "Ece",
+              "last_name": "Çetin"
+            }
+          ]
+        }
+      },
+      {
+        "id": 5.1,
+        "dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email IS NOT NULL) ORDERBY(id ASC) LIMIT(20)",
         "sql": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC LIMIT 20",
         "convertedSql": "SELECT students.id AS id, students.first_name AS first_name, students.last_name AS last_name FROM students WHERE students.email IS NOT NULL ORDER BY students.id ASC LIMIT 20 OFFSET 0",
         "same": true,
@@ -400,6 +469,30 @@
         }
       },
       {
+        "id": 11.1,
+        "dsl": "FETCH(CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total) FROM students FILTER(ISNULL(first_name, 'noname') CONTAINS(LOWER('T'))) GROUPBY(name) HAVING(total > 2) ORDERBY(total DESC)",
+        "sql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING COUNT(*) > 2 ORDER BY total DESC",
+        "convertedSql": "SELECT CONCAT(LOWER(students.first_name), '-', UPPER(students.last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(students.first_name, 'noname') LIKE CONCAT('%', LOWER('T'), '%') GROUP BY CONCAT(LOWER(students.first_name), '-', UPPER(students.last_name)) HAVING COUNT(*) > 2 ORDER BY COUNT(*) DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "name": "fatma-AKSOY",
+              "total": 4
+            },
+            {
+              "name": "umut-KAPLAN",
+              "total": 4
+            },
+            {
+              "name": "umut-ÖZTÜRK",
+              "total": 3
+            }
+          ]
+        }
+      },
+      {
         "id": 12,
         "dsl": "FETCH(DATEDIFF('year', birth_date, CURRENT_DATE()) AS age, COUNT(*) AS cnt) FROM students GROUPBY(age) ORDERBY(cnt DESC) LIMIT(10)",
         "sql": "SELECT DATE_PART('year', AGE(CURRENT_DATE, birth_date)) AS age, COUNT(*) AS cnt FROM students GROUP BY DATE_PART('year', AGE(CURRENT_DATE, birth_date)) ORDER BY cnt DESC LIMIT 10",
@@ -413,20 +506,20 @@
               "cnt": 62
             },
             {
-              "age": 3,
-              "cnt": 57
-            },
-            {
               "age": 1,
-              "cnt": 57
+              "cnt": 58
             },
             {
               "age": 2,
               "cnt": 57
             },
             {
-              "age": 0,
+              "age": 3,
               "cnt": 57
+            },
+            {
+              "age": 0,
+              "cnt": 56
             }
           ]
         }
@@ -980,6 +1073,146 @@
             }
           ]
         }
+      },
+      {
+        "id": 27.1,
+        "dsl": "FETCH(id, first_name) FROM students FILTER(first_name STARTSWITH('A')) ORDERBY(first_name ASC) LIMIT(20)",
+        "sql": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name LIMIT 20",
+        "convertedSql": "SELECT students.id AS id, students.first_name AS first_name FROM students WHERE students.first_name LIKE 'A%' ORDER BY students.first_name ASC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "id": 235,
+              "first_name": "Ahmet"
+            },
+            {
+              "id": 269,
+              "first_name": "Ahmet"
+            },
+            {
+              "id": 337,
+              "first_name": "Ahmet"
+            },
+            {
+              "id": 111,
+              "first_name": "Ahmet"
+            },
+            {
+              "id": 253,
+              "first_name": "Ahmet"
+            }
+          ]
+        }
+      },
+      {
+        "id": 28,
+        "dsl": "FETCH(name, city) FROM schools FILTER(city IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya')) ORDERBY(city ASC, name ASC) LIMIT(20)",
+        "sql": "SELECT name, city FROM schools WHERE city IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name LIMIT 20",
+        "convertedSql": "SELECT schools.name AS name, schools.city AS city FROM schools WHERE schools.city IN ('İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY schools.city ASC, schools.name ASC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "name": "Ankara Hacı Bektaş Veli Anadolu Lisesi",
+              "city": "Ankara"
+            },
+            {
+              "name": "Eskişehir Fatih Fen Lisesi",
+              "city": "Eskişehir"
+            }
+          ]
+        }
+      },
+      {
+        "id": 28.1,
+        "dsl": "FETCH(name, city) FROM schools FILTER(city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya')) ORDERBY(city ASC, name ASC) LIMIT(20)",
+        "sql": "SELECT name, city FROM schools WHERE city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name LIMIT 20",
+        "convertedSql": "SELECT schools.name AS name, schools.city AS city FROM schools WHERE schools.city NOT IN ('İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY schools.city ASC, schools.name ASC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "name": "Kayseri Barbaros MTAL",
+              "city": "Kayseri"
+            },
+            {
+              "name": "Sakarya Gazi İlkokulu",
+              "city": "Sakarya"
+            },
+            {
+              "name": "Van Gazi İlkokulu",
+              "city": "Van"
+            }
+          ]
+        }
+      },
+      {
+        "id": 29,
+        "dsl": "FETCH(enrollments.id, grades.grade) FROM enrollments INCLUDE(grades INNER) FILTER(grades.grade BETWEEN(50,70)) ORDERBY(grades.grade DESC) LIMIT(20)",
+        "sql": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade BETWEEN 50 AND 70 ORDER BY g.grade DESC LIMIT 20",
+        "convertedSql": "SELECT enrollments.id AS enrollments_id, grades.grade AS grades_grade FROM enrollments INNER JOIN grades ON enrollments.id = grades.enrollment_id WHERE grades.grade BETWEEN 50 AND 70 ORDER BY grades.grade DESC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "enrollments_id": 781,
+              "grades_grade": 70
+            },
+            {
+              "enrollments_id": 1040,
+              "grades_grade": 70
+            },
+            {
+              "enrollments_id": 714,
+              "grades_grade": 70
+            },
+            {
+              "enrollments_id": 774,
+              "grades_grade": 70
+            },
+            {
+              "enrollments_id": 464,
+              "grades_grade": 70
+            }
+          ]
+        }
+      },
+      {
+        "id": 29.1,
+        "dsl": "FETCH(enrollments.id, grades.grade) FROM enrollments INCLUDE(grades INNER) FILTER(grades.grade NOT BETWEEN(50,70)) ORDERBY(grades.grade DESC) LIMIT(20)",
+        "sql": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade NOT BETWEEN 50 AND 70 ORDER BY g.grade DESC LIMIT 20",
+        "convertedSql": "SELECT enrollments.id AS enrollments_id, grades.grade AS grades_grade FROM enrollments INNER JOIN grades ON enrollments.id = grades.enrollment_id WHERE grades.grade NOT BETWEEN 50 AND 70 ORDER BY grades.grade DESC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "enrollments_id": 965,
+              "grades_grade": 100
+            },
+            {
+              "enrollments_id": 1315,
+              "grades_grade": 100
+            },
+            {
+              "enrollments_id": 491,
+              "grades_grade": 100
+            },
+            {
+              "enrollments_id": 682,
+              "grades_grade": 100
+            },
+            {
+              "enrollments_id": 1009,
+              "grades_grade": 100
+            }
+          ]
+        }
       }
     ]
   },
@@ -1005,6 +1238,38 @@
       {
         "id": 2,
         "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
+        "sql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+        "convertedSql": "SELECT students.first_name AS first_name, COUNT(*) AS count FROM students WHERE LOWER(students.first_name) LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 20 ORDER BY COUNT(*) DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "first_name": "Fatma",
+              "count": 25
+            },
+            {
+              "first_name": "Mehmet",
+              "count": 24
+            },
+            {
+              "first_name": "Merve",
+              "count": 23
+            },
+            {
+              "first_name": "Gamze",
+              "count": 22
+            },
+            {
+              "first_name": "Ahmet",
+              "count": 21
+            }
+          ]
+        }
+      },
+      {
+        "id": 2.1,
+        "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS ('m')) GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
         "sql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
         "convertedSql": "SELECT students.first_name AS first_name, COUNT(*) AS count FROM students WHERE LOWER(students.first_name) LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 20 ORDER BY COUNT(*) DESC",
         "same": true,
@@ -1116,6 +1381,43 @@
       {
         "id": 5,
         "dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email != NULL) ORDERBY(id ASC) LIMIT(20)",
+        "sql": "SELECT TOP 20 id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC",
+        "convertedSql": "SELECT students.id AS id, students.first_name AS first_name, students.last_name AS last_name FROM students WHERE students.email IS NOT NULL ORDER BY students.id ASC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "id": 1,
+              "first_name": "Can",
+              "last_name": "Kurt"
+            },
+            {
+              "id": 2,
+              "first_name": "Onur",
+              "last_name": "Çetin"
+            },
+            {
+              "id": 3,
+              "first_name": "Gamze",
+              "last_name": "Kurt"
+            },
+            {
+              "id": 4,
+              "first_name": "Ece",
+              "last_name": "Yıldırım"
+            },
+            {
+              "id": 5,
+              "first_name": "Zeynep",
+              "last_name": "Işık"
+            }
+          ]
+        }
+      },
+      {
+        "id": 5.1,
+        "dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email IS NOT NULL) ORDERBY(id ASC) LIMIT(20)",
         "sql": "SELECT TOP 20 id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC",
         "convertedSql": "SELECT students.id AS id, students.first_name AS first_name, students.last_name AS last_name FROM students WHERE students.email IS NOT NULL ORDER BY students.id ASC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
         "same": true,
@@ -1376,6 +1678,26 @@
         }
       },
       {
+        "id": 11.1,
+        "dsl": "FETCH(CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total) FROM students FILTER(ISNULL(first_name, 'noname') CONTAINS(LOWER('T'))) GROUPBY(name) HAVING(total > 2) ORDERBY(total DESC)",
+        "sql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY CONCAT(LOWER(first_name), '-', UPPER(last_name)) HAVING COUNT(*) > 2 ORDER BY total DESC",
+        "convertedSql": "SELECT CONCAT(LOWER(students.first_name), '-', UPPER(students.last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(students.first_name, 'noname') LIKE CONCAT('%', LOWER('T'), '%') GROUP BY CONCAT(LOWER(students.first_name), '-', UPPER(students.last_name)) HAVING COUNT(*) > 2 ORDER BY COUNT(*) DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "name": "mehmet-ERDOĞAN",
+              "total": 4
+            },
+            {
+              "name": "mehmet-AVCI",
+              "total": 3
+            }
+          ]
+        }
+      },
+      {
         "id": 12,
         "dsl": "FETCH(DATEDIFF('year', birth_date, CURRENT_DATE()) AS age, COUNT(*) AS cnt) FROM students GROUPBY(age) ORDERBY(cnt DESC) LIMIT(10)",
         "sql": "SELECT TOP 10 real_age, COUNT(*) AS cnt FROM (SELECT DATEDIFF(year, birth_date, GETDATE()) - CASE WHEN DATEADD(year, DATEDIFF(year, birth_date, GETDATE()), birth_date) > GETDATE() THEN 1 ELSE 0 END AS real_age FROM students) t GROUP BY real_age ORDER BY cnt DESC;",
@@ -1386,15 +1708,15 @@
           "Result": [
             {
               "age": 3,
-              "cnt": 68
+              "cnt": 67
             },
             {
               "age": 1,
-              "cnt": 64
+              "cnt": 63
             },
             {
               "age": 4,
-              "cnt": 58
+              "cnt": 59
             },
             {
               "age": 5,
@@ -1402,7 +1724,7 @@
             },
             {
               "age": 2,
-              "cnt": 54
+              "cnt": 55
             }
           ]
         }
@@ -1907,6 +2229,146 @@
             }
           ]
         }
+      },
+      {
+        "id": 27.1,
+        "dsl": "FETCH(id, first_name) FROM students FILTER(first_name STARTSWITH('A')) ORDERBY(first_name ASC) LIMIT(20)",
+        "sql": "SELECT TOP 20 id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name",
+        "convertedSql": "SELECT students.id AS id, students.first_name AS first_name FROM students WHERE students.first_name LIKE 'A%' ORDER BY students.first_name ASC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "id": 230,
+              "first_name": "Ahmet"
+            },
+            {
+              "id": 158,
+              "first_name": "Ahmet"
+            },
+            {
+              "id": 58,
+              "first_name": "Ahmet"
+            },
+            {
+              "id": 46,
+              "first_name": "Ahmet"
+            },
+            {
+              "id": 44,
+              "first_name": "Ahmet"
+            }
+          ]
+        }
+      },
+      {
+        "id": 28,
+        "dsl": "FETCH(name, city) FROM schools FILTER(city IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya')) ORDERBY(city ASC, name ASC) LIMIT(20)",
+        "sql": "SELECT TOP 20 name, city FROM schools WHERE city IN (N'İstanbul', N'Ankara', N'İzmir', N'Bursa', N'Eskişehir', N'Konya') ORDER BY city, name",
+        "convertedSql": "SELECT schools.name AS name, schools.city AS city FROM schools WHERE schools.city IN ('İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY schools.city ASC, schools.name ASC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "name": "İstanbul Hacı Bektaş Veli Anadolu Lisesi",
+              "city": "İstanbul"
+            }
+          ]
+        }
+      },
+      {
+        "id": 28.1,
+        "dsl": "FETCH(name, city) FROM schools FILTER(city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya')) ORDERBY(city ASC, name ASC) LIMIT(20)",
+        "sql": "SELECT TOP 20 name, city FROM schools WHERE city NOT IN (N'İstanbul', N'Ankara', N'İzmir', N'Bursa', N'Eskişehir', N'Konya') ORDER BY city, name",
+        "convertedSql": "SELECT schools.name AS name, schools.city AS city FROM schools WHERE schools.city NOT IN ('İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY schools.city ASC, schools.name ASC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "name": "Balıkesir Şehitler Lisesi",
+              "city": "Balıkesir"
+            },
+            {
+              "name": "Malatya Hacı Bektaş Veli Anadolu Lisesi",
+              "city": "Malatya"
+            },
+            {
+              "name": "Sakarya İnönü Anadolu Lisesi",
+              "city": "Sakarya"
+            },
+            {
+              "name": "Samsun Yunus Emre Ortaokulu",
+              "city": "Samsun"
+            }
+          ]
+        }
+      },
+      {
+        "id": 29,
+        "dsl": "FETCH(enrollments.id, grades.grade) FROM enrollments INCLUDE(grades INNER) FILTER(grades.grade BETWEEN(50,70)) ORDERBY(grades.grade DESC) LIMIT(20)",
+        "sql": "SELECT TOP 20 e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade BETWEEN 50 AND 70 ORDER BY g.grade DESC",
+        "convertedSql": "SELECT enrollments.id AS enrollments_id, grades.grade AS grades_grade FROM enrollments INNER JOIN grades ON enrollments.id = grades.enrollment_id WHERE grades.grade BETWEEN 50 AND 70 ORDER BY grades.grade DESC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "enrollments_id": 14,
+              "grades_grade": 70
+            },
+            {
+              "enrollments_id": 209,
+              "grades_grade": 70
+            },
+            {
+              "enrollments_id": 295,
+              "grades_grade": 70
+            },
+            {
+              "enrollments_id": 319,
+              "grades_grade": 70
+            },
+            {
+              "enrollments_id": 603,
+              "grades_grade": 70
+            }
+          ]
+        }
+      },
+      {
+        "id": 29.1,
+        "dsl": "FETCH(enrollments.id, grades.grade) FROM enrollments INCLUDE(grades INNER) FILTER(grades.grade NOT BETWEEN(50,70)) ORDERBY(grades.grade DESC) LIMIT(20)",
+        "sql": "SELECT TOP 20 e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade NOT BETWEEN 50 AND 70 ORDER BY g.grade DESC",
+        "convertedSql": "SELECT enrollments.id AS enrollments_id, grades.grade AS grades_grade FROM enrollments INNER JOIN grades ON enrollments.id = grades.enrollment_id WHERE grades.grade NOT BETWEEN 50 AND 70 ORDER BY grades.grade DESC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "enrollments_id": 81,
+              "grades_grade": 100
+            },
+            {
+              "enrollments_id": 131,
+              "grades_grade": 100
+            },
+            {
+              "enrollments_id": 138,
+              "grades_grade": 100
+            },
+            {
+              "enrollments_id": 170,
+              "grades_grade": 100
+            },
+            {
+              "enrollments_id": 293,
+              "grades_grade": 100
+            }
+          ]
+        }
       }
     ]
   },
@@ -1936,6 +2398,38 @@
       {
         "id": 2,
         "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
+        "sql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+        "convertedSql": "SELECT students.first_name AS first_name, COUNT(*) AS count FROM students WHERE LOWER(students.first_name) LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 20 ORDER BY COUNT(*) DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "first_name": "Cem",
+              "count": 31
+            },
+            {
+              "first_name": "Ahmet",
+              "count": 29
+            },
+            {
+              "first_name": "Umut",
+              "count": 23
+            },
+            {
+              "first_name": "Mehmet",
+              "count": 22
+            },
+            {
+              "first_name": "Sinem",
+              "count": 21
+            }
+          ]
+        }
+      },
+      {
+        "id": 2.1,
+        "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS ('m')) GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
         "sql": "SELECT s.first_name, COUNT(*) AS cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
         "convertedSql": "SELECT students.first_name AS first_name, COUNT(*) AS count FROM students WHERE LOWER(students.first_name) LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 20 ORDER BY COUNT(*) DESC",
         "same": true,
@@ -2047,6 +2541,43 @@
       {
         "id": 5,
         "dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email != NULL) ORDERBY(id ASC) LIMIT(20)",
+        "sql": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC LIMIT 20",
+        "convertedSql": "SELECT students.id AS id, students.first_name AS first_name, students.last_name AS last_name FROM students WHERE students.email IS NOT NULL ORDER BY students.id ASC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "id": 1,
+              "first_name": "Emre",
+              "last_name": "Doğan"
+            },
+            {
+              "id": 2,
+              "first_name": "Mehmet",
+              "last_name": "Erdem"
+            },
+            {
+              "id": 3,
+              "first_name": "Deniz",
+              "last_name": "Koç"
+            },
+            {
+              "id": 4,
+              "first_name": "Zeynep",
+              "last_name": "Bulut"
+            },
+            {
+              "id": 5,
+              "first_name": "Can",
+              "last_name": "Erdoğan"
+            }
+          ]
+        }
+      },
+      {
+        "id": 5.1,
+        "dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email IS NOT NULL) ORDERBY(id ASC) LIMIT(20)",
         "sql": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC LIMIT 20",
         "convertedSql": "SELECT students.id AS id, students.first_name AS first_name, students.last_name AS last_name FROM students WHERE students.email IS NOT NULL ORDER BY students.id ASC LIMIT 20 OFFSET 0",
         "same": true,
@@ -2319,6 +2850,38 @@
         }
       },
       {
+        "id": 11.1,
+        "dsl": "FETCH(CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total) FROM students FILTER(ISNULL(first_name, 'noname') CONTAINS(LOWER('T'))) GROUPBY(name) HAVING(total > 2) ORDERBY(total DESC)",
+        "sql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING total > 2 ORDER BY total DESC",
+        "convertedSql": "SELECT CONCAT(COALESCE(LOWER(students.first_name), ''), COALESCE('-', ''), COALESCE(UPPER(students.last_name), '')) AS name, COUNT(*) AS total FROM students WHERE COALESCE(students.first_name, 'noname') LIKE CONCAT(COALESCE('%', ''), COALESCE(LOWER('T'), ''), COALESCE('%', '')) GROUP BY CONCAT(COALESCE(LOWER(students.first_name), ''), COALESCE('-', ''), COALESCE(UPPER(students.last_name), '')) HAVING COUNT(*) > 2 ORDER BY COUNT(*) DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "name": "ahmet-GÜNEŞ",
+              "total": 4
+            },
+            {
+              "name": "umut-KOÇ",
+              "total": 4
+            },
+            {
+              "name": "fatma-BULUT",
+              "total": 4
+            },
+            {
+              "name": "mehmet-AYDIN",
+              "total": 3
+            },
+            {
+              "name": "ahmet-ARSLAN",
+              "total": 3
+            }
+          ]
+        }
+      },
+      {
         "id": 12,
         "dsl": "FETCH(DATEDIFF('year', birth_date, CURRENT_DATE()) AS age, COUNT(*) AS cnt) FROM students GROUPBY(age) ORDERBY(cnt DESC) LIMIT(10)",
         "sql": "SELECT TIMESTAMPDIFF(YEAR, birth_date, CURRENT_DATE()) AS age, COUNT(*) AS cnt FROM students GROUP BY TIMESTAMPDIFF(YEAR, birth_date, CURRENT_DATE()) ORDER BY cnt DESC LIMIT 10",
@@ -2329,11 +2892,11 @@
           "Result": [
             {
               "age": 2,
-              "cnt": 63
+              "cnt": 64
             },
             {
               "age": 1,
-              "cnt": 62
+              "cnt": 61
             },
             {
               "age": 4,
@@ -2855,6 +3418,146 @@
             }
           ]
         }
+      },
+      {
+        "id": 27.1,
+        "dsl": "FETCH(id, first_name) FROM students FILTER(first_name STARTSWITH('A')) ORDERBY(first_name ASC) LIMIT(20)",
+        "sql": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name LIMIT 20",
+        "convertedSql": "SELECT students.id AS id, students.first_name AS first_name FROM students WHERE students.first_name LIKE 'A%' ORDER BY students.first_name ASC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "id": 284,
+              "first_name": "Ahmet"
+            },
+            {
+              "id": 214,
+              "first_name": "Ahmet"
+            },
+            {
+              "id": 226,
+              "first_name": "Ahmet"
+            },
+            {
+              "id": 187,
+              "first_name": "Ahmet"
+            },
+            {
+              "id": 359,
+              "first_name": "Ahmet"
+            }
+          ]
+        }
+      },
+      {
+        "id": 28,
+        "dsl": "FETCH(name, city) FROM schools FILTER(city IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya')) ORDERBY(city ASC, name ASC) LIMIT(20)",
+        "sql": "SELECT name, city FROM schools WHERE city IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name LIMIT 20",
+        "convertedSql": "SELECT schools.name AS name, schools.city AS city FROM schools WHERE schools.city IN ('İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY schools.city ASC, schools.name ASC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "name": "Konya İnönü Anadolu Lisesi",
+              "city": "Konya"
+            }
+          ]
+        }
+      },
+      {
+        "id": 28.1,
+        "dsl": "FETCH(name, city) FROM schools FILTER(city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya')) ORDERBY(city ASC, name ASC) LIMIT(20)",
+        "sql": "SELECT name, city FROM schools WHERE city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name LIMIT 20",
+        "convertedSql": "SELECT schools.name AS name, schools.city AS city FROM schools WHERE schools.city NOT IN ('İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY schools.city ASC, schools.name ASC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "name": "Balıkesir İnönü Anadolu Lisesi",
+              "city": "Balıkesir"
+            },
+            {
+              "name": "Kayseri Hacı Bektaş Veli Anadolu Lisesi",
+              "city": "Kayseri"
+            },
+            {
+              "name": "Manisa Fatih Fen Lisesi",
+              "city": "Manisa"
+            },
+            {
+              "name": "Sakarya Atatürk Anadolu Lisesi",
+              "city": "Sakarya"
+            }
+          ]
+        }
+      },
+      {
+        "id": 29,
+        "dsl": "FETCH(enrollments.id, grades.grade) FROM enrollments INCLUDE(grades INNER) FILTER(grades.grade BETWEEN(50,70)) ORDERBY(grades.grade DESC) LIMIT(20)",
+        "sql": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade BETWEEN 50 AND 70 ORDER BY g.grade DESC LIMIT 20",
+        "convertedSql": "SELECT enrollments.id AS enrollments_id, grades.grade AS grades_grade FROM enrollments INNER JOIN grades ON enrollments.id = grades.enrollment_id WHERE grades.grade BETWEEN 50 AND 70 ORDER BY grades.grade DESC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "enrollments_id": 51,
+              "grades_grade": 70
+            },
+            {
+              "enrollments_id": 66,
+              "grades_grade": 70
+            },
+            {
+              "enrollments_id": 158,
+              "grades_grade": 70
+            },
+            {
+              "enrollments_id": 184,
+              "grades_grade": 70
+            },
+            {
+              "enrollments_id": 243,
+              "grades_grade": 70
+            }
+          ]
+        }
+      },
+      {
+        "id": 29.1,
+        "dsl": "FETCH(enrollments.id, grades.grade) FROM enrollments INCLUDE(grades INNER) FILTER(grades.grade NOT BETWEEN(50,70)) ORDERBY(grades.grade DESC) LIMIT(20)",
+        "sql": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade NOT BETWEEN 50 AND 70 ORDER BY g.grade DESC LIMIT 20",
+        "convertedSql": "SELECT enrollments.id AS enrollments_id, grades.grade AS grades_grade FROM enrollments INNER JOIN grades ON enrollments.id = grades.enrollment_id WHERE grades.grade NOT BETWEEN 50 AND 70 ORDER BY grades.grade DESC LIMIT 20 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "enrollments_id": 28,
+              "grades_grade": 100
+            },
+            {
+              "enrollments_id": 63,
+              "grades_grade": 100
+            },
+            {
+              "enrollments_id": 80,
+              "grades_grade": 100
+            },
+            {
+              "enrollments_id": 140,
+              "grades_grade": 100
+            },
+            {
+              "enrollments_id": 206,
+              "grades_grade": 100
+            }
+          ]
+        }
       }
     ]
   },
@@ -2884,6 +3587,38 @@
       {
         "id": 2,
         "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS 'm') GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
+        "sql": "SELECT s.first_name, COUNT(*) cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
+        "convertedSql": "SELECT students.first_name AS first_name, COUNT(*) AS count FROM students WHERE LOWER(students.first_name) LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 20 ORDER BY COUNT(*) DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "FIRST_NAME": "Mehmet",
+              "COUNT": 34
+            },
+            {
+              "FIRST_NAME": "Ahmet",
+              "COUNT": 27
+            },
+            {
+              "FIRST_NAME": "Merve",
+              "COUNT": 26
+            },
+            {
+              "FIRST_NAME": "Cem",
+              "COUNT": 24
+            },
+            {
+              "FIRST_NAME": "Melisa",
+              "COUNT": 23
+            }
+          ]
+        }
+      },
+      {
+        "id": 2.1,
+        "dsl": "FETCH(first_name, COUNT(*)) FROM students FILTER(LOWER(first_name) CONTAINS ('m')) GROUPBY(first_name) HAVING(COUNT(*) >= 20) ORDERBY(COUNT(*) DESC)",
         "sql": "SELECT s.first_name, COUNT(*) cnt FROM students s WHERE LOWER(s.first_name) LIKE '%m%' GROUP BY s.first_name HAVING COUNT(*) >= 20 ORDER BY cnt DESC",
         "convertedSql": "SELECT students.first_name AS first_name, COUNT(*) AS count FROM students WHERE LOWER(students.first_name) LIKE '%m%' GROUP BY students.first_name HAVING COUNT(*) >= 20 ORDER BY COUNT(*) DESC",
         "same": true,
@@ -2995,6 +3730,43 @@
       {
         "id": 5,
         "dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email != NULL) ORDERBY(id ASC) LIMIT(20)",
+        "sql": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC FETCH FIRST 20 ROWS ONLY",
+        "convertedSql": "SELECT students.id AS id, students.first_name AS first_name, students.last_name AS last_name FROM students WHERE students.email IS NOT NULL ORDER BY students.id ASC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "ID": 1,
+              "FIRST_NAME": "Burak",
+              "LAST_NAME": "Erdem"
+            },
+            {
+              "ID": 2,
+              "FIRST_NAME": "Elif",
+              "LAST_NAME": "Kurt"
+            },
+            {
+              "ID": 3,
+              "FIRST_NAME": "Rabia",
+              "LAST_NAME": "Şahin"
+            },
+            {
+              "ID": 4,
+              "FIRST_NAME": "Oğuz",
+              "LAST_NAME": "Şahin"
+            },
+            {
+              "ID": 5,
+              "FIRST_NAME": "Elif",
+              "LAST_NAME": "Bozkurt"
+            }
+          ]
+        }
+      },
+      {
+        "id": 5.1,
+        "dsl": "FETCH(id, first_name, last_name) FROM students FILTER(email IS NOT NULL) ORDERBY(id ASC) LIMIT(20)",
         "sql": "SELECT id, first_name, last_name FROM students WHERE email IS NOT NULL ORDER BY id ASC FETCH FIRST 20 ROWS ONLY",
         "convertedSql": "SELECT students.id AS id, students.first_name AS first_name, students.last_name AS last_name FROM students WHERE students.email IS NOT NULL ORDER BY students.id ASC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
         "same": true,
@@ -3267,6 +4039,38 @@
         }
       },
       {
+        "id": 11.1,
+        "dsl": "FETCH(CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total) FROM students FILTER(ISNULL(first_name, 'noname') CONTAINS(LOWER('T'))) GROUPBY(name) HAVING(total > 2) ORDERBY(total DESC)",
+        "sql": "SELECT CONCAT(LOWER(first_name), '-', UPPER(last_name)) AS name, COUNT(*) AS total FROM students WHERE COALESCE(first_name, 'noname') LIKE LOWER('%T%') GROUP BY name HAVING total > 2 ORDER BY total DESC",
+        "convertedSql": "SELECT LOWER(students.first_name) || '-' || UPPER(students.last_name) AS name, COUNT(*) AS total FROM students WHERE COALESCE(students.first_name, 'noname') LIKE '%' || LOWER('T') || '%' GROUP BY LOWER(students.first_name) || '-' || UPPER(students.last_name) HAVING COUNT(*) > 2 ORDER BY COUNT(*) DESC",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "NAME": "fatma-IŞIK",
+              "TOTAL": 3
+            },
+            {
+              "NAME": "mehmet-ÇETIN",
+              "TOTAL": 3
+            },
+            {
+              "NAME": "fatma-ÖZDEMIR",
+              "TOTAL": 3
+            },
+            {
+              "NAME": "ahmet-KAPLAN",
+              "TOTAL": 3
+            },
+            {
+              "NAME": "mehmet-KOÇ",
+              "TOTAL": 3
+            }
+          ]
+        }
+      },
+      {
         "id": 12,
         "dsl": "FETCH(DATEDIFF('year', birth_date, CURRENT_DATE()) AS age, COUNT(*) AS cnt) FROM students GROUPBY(age) ORDERBY(cnt DESC) LIMIT(10)",
         "sql": "SELECT age, cnt FROM (SELECT FLOOR(MONTHS_BETWEEN(TRUNC(SYSDATE), birth_date)/12) AS age, COUNT(*) AS cnt FROM students GROUP BY FLOOR(MONTHS_BETWEEN(TRUNC(SYSDATE), birth_date)/12)) t ORDER BY cnt DESC FETCH FIRST 10 ROWS ONLY",
@@ -3277,11 +4081,11 @@
           "Result": [
             {
               "AGE": 1,
-              "CNT": 70
+              "CNT": 69
             },
             {
               "AGE": 5,
-              "CNT": 67
+              "CNT": 65
             },
             {
               "AGE": 3,
@@ -3293,7 +4097,7 @@
             },
             {
               "AGE": 4,
-              "CNT": 54
+              "CNT": 55
             }
           ]
         }
@@ -3791,6 +4595,146 @@
             {
               "ID": 361,
               "FIRST_NAME": "Ahmet"
+            }
+          ]
+        }
+      },
+      {
+        "id": 27.1,
+        "dsl": "FETCH(id, first_name) FROM students FILTER(first_name STARTSWITH('A')) ORDERBY(first_name ASC) LIMIT(20)",
+        "sql": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY first_name FETCH FIRST 20 ROWS ONLY",
+        "convertedSql": "SELECT students.id AS id, students.first_name AS first_name FROM students WHERE students.first_name LIKE 'A%' ORDER BY students.first_name ASC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "ID": 14,
+              "FIRST_NAME": "Ahmet"
+            },
+            {
+              "ID": 414,
+              "FIRST_NAME": "Ahmet"
+            },
+            {
+              "ID": 388,
+              "FIRST_NAME": "Ahmet"
+            },
+            {
+              "ID": 364,
+              "FIRST_NAME": "Ahmet"
+            },
+            {
+              "ID": 361,
+              "FIRST_NAME": "Ahmet"
+            }
+          ]
+        }
+      },
+      {
+        "id": 28,
+        "dsl": "FETCH(name, city) FROM schools FILTER(city IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya')) ORDERBY(city ASC, name ASC) LIMIT(20)",
+        "sql": "SELECT name, city FROM schools WHERE city IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name FETCH FIRST 20 ROWS ONLY",
+        "convertedSql": "SELECT schools.name AS name, schools.city AS city FROM schools WHERE schools.city IN ('İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY schools.city ASC, schools.name ASC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "NAME": "Eskişehir Cumhuriyet İlkokulu",
+              "CITY": "Eskişehir"
+            }
+          ]
+        }
+      },
+      {
+        "id": 28.1,
+        "dsl": "FETCH(name, city) FROM schools FILTER(city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya')) ORDERBY(city ASC, name ASC) LIMIT(20)",
+        "sql": "SELECT name, city FROM schools WHERE city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name FETCH FIRST 20 ROWS ONLY",
+        "convertedSql": "SELECT schools.name AS name, schools.city AS city FROM schools WHERE schools.city NOT IN ('İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY schools.city ASC, schools.name ASC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "NAME": "Kayseri Atatürk Anadolu Lisesi",
+              "CITY": "Kayseri"
+            },
+            {
+              "NAME": "Kayseri Barbaros MTAL",
+              "CITY": "Kayseri"
+            },
+            {
+              "NAME": "Malatya Şehitler Lisesi",
+              "CITY": "Malatya"
+            },
+            {
+              "NAME": "Manisa Gazi İlkokulu",
+              "CITY": "Manisa"
+            }
+          ]
+        }
+      },
+      {
+        "id": 29,
+        "dsl": "FETCH(enrollments.id, grades.grade) FROM enrollments INCLUDE(grades INNER) FILTER(grades.grade BETWEEN(50,70)) ORDERBY(grades.grade DESC) LIMIT(20)",
+        "sql": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade BETWEEN 50 AND 70 ORDER BY g.grade DESC FETCH FIRST 20 ROWS ONLY",
+        "convertedSql": "SELECT enrollments.id AS enrollments_id, grades.grade AS grades_grade FROM enrollments INNER JOIN grades ON enrollments.ID = grades.ENROLLMENT_ID WHERE grades.grade BETWEEN 50 AND 70 ORDER BY grades.grade DESC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "ENROLLMENTS_ID": 16,
+              "GRADES_GRADE": 70
+            },
+            {
+              "ENROLLMENTS_ID": 1193,
+              "GRADES_GRADE": 70
+            },
+            {
+              "ENROLLMENTS_ID": 1136,
+              "GRADES_GRADE": 70
+            },
+            {
+              "ENROLLMENTS_ID": 1005,
+              "GRADES_GRADE": 70
+            },
+            {
+              "ENROLLMENTS_ID": 888,
+              "GRADES_GRADE": 70
+            }
+          ]
+        }
+      },
+      {
+        "id": 29.1,
+        "dsl": "FETCH(enrollments.id, grades.grade) FROM enrollments INCLUDE(grades INNER) FILTER(grades.grade NOT BETWEEN(50,70)) ORDERBY(grades.grade DESC) LIMIT(20)",
+        "sql": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade NOT BETWEEN 50 AND 70 ORDER BY g.grade DESC FETCH FIRST 20 ROWS ONLY",
+        "convertedSql": "SELECT enrollments.id AS enrollments_id, grades.grade AS grades_grade FROM enrollments INNER JOIN grades ON enrollments.ID = grades.ENROLLMENT_ID WHERE grades.grade NOT BETWEEN 50 AND 70 ORDER BY grades.grade DESC OFFSET 0 ROWS FETCH NEXT 20 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "ENROLLMENTS_ID": 97,
+              "GRADES_GRADE": 100
+            },
+            {
+              "ENROLLMENTS_ID": 1619,
+              "GRADES_GRADE": 100
+            },
+            {
+              "ENROLLMENTS_ID": 1505,
+              "GRADES_GRADE": 100
+            },
+            {
+              "ENROLLMENTS_ID": 1494,
+              "GRADES_GRADE": 100
+            },
+            {
+              "ENROLLMENTS_ID": 1476,
+              "GRADES_GRADE": 100
             }
           ]
         }

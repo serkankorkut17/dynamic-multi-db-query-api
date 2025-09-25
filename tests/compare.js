@@ -124,7 +124,7 @@ async function run() {
 					isEmpty,
 					Example: same ? { Result: dsl5 } : { dsl: dsl5, sql: sql5 },
 				});
-				let queryNo = cfg.queries.indexOf(q) + 1;
+				let queryNo = q.id;
 				console.log(`Query #${queryNo} DSL vs SQL -> ${same ? "OK" : "DIFF"}`);
 				if (isEmpty) {
 					console.warn("  Warning: One of the results is empty!");

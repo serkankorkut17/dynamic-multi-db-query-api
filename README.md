@@ -17,15 +17,17 @@
 ## API Endpoints
 
 ### POST /api/query
+
 Purpose: Execute a DSL query (the custom “My Query Language”).<br>
 Request body (QueryRequestDTO):
+
 ```json
 {
 	"DbType": "postgres",
 	"ConnectionString": "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb;SSL Mode=Disable;",
 	"Query": "FETCH(courses.name, COUNT(enrollments.id) AS enroll_cnt) FROM courses INCLUDE(enrollments) GROUPBY(courses.name) HAVING(enroll_cnt > 5) ORDERBY(enroll_cnt DESC)",
-  "WriteToOutputDb": true, // Optional, default is false
-  "OutputDbType": "mysql", // Required if WriteToOutputDb is true
+	"WriteToOutputDb": true, // Optional, default is false
+	"OutputDbType": "mysql", // Required if WriteToOutputDb is true
 	"OutputDbType": "oracle", // Required if WriteToOutputDb is true
 	"OutputConnectionString": "User Id=system;Password=oracle;Data Source=localhost/FREEPDB1;", // Required if WriteToOutputDb is true
 	"OutputTableName": "result_table" // Required if WriteToOutputDb is true
@@ -33,33 +35,38 @@ Request body (QueryRequestDTO):
 ```
 
 Response body (QueryResultDTO):
+
 ```json
 {
-  "sql": "SELECT courses.name, COUNT(enrollments.id) AS enroll_cnt FROM courses LEFT JOIN enrollments ON enrollments.course_id = c.id GROUP BY courses.name HAVING COUNT(enrollments.id) > 5 ORDER BY enroll_cnt DESC",
-  "data": [
-    { "name": "Algebra", "enroll_cnt": 12 },
-    { "name": "Physics", "enroll_cnt": 8 }
-  ],
-  "writtenToOutputDb": true
+	"sql": "SELECT courses.name, COUNT(enrollments.id) AS enroll_cnt FROM courses LEFT JOIN enrollments ON enrollments.course_id = c.id GROUP BY courses.name HAVING COUNT(enrollments.id) > 5 ORDER BY enroll_cnt DESC",
+	"data": [
+		{ "name": "Algebra", "enroll_cnt": 12 },
+		{ "name": "Physics", "enroll_cnt": 8 }
+	],
+	"writtenToOutputDb": true
 }
 ```
 
 ### POST /api/query/sql
+
 Purpose: Execute raw SQL as-is.<br>
 Request body (QueryRequestDTO), same shape as above; Query contains SQL.<br>
 Response body (QueryResultDTO), same shape as above.
 
 ### POST /api/query/inspect
+
 Purpose: Inspect schema: tables, columns, and relationships in the input DB.<br>
 Request body (InspectRequestDTO):
+
 ```json
 {
-  "DbType": "postgres",
-  "ConnectionString": "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb;SSL Mode=Disable;"
+	"DbType": "postgres",
+	"ConnectionString": "Host=localhost;Port=5432;Username=postgres;Password=postgres;Database=querydb;SSL Mode=Disable;"
 }
 ```
 
 Response body (InspectResponseDTO):
+
 ```json
 {
   "tables": [
@@ -91,22 +98,22 @@ Response body (InspectResponseDTO):
 
 ## SQL vs My Query Language
 
-|               | SQL                        | MY QUERY                         |
-| ------------- | -------------------------- | -------------------------------- |
-| SELECT        | SELECT name, surname       | FETCH (name, surname)            |
-| DISTINCT      | SELECT DISTINCT            | FETCHD / FETCH DISTINCT(...)     |
-| FROM          | FROM table                 | FROM table / FROM (table)        |
-| JOIN          | [joinType] JOIN table2 ... | INCLUDE (table2) (left join)     |
-| INNER JOIN    | INNER JOIN table2 ...      | INCLUDE (table2 INNER)           |
-| JOIN CHAINING | ... JOIN table3 ...        | INCLUDE (table2.table3)          |
-| JOIN with keys| ... JOIN table3 ...        | INCLUDE (table2(table1.col, table2.col))   |
-| SELECT (JOIN) | SELECT table2.id           | FETCH (name, surname, table2.id) |
-| WHERE         | WHERE age >= 18            | FILTER (age >= 18)               |
-| GROUP BY      | GROUP BY name              | GROUPBY (name)                   |
-| HAVING        | HAVING COUNT(\*) >= 20     | HAVING (COUNT(\*) >= 20)         |
-| ORDER BY      | ORDER BY name DESC         | ORDERBY (name DESC)              |
-| LIMIT         | LIMIT 10                   | TAKE (10) / LIMIT (10)           |
-| OFFSET        | OFFSET 10                  | SKIP (10) / OFFSET (10)          |
+|                | SQL                        | MY QUERY                                 |
+| -------------- | -------------------------- | ---------------------------------------- |
+| SELECT         | SELECT name, surname       | FETCH (name, surname)                    |
+| DISTINCT       | SELECT DISTINCT            | FETCHD / FETCH DISTINCT(...)             |
+| FROM           | FROM table                 | FROM table / FROM (table)                |
+| JOIN           | [joinType] JOIN table2 ... | INCLUDE (table2) (left join)             |
+| INNER JOIN     | INNER JOIN table2 ...      | INCLUDE (table2 INNER)                   |
+| JOIN CHAINING  | ... JOIN table3 ...        | INCLUDE (table2.table3)                  |
+| JOIN with keys | ... JOIN table3 ...        | INCLUDE (table2(table1.col, table2.col)) |
+| SELECT (JOIN)  | SELECT table2.id           | FETCH (name, surname, table2.id)         |
+| WHERE          | WHERE age >= 18            | FILTER (age >= 18)                       |
+| GROUP BY       | GROUP BY name              | GROUPBY (name)                           |
+| HAVING         | HAVING COUNT(\*) >= 20     | HAVING (COUNT(\*) >= 20)                 |
+| ORDER BY       | ORDER BY name DESC         | ORDERBY (name DESC)                      |
+| LIMIT          | LIMIT 10                   | TAKE (10) / LIMIT (10)                   |
+| OFFSET         | OFFSET 10                  | SKIP (10) / OFFSET (10)                  |
 
 My Query Example:
 
@@ -159,14 +166,27 @@ LIMIT  10;
 
 ### 1. Comparison Operators
 
-| OPERATOR | SQL EQUIVALENT |
-| -------- | -------------- |
-| = / ==   | =              |
-| != / <>  | <>             |
-| >        | >              |
-| <        | <              |
-| >=       | >=             |
-| <=       | <=             |
+| OPERATOR    | SQL EQUIVALENT      |
+| ----------- | ------------------- |
+| = / ==      | =                   |
+| != / <>     | <>                  |
+| >           | >                   |
+| <           | <                   |
+| >=          | >=                  |
+| <=          | <=                  |
+| IN          | IN (...)            |
+| NOT IN      | NOT IN (...)        |
+| BETWEEN     | BETWEEN ... AND     |
+| NOT BETWEEN | NOT BETWEEN ... AND |
+
+- Usage: column OPERATOR value, column OPERATOR(value1, value2, ...)
+  > age >= 18
+  > <br>
+  > age IN(18,21,25)
+  > <br>
+  > age BETWEEN(18,30)
+  > <br>
+  > LOWER(name) = 'serkan'
 
 ### 2. String Match Operators
 
@@ -185,12 +205,14 @@ LIMIT  10;
 
 ### 3. NULL Operators
 
-| OPERATOR    | SQL EQUIVALENT  |
-| ----------- | --------------- |
-| col = NULL  | col IS NULL     |
-| col == NULL | col IS NULL     |
-| col != NULL | col IS NOT NULL |
-| col <> NULL | col IS NOT NULL |
+| OPERATOR        | SQL EQUIVALENT  |
+| --------------- | --------------- |
+| col = NULL      | col IS NULL     |
+| col == NULL     | col IS NULL     |
+| col != NULL     | col IS NOT NULL |
+| col <> NULL     | col IS NOT NULL |
+| col IS NULL     | col IS NULL     |
+| col IS NOT NULL | col IS NOT NULL |
 
 ### 4. Logical Operators & Precedence
 
@@ -373,20 +395,20 @@ ORDER BY total DESC
 My Query:
 
 ```sql
-FETCH(id, first_name, last_name, gpa) 
-FROM students 
-FILTER(is_active = TRUE AND gpa >= 3.5) 
-ORDERBY(gpa DESC) 
+FETCH(id, first_name, last_name, gpa)
+FROM students
+FILTER(is_active = TRUE AND gpa >= 3.5)
+ORDERBY(gpa DESC)
 LIMIT(15)
 ```
 
 PostgreSQL:
 
 ```sql
-SELECT id, first_name, last_name, gpa 
-FROM students 
-WHERE is_active = TRUE AND gpa >= 3.5 
-ORDER BY gpa DESC 
+SELECT id, first_name, last_name, gpa
+FROM students
+WHERE is_active = TRUE AND gpa >= 3.5
+ORDER BY gpa DESC
 LIMIT 15
 ```
 
@@ -466,17 +488,18 @@ ORDER BY yr DESC, mo DESC, dy DESC
 My Query:
 
 ```sql
-FETCH(school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary) 
-FROM teachers GROUPBY(school_id) 
-HAVING(COUNT(*) > 2) 
+FETCH(school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary)
+FROM teachers GROUPBY(school_id)
+HAVING(COUNT(*) > 2)
 ORDERBY(avg_salary DESC)
 ```
 
 PostgreSQL:
+
 ```sql
-SELECT school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary 
-FROM teachers 
-GROUP BY school_id 
-HAVING COUNT(*) > 2 
+SELECT school_id, AVG(salary) AS avg_salary, MIN(salary) AS min_salary, MAX(salary) AS max_salary
+FROM teachers
+GROUP BY school_id
+HAVING COUNT(*) > 2
 ORDER BY avg_salary DESC
 ```

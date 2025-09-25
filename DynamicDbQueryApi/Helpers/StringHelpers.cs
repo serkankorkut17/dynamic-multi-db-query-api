@@ -155,6 +155,61 @@ namespace DynamicDbQueryApi.Helpers
             return result;
         }
 
+        public static List<string> SplitByWhitespaces(string input)
+        {
+            List<string> result = new List<string>();
+            for (int i = 0; i < input.Length; i++)
+            {
+                if (input[i] == '(')
+                {
+                    // Parantez içindeki virgülleri yok say
+                    int closeIdx = FindClosingParenthesis(input, i);
+                    if (closeIdx == -1)
+                    {
+                        throw new Exception("Could not find closing parenthesis in FETCH columns.");
+                    }
+                    i = closeIdx;
+                }
+
+                else if (input[i] == '\'')
+                {
+                    // String içindeki virgülleri yok say
+                    int closeIdx = FindClosingQuote(input, i);
+                    if (closeIdx == -1)
+                    {
+                        throw new Exception("Could not find closing quote in FETCH columns.");
+                    }
+                    i = closeIdx;
+                }
+
+                else if (input[i] == '{')
+                {
+                    // Süslü parantez içindeki virgülleri yok say
+                    int closeIdx = FindClosingBracket(input, i);
+                    if (closeIdx == -1)
+                    {
+                        throw new Exception("Could not find closing bracket in FETCH columns.");
+                    }
+                    i = closeIdx;
+                }
+
+                else if (char.IsWhiteSpace(input[i]))
+                {
+                    // Boşluk bulundu, böl
+                    result.Add(input.Substring(0, i).Trim());
+                    input = input.Substring(i + 1).Trim();
+                    i = -1;
+                }
+            }
+            // Son parçayı ekle
+            if (!string.IsNullOrWhiteSpace(input))
+            {
+                result.Add(input.Trim());
+            }
+
+            return result;
+        }
+
         // Parantezlerin dengeli olup olmadığını kontrol etme
         public static bool CheckIfParanthesesBalanced(string input)
         {
@@ -168,6 +223,13 @@ namespace DynamicDbQueryApi.Helpers
                 if (balance < 0) return false;
             }
             return balance == 0;
+        }
+
+        public static string RemoveExtraSpaces(string s)
+        {
+            if (string.IsNullOrWhiteSpace(s)) return s;
+            var parts = s.Split(new char[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            return string.Join(' ', parts);
         }
 
         public static List<string> ExtractTopLevelOperands(ref string body, out string replacedBody)

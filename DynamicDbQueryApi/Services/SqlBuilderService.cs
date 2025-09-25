@@ -1011,13 +1011,46 @@ namespace DynamicDbQueryApi.Services
                 }
 
                 var value = condition.Value;
-                var funcValueInfo = value != null ? GetFunction(value) : null;
-                if (funcValueInfo != null)
+                string? funcValue = null;
+                
+                // Eğer value value1, value2 gibi birden fazla değer içeriyorsa her birini işle
+                if (value != null && value.Contains(","))
                 {
-                    var funcName = funcValueInfo.Value.funcName;
-                    var inner = funcValueInfo.Value.inner;
-                    var args = StringHelpers.SplitByCommas(inner);
-                    value = BuildFunction(dbType, funcName, args);
+                    var parts = StringHelpers.SplitByCommas(value);
+                    for (int i = 0; i < parts.Count; i++)
+                    {
+                        var funcValueInfo = GetFunction(parts[i]);
+                        if (funcValueInfo != null)
+                        {
+                            var funcName = funcValueInfo.Value.funcName;
+                            var inner = funcValueInfo.Value.inner;
+                            var args = StringHelpers.SplitByCommas(inner);
+                            parts[i] = BuildFunction(dbType, funcName, args);
+                        }
+                        else
+                        {
+                            parts[i] = BuildTrueFalse(dbType, parts[i].Trim());
+                            parts[i] = ConvertStringToDate(dbType, parts[i]);
+                        }
+                    }
+                    value = string.Join(", ", parts);
+                }
+                else
+                {
+                    var funcValueInfo = value != null ? GetFunction(value) : null;
+                    if (funcValueInfo != null)
+                    {
+                        var funcName = funcValueInfo.Value.funcName;
+                        funcValue = funcName;
+                        var inner = funcValueInfo.Value.inner;
+                        var args = StringHelpers.SplitByCommas(inner);
+                        value = BuildFunction(dbType, funcName, args);
+                    }
+                    else
+                    {
+                        value = BuildTrueFalse(dbType, (value ?? string.Empty).Trim());
+                        value = ConvertStringToDate(dbType, value);
+                    }
                 }
 
                 if (comparisonOperator == ComparisonOperator.IsNull)
@@ -1040,8 +1073,8 @@ namespace DynamicDbQueryApi.Services
                     // Stringdeki tırnakları kaldır
                     string valueRaw = value.ToString().Trim('\'');
 
-                    // Eğer value fonksiyon ise CONCAT ile 
-                    if (funcValueInfo != null)
+                    // Eğer value fonksiyon ise CONCAT ile işle
+                    if (funcValue != null)
                     {
                         if (comparisonOperator == ComparisonOperator.Like)
                         {
@@ -1074,6 +1107,19 @@ namespace DynamicDbQueryApi.Services
                         return $"{columnName} LIKE '{pattern}'";
                     }
                 }
+                else if (comparisonOperator == ComparisonOperator.In || comparisonOperator == ComparisonOperator.NotIn)
+                {
+                    return $"{columnName} {(comparisonOperator == ComparisonOperator.In ? "IN" : "NOT IN")} ({value})";
+                }
+                else if (comparisonOperator == ComparisonOperator.Between || comparisonOperator == ComparisonOperator.NotBetween)
+                {
+                    var parts = value.ToString().Split(new[] { ',' }, 2);
+                    if (parts.Length != 2)
+                    {
+                        throw new ArgumentException($"Value for BETWEEN operator must contain two comma-separated values.");
+                    }
+                    return $"{columnName} {(comparisonOperator == ComparisonOperator.Between ? "BETWEEN" : "NOT BETWEEN")} {parts[0].Trim()} AND {parts[1].Trim()}";
+                }
                 else
                 {
                     string sqlOperator = comparisonOperator switch
@@ -1086,27 +1132,6 @@ namespace DynamicDbQueryApi.Services
                         ComparisonOperator.Gte => ">=",
                         _ => throw new NotSupportedException($"Unsupported operator {comparisonOperator}")
                     };
-
-                    // Eğer value true ya da false ise, MSSQL'de 1 ya da 0 olarak kullan
-                    if (value.Equals("true", StringComparison.OrdinalIgnoreCase) || value.Equals("false", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (dbType == "mssql" || dbType == "sqlserver")
-                        {
-                            value = value.Equals("true", StringComparison.OrdinalIgnoreCase) ? "1" : "0";
-                        }
-                        else if (dbType == "postgresql" || dbType == "postgres")
-                        {
-                            value = value.Equals("true", StringComparison.OrdinalIgnoreCase) ? "TRUE" : "FALSE";
-                        }
-                        else if (dbType == "mysql")
-                        {
-                            value = value.Equals("true", StringComparison.OrdinalIgnoreCase) ? "1" : "0";
-                        }
-                        else if (dbType == "oracle")
-                        {
-                            value = value.Equals("true", StringComparison.OrdinalIgnoreCase) ? "1" : "0";
-                        }
-                    }
 
                     return $"{columnName} {sqlOperator} {value}";
                 }
@@ -1123,6 +1148,33 @@ namespace DynamicDbQueryApi.Services
             {
                 throw new NotSupportedException($"Filter type {filter.GetType()} is not supported.");
             }
+        }
+
+        public string BuildTrueFalse(string dbType, string value)
+        {
+            // Eğer value true ya da false ise, MSSQL'de 1 ya da 0 olarak kullan
+            if (value.Equals("true", StringComparison.OrdinalIgnoreCase) || value.Equals("false", StringComparison.OrdinalIgnoreCase))
+            {
+                if (dbType == "mssql" || dbType == "sqlserver")
+                {
+                    value = value.Equals("true", StringComparison.OrdinalIgnoreCase) ? "1" : "0";
+                }
+                else if (dbType == "postgresql" || dbType == "postgres")
+                {
+                    value = value.Equals("true", StringComparison.OrdinalIgnoreCase) ? "TRUE" : "FALSE";
+                }
+                else if (dbType == "mysql")
+                {
+                    value = value.Equals("true", StringComparison.OrdinalIgnoreCase) ? "1" : "0";
+                }
+                else if (dbType == "oracle")
+                {
+                    value = value.Equals("true", StringComparison.OrdinalIgnoreCase) ? "1" : "0";
+                }
+
+                return value;
+            }
+            return value;
         }
 
         public string BuildInsertSql(string tableName, string column, string value)
