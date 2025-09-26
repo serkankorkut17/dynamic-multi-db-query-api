@@ -275,7 +275,7 @@
 			"oracle": "SELECT name, city FROM schools WHERE city IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name FETCH FIRST 20 ROWS ONLY"
 		},
 		{
-			"id": 28.1,
+			"id": 29,
 			"dsl": "FETCH(name, city) FROM schools FILTER(city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya')) ORDERBY(city ASC, name ASC) LIMIT(20)",
 			"postgres": "SELECT name, city FROM schools WHERE city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name LIMIT 20",
 			"mysql": "SELECT name, city FROM schools WHERE city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name LIMIT 20",
@@ -283,7 +283,7 @@
 			"oracle": "SELECT name, city FROM schools WHERE city NOT IN ('İstanbul','Ankara','İzmir', 'Bursa', 'Eskişehir', 'Konya') ORDER BY city, name FETCH FIRST 20 ROWS ONLY"
 		},
 		{
-			"id": 29,
+			"id": 30,
 			"dsl": "FETCH(enrollments.id, grades.grade) FROM enrollments INCLUDE(grades INNER) FILTER(grades.grade BETWEEN(50,70)) ORDERBY(grades.grade DESC) LIMIT(20)",
 			"postgres": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade BETWEEN 50 AND 70 ORDER BY g.grade DESC LIMIT 20",
 			"mysql": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade BETWEEN 50 AND 70 ORDER BY g.grade DESC LIMIT 20",
@@ -291,12 +291,76 @@
 			"oracle": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade BETWEEN 50 AND 70 ORDER BY g.grade DESC FETCH FIRST 20 ROWS ONLY"
 		},
 		{
-			"id": 29.1,
+			"id": 31,
 			"dsl": "FETCH(enrollments.id, grades.grade) FROM enrollments INCLUDE(grades INNER) FILTER(grades.grade NOT BETWEEN(50,70)) ORDERBY(grades.grade DESC) LIMIT(20)",
 			"postgres": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade NOT BETWEEN 50 AND 70 ORDER BY g.grade DESC LIMIT 20",
 			"mysql": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade NOT BETWEEN 50 AND 70 ORDER BY g.grade DESC LIMIT 20",
 			"mssql": "SELECT TOP 20 e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade NOT BETWEEN 50 AND 70 ORDER BY g.grade DESC",
 			"oracle": "SELECT e.id, g.grade FROM enrollments e JOIN grades g ON g.enrollment_id = e.id WHERE g.grade NOT BETWEEN 50 AND 70 ORDER BY g.grade DESC FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 32,
+			"dsl": "FETCH(id, first_name) FROM students FILTER(first_name ISTARTSWITH 'm') ORDERBY(id,first_name) LIMIT(20)",
+			"postgres": "SELECT id, first_name FROM students WHERE first_name ILIKE 'm%' ORDER BY id, first_name LIMIT 20",
+			"mysql": "SELECT id, first_name FROM students WHERE LOWER(first_name) LIKE 'm%' ORDER BY id, first_name LIMIT 20",
+			"mssql": "SELECT TOP 20 id, first_name FROM students WHERE LOWER(first_name) LIKE 'm%' ORDER BY id, first_name",
+			"oracle": "SELECT id, first_name FROM students WHERE LOWER(first_name) LIKE 'm%' ORDER BY id, first_name FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 33,
+			"dsl": "FETCH(id, last_name) FROM students FILTER(last_name IENDSWITH 't') ORDERBY(id,last_name) LIMIT(20)",
+			"postgres": "SELECT id, last_name FROM students WHERE last_name ILIKE '%t' ORDER BY id, last_name LIMIT 20",
+			"mysql": "SELECT id, last_name FROM students WHERE LOWER(last_name) LIKE '%t' ORDER BY id, last_name LIMIT 20",
+			"mssql": "SELECT TOP 20 id, last_name FROM students WHERE LOWER(last_name) LIKE '%t' ORDER BY id, last_name",
+			"oracle": "SELECT id, last_name FROM students WHERE LOWER(last_name) LIKE '%t' ORDER BY id, last_name FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 34,
+			"dsl": "FETCH(id, email) FROM students FILTER(email ICONTAINS '.cetin@') ORDERBY(id,email) LIMIT(20)",
+			"postgres": "SELECT id, email FROM students WHERE email ILIKE '%.cetin@%' ORDER BY id, email LIMIT 20",
+			"mysql": "SELECT id, email FROM students WHERE LOWER(email) LIKE '%.cetin@%' ORDER BY id, email LIMIT 20",
+			"mssql": "SELECT TOP 20 id, email FROM students WHERE LOWER(email) LIKE '%.cetin@%' ORDER BY id, email",
+			"oracle": "SELECT id, email FROM students WHERE LOWER(email) LIKE '%.cetin@%' ORDER BY id, email FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 35,
+			"dsl": "FETCH(id, first_name) FROM students FILTER(first_name NOT STARTSWITH 'A') ORDERBY(id,first_name) LIMIT(20)",
+			"postgres": "SELECT id, first_name FROM students WHERE first_name NOT LIKE 'A%' ORDER BY id, first_name LIMIT 20",
+			"mysql": "SELECT id, first_name FROM students WHERE first_name NOT LIKE 'A%' ORDER BY id, first_name LIMIT 20",
+			"mssql": "SELECT TOP 20 id, first_name FROM students WHERE first_name NOT LIKE 'A%' ORDER BY id, first_name",
+			"oracle": "SELECT id, first_name FROM students WHERE first_name NOT LIKE 'A%' ORDER BY id, first_name FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 36,
+			"dsl": "FETCH(id, progress_percent) FROM enrollments FILTER(progress_percent NOT BETWEEN 40,60) ORDERBY(id, progress_percent) LIMIT(20)",
+			"postgres": "SELECT id, progress_percent FROM enrollments WHERE progress_percent NOT BETWEEN 40 AND 60 ORDER BY id, progress_percent LIMIT 20",
+			"mysql": "SELECT id, progress_percent FROM enrollments WHERE progress_percent NOT BETWEEN 40 AND 60 ORDER BY id, progress_percent LIMIT 20",
+			"mssql": "SELECT TOP 20 id, progress_percent FROM enrollments WHERE progress_percent NOT BETWEEN 40 AND 60 ORDER BY id, progress_percent",
+			"oracle": "SELECT id, progress_percent FROM enrollments WHERE progress_percent NOT BETWEEN 40 AND 60 ORDER BY id, progress_percent FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 37,
+			"dsl": "FETCH(id, email) FROM students FILTER(email NOT IENDSWITH '.com') ORDERBY(id, email) LIMIT(20)",
+			"postgres": "SELECT id, email FROM students WHERE email NOT ILIKE '%.com' ORDER BY id, email LIMIT 20",
+			"mysql": "SELECT id, email FROM students WHERE NOT (LOWER(email) LIKE '%.com') ORDER BY id, email LIMIT 20",
+			"mssql": "SELECT TOP 20 id, email FROM students WHERE NOT (LOWER(email) LIKE '%.com') ORDER BY id, email",
+			"oracle": "SELECT id, email FROM students WHERE NOT (LOWER(email) LIKE '%.com') ORDER BY id, email FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 38,
+			"dsl": "FETCH(id, first_name) FROM students FILTER(first_name BEGINSWITH 'A') ORDERBY(id, first_name) LIMIT(15)",
+			"postgres": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY id, first_name LIMIT 15",
+			"mysql": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY id, first_name LIMIT 15",
+			"mssql": "SELECT TOP 15 id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY id, first_name",
+			"oracle": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' ORDER BY id, first_name FETCH FIRST 15 ROWS ONLY"
+		},
+		{
+			"id": 39,
+			"dsl": "FETCH(id, first_name, last_name) FROM students FILTER(first_name ICONTAINS 'der' AND last_name NOT ILIKE '%lan%') ORDERBY(id, first_name), last_name LIMIT(20)",
+			"postgres": "SELECT id, first_name, last_name FROM students WHERE first_name ILIKE '%der%' AND last_name NOT ILIKE '%lan%' ORDER BY id, first_name, last_name LIMIT 20",
+			"mysql": "SELECT id, first_name, last_name FROM students WHERE LOWER(first_name) LIKE '%der%' AND NOT (LOWER(last_name) LIKE '%lan%') ORDER BY id, first_name, last_name LIMIT 20",
+			"mssql": "SELECT TOP 20 id, first_name, last_name FROM students WHERE LOWER(first_name) LIKE '%der%' AND NOT (LOWER(last_name) LIKE '%lan%') ORDER BY id, first_name, last_name",
+			"oracle": "SELECT id, first_name, last_name FROM students WHERE LOWER(first_name) LIKE '%der%' AND NOT (LOWER(last_name) LIKE '%lan%') ORDER BY id, first_name, last_name FETCH FIRST 20 ROWS ONLY"
 		}
 	]
 }

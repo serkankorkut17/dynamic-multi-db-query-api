@@ -20,9 +20,21 @@ namespace DynamicDbQueryApi.Entities.Query
         Gt,         // >
         Gte,        // >=
         Like,       // LIKE -> %val%
+        ILike,      // ILIKE -> %val% (case insensitive)
+        NotLike,    // NOT LIKE -> NOT %val%
+        NotILike,   // NOT ILIKE -> NOT %val% (case insensitive)
         Contains,   // CONTAINS -> %val%
+        IContains,  // ICONTAINS -> %val% (case insensitive)
+        NotContains,// NOT CONTAINS -> NOT %val%
+        NotIContains,// NOT ICONTAINS -> NOT %val% (case insensitive)
         BeginsWith, // BEGINSWITH -> val%
+        IBeginsWith,// IBEGINSWITH -> val% (case insensitive)
+        NotBeginsWith, // NOT BEGINSWITH -> NOT val%
+        NotIBeginsWith,// NOT IBEGINSWITH -> NOT val% (case insensitive)
         EndsWith,   // ENDSWITH -> %val
+        IEndsWith,  // IENDSWITH -> %val (case insensitive)
+        NotEndsWith,// NOT ENDSWITH -> NOT %val
+        NotIEndsWith,// NOT IENDSWITH -> NOT %val (case insensitive)
         IsNull,     // IS NULL
         IsNotNull,  // IS NOT NULL
         In,         // IN (val1, val2, ...)

@@ -1068,73 +1068,166 @@ namespace DynamicDbQueryApi.Services
                 else if (comparisonOperator == ComparisonOperator.Like ||
                          comparisonOperator == ComparisonOperator.Contains ||
                          comparisonOperator == ComparisonOperator.BeginsWith ||
-                         comparisonOperator == ComparisonOperator.EndsWith)
+                         comparisonOperator == ComparisonOperator.EndsWith || 
+                         comparisonOperator == ComparisonOperator.NotLike ||
+                         comparisonOperator == ComparisonOperator.NotContains ||
+                         comparisonOperator == ComparisonOperator.NotBeginsWith ||
+                         comparisonOperator == ComparisonOperator.NotEndsWith)
                 {
+                    bool isStringLiteral = value.StartsWith("'") && value.EndsWith("'");
                     // Stringdeki tırnakları kaldır
                     string valueRaw = value.ToString().Trim('\'');
 
                     // Eğer value fonksiyon ise CONCAT ile işle
-                    if (funcValue != null)
+                    if (funcValue != null || !isStringLiteral)
                     {
                         if (comparisonOperator == ComparisonOperator.Like)
                         {
                             valueRaw = value.ToString();
                         }
-                        else if (comparisonOperator == ComparisonOperator.Contains)
+                        else if (comparisonOperator == ComparisonOperator.Contains || comparisonOperator == ComparisonOperator.NotContains)
                         {
                             valueRaw = ConcatExpressions(dbType, new List<string> { "'%'", value.ToString(), "'%'" });
                         }
-                        else if (comparisonOperator == ComparisonOperator.BeginsWith)
+                        else if (comparisonOperator == ComparisonOperator.BeginsWith || comparisonOperator == ComparisonOperator.NotBeginsWith)
                         {
                             valueRaw = ConcatExpressions(dbType, new List<string> { value.ToString(), "'%'" });
                         }
-                        else if (comparisonOperator == ComparisonOperator.EndsWith)
+                        else if (comparisonOperator == ComparisonOperator.EndsWith || comparisonOperator == ComparisonOperator.NotEndsWith)
                         {
                             valueRaw = ConcatExpressions(dbType, new List<string> { "'%'", value.ToString() });
                         }
-                        return $"{columnName} LIKE {valueRaw}";
+                        
+                        if (comparisonOperator == ComparisonOperator.NotLike || comparisonOperator == ComparisonOperator.NotContains || comparisonOperator == ComparisonOperator.NotBeginsWith || comparisonOperator == ComparisonOperator.NotEndsWith)
+                        {
+                            return $"{columnName} NOT LIKE {valueRaw}";
+                        }
+                        else
+                        {
+                            return $"{columnName} LIKE {valueRaw}";
+                        }
                     }
                     else
                     {
                         string pattern = comparisonOperator switch
                         {
                             ComparisonOperator.Like => $"{valueRaw}",
+                            ComparisonOperator.NotLike => $"{valueRaw}",
                             ComparisonOperator.Contains => $"%{valueRaw}%",
+                            ComparisonOperator.NotContains => $"%{valueRaw}%",
                             ComparisonOperator.BeginsWith => $"{valueRaw}%",
+                            ComparisonOperator.NotBeginsWith => $"{valueRaw}%",
                             ComparisonOperator.EndsWith => $"%{valueRaw}",
+                            ComparisonOperator.NotEndsWith => $"%{valueRaw}",
                             _ => throw new NotSupportedException($"Unsupported operator {comparisonOperator}")
                         };
-                        return $"{columnName} LIKE '{pattern}'";
+                        if (comparisonOperator == ComparisonOperator.NotLike || comparisonOperator == ComparisonOperator.NotContains || comparisonOperator == ComparisonOperator.NotBeginsWith || comparisonOperator == ComparisonOperator.NotEndsWith)
+                        {
+                            return $"{columnName} NOT LIKE '{pattern}'";
+                        }
+                        else
+                        {
+                            return $"{columnName} LIKE '{pattern}'";
+                        }
                     }
                 }
-                else if (comparisonOperator == ComparisonOperator.In || comparisonOperator == ComparisonOperator.NotIn)
+                else if (comparisonOperator == ComparisonOperator.ILike ||
+                         comparisonOperator == ComparisonOperator.IContains ||
+                         comparisonOperator == ComparisonOperator.IBeginsWith ||
+                         comparisonOperator == ComparisonOperator.IEndsWith || 
+                         comparisonOperator == ComparisonOperator.NotILike ||
+                         comparisonOperator == ComparisonOperator.NotIContains ||
+                         comparisonOperator == ComparisonOperator.NotIBeginsWith ||
+                         comparisonOperator == ComparisonOperator.NotIEndsWith)
                 {
-                    return $"{columnName} {(comparisonOperator == ComparisonOperator.In ? "IN" : "NOT IN")} ({value})";
-                }
-                else if (comparisonOperator == ComparisonOperator.Between || comparisonOperator == ComparisonOperator.NotBetween)
-                {
-                    var parts = value.ToString().Split(new[] { ',' }, 2);
-                    if (parts.Length != 2)
-                    {
-                        throw new ArgumentException($"Value for BETWEEN operator must contain two comma-separated values.");
-                    }
-                    return $"{columnName} {(comparisonOperator == ComparisonOperator.Between ? "BETWEEN" : "NOT BETWEEN")} {parts[0].Trim()} AND {parts[1].Trim()}";
-                }
-                else
-                {
-                    string sqlOperator = comparisonOperator switch
-                    {
-                        ComparisonOperator.Eq => "=",
-                        ComparisonOperator.Neq => "!=",
-                        ComparisonOperator.Lt => "<",
-                        ComparisonOperator.Lte => "<=",
-                        ComparisonOperator.Gt => ">",
-                        ComparisonOperator.Gte => ">=",
-                        _ => throw new NotSupportedException($"Unsupported operator {comparisonOperator}")
-                    };
+                    bool isStringLiteral = value.StartsWith("'") && value.EndsWith("'");
+                    // Stringdeki tırnakları kaldır
+                    string valueRaw = value.ToString().Trim('\'');
 
-                    return $"{columnName} {sqlOperator} {value}";
+                    // Eğer value fonksiyon ise CONCAT ile işle
+                    if (funcValue != null || !isStringLiteral)
+                    {
+                        if (comparisonOperator == ComparisonOperator.ILike)
+                        {
+                            valueRaw = value.ToString();
+                        }
+                        else if (comparisonOperator == ComparisonOperator.IContains || comparisonOperator == ComparisonOperator.NotIContains)
+                        {
+                            valueRaw = ConcatExpressions(dbType, new List<string> { "'%'", value.ToString(), "'%'" });
+                        }
+                        else if (comparisonOperator == ComparisonOperator.IBeginsWith || comparisonOperator == ComparisonOperator.NotIBeginsWith)
+                        {
+                            valueRaw = ConcatExpressions(dbType, new List<string> { value.ToString(), "'%'" });
+                        }
+                        else if (comparisonOperator == ComparisonOperator.IEndsWith || comparisonOperator == ComparisonOperator.NotIEndsWith)
+                        {
+                            valueRaw = ConcatExpressions(dbType, new List<string> { "'%'", value.ToString() });
+                        }
+
+                        if (comparisonOperator == ComparisonOperator.NotILike || comparisonOperator == ComparisonOperator.NotIContains || comparisonOperator == ComparisonOperator.NotIBeginsWith || comparisonOperator == ComparisonOperator.NotIEndsWith)
+                        {
+                            return $"LOWER({columnName}) NOT LIKE LOWER({valueRaw})";
+                        }
+                        else
+                        {
+                            return $"LOWER({columnName}) LIKE LOWER({valueRaw})";
+                        }
+                    }
+                    else
+                    {
+                        valueRaw = valueRaw.ToLower();
+                        string pattern = comparisonOperator switch
+                        {
+                            ComparisonOperator.ILike => $"{valueRaw}",
+                            ComparisonOperator.NotILike => $"{valueRaw}",
+                            ComparisonOperator.IContains => $"%{valueRaw}%",
+                            ComparisonOperator.NotIContains => $"%{valueRaw}%",
+                            ComparisonOperator.IBeginsWith => $"{valueRaw}%",
+                            ComparisonOperator.NotIBeginsWith => $"{valueRaw}%",
+                            ComparisonOperator.IEndsWith => $"%{valueRaw}",
+                            ComparisonOperator.NotIEndsWith => $"%{valueRaw}",
+                            _ => throw new NotSupportedException($"Unsupported operator {comparisonOperator}")
+                        };
+                        if (comparisonOperator == ComparisonOperator.NotILike || comparisonOperator == ComparisonOperator.NotIContains || comparisonOperator == ComparisonOperator.NotIBeginsWith || comparisonOperator == ComparisonOperator.NotIEndsWith)
+                        {
+                            return $"LOWER({columnName}) NOT LIKE '{pattern}'";
+                        }
+                        else
+                        {
+                            return $"LOWER({columnName}) LIKE '{pattern}'";
+                        }
+                    }
                 }
+
+
+                else if (comparisonOperator == ComparisonOperator.In || comparisonOperator == ComparisonOperator.NotIn)
+                    {
+                        return $"{columnName} {(comparisonOperator == ComparisonOperator.In ? "IN" : "NOT IN")} ({value})";
+                    }
+                    else if (comparisonOperator == ComparisonOperator.Between || comparisonOperator == ComparisonOperator.NotBetween)
+                    {
+                        var parts = value.ToString().Split(new[] { ',' }, 2);
+                        if (parts.Length != 2)
+                        {
+                            throw new ArgumentException($"Value for BETWEEN operator must contain two comma-separated values.");
+                        }
+                        return $"{columnName} {(comparisonOperator == ComparisonOperator.Between ? "BETWEEN" : "NOT BETWEEN")} {parts[0].Trim()} AND {parts[1].Trim()}";
+                    }
+                    else
+                    {
+                        string sqlOperator = comparisonOperator switch
+                        {
+                            ComparisonOperator.Eq => "=",
+                            ComparisonOperator.Neq => "!=",
+                            ComparisonOperator.Lt => "<",
+                            ComparisonOperator.Lte => "<=",
+                            ComparisonOperator.Gt => ">",
+                            ComparisonOperator.Gte => ">=",
+                            _ => throw new NotSupportedException($"Unsupported operator {comparisonOperator}")
+                        };
+
+                        return $"{columnName} {sqlOperator} {value}";
+                    }
             }
             else if (filter is LogicalFilterModel logical)
             {

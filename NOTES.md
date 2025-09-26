@@ -18,3 +18,8 @@ User Id=system;Password=oracle;Data Source=localhost/FREEPDB1;
 User Id=system;Password=oracle;Data Source=localhost:1521/FREEPDB1;
 
 system/oracle@localhost/FREEPDB1
+
+
+not like
+table alias
+ilike

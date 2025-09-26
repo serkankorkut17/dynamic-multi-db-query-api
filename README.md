@@ -190,18 +190,43 @@ LIMIT  10;
 
 ### 2. String Match Operators
 
-| OPERATOR   | SQL EQUIVALENT   |
-| ---------- | ---------------- |
-| CONTAINS   | col LIKE '%val%' |
-| STARTSWITH | col LIKE 'val%'  |
-| BEGINSWITH | col LIKE 'val%'  |
-| ENDSWITH   | col LIKE '%val'  |
-| LIKE       | col LIKE 'same'  |
+| OPERATOR        | SQL EQUIVALENT              |
+| --------------- | --------------------------- |
+| LIKE            | col LIKE 'same'             |
+| ILIKE           | LOWER(col) LIKE 'same'      |
+| NOT LIKE        | col NOT LIKE 'same'         |
+| NOT ILIKE       | LOWER(col) NOT LIKE 'same'  |
+| CONTAINS        | col LIKE '%val%'            |
+| ICONTAINS       | LOWER(col) LIKE '%val%'     |
+| NOT CONTAINS    | col NOT LIKE '%val%'        |
+| NOT ICONTAINS   | LOWER(col) NOT LIKE '%val%' |
+| STARTSWITH      | col LIKE 'val%'             |
+| ISTARTSWITH     | LOWER(col) LIKE 'val%'      |
+| NOT STARTSWITH  | col NOT LIKE 'val%'         |
+| NOT ISTARTSWITH | LOWER(col) NOT LIKE 'val%'  |
+| BEGINSWITH      | col LIKE 'val%'             |
+| IBEGINSWITH     | LOWER(col) LIKE 'val%'      |
+| NOT BEGINSWITH  | col NOT LIKE 'val%'         |
+| NOT IBEGINSWITH | LOWER(col) NOT LIKE 'val%'  |
+| ENDSWITH        | col LIKE '%val'             |
+| IENDSWITH       | LOWER(col) LIKE '%val'      |
+| NOT ENDSWITH    | col NOT LIKE '%val'         |
+| NOT IENDSWITH   | LOWER(col) NOT LIKE '%val'  |
 
 - Usage: column OPERATOR 'value', column OPERATOR('...')
+
   > name CONTAINS('Serkan')
   > <br>
   > LOWER(name) CONTAINS('serkan')
+
+- For case-insensitive operators (ILIKE, ICONTAINS, ISTARTSWITH, IENDSWITH), the column is converted to LOWER() and the value is also converted to lowercase.
+  > name ILIKE 'serkan' → LOWER(name) LIKE 'serkan'
+  > <br>
+  > name ICONTAINS('serkan') → LOWER(name) LIKE '%serkan%'
+  > <br>
+  > name ISTARTSWITH('serkan') → LOWER(name) LIKE 'serkan%'
+  > <br>
+  > name IENDSWITH('serkan') → LOWER(name) LIKE '%serkan'
 
 ### 3. NULL Operators
 

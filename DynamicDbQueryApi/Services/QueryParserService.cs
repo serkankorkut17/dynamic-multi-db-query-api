@@ -152,8 +152,6 @@ namespace DynamicDbQueryApi.Services
                         {
                             alias = "_" + alias;
                         }
-
-                        // Eğer alias çok uzunsa kısalt
                     }
 
                     // Eğer alias sayı ile başlıyorsa başına _ ekle
@@ -276,9 +274,9 @@ namespace DynamicDbQueryApi.Services
                 return new IncludeModel
                 {
                     Table = fromTable,
-                    TableKey = col1,
+                    TableKey = col1, // Ana tablonun anahtarı
                     IncludeTable = tableName,
-                    IncludeKey = col2,
+                    IncludeKey = col2, // Include tablonun anahtarı
                     JoinType = joinType
                 };
             }
@@ -977,10 +975,19 @@ namespace DynamicDbQueryApi.Services
             var pattern = @"^\s*
                     (?<op>
                         >=|<=|!=|<>|==|=|>|<
-                        |IS\s+NOT|IS
                         |NOT\s+IN|IN
                         |NOT\s+BETWEEN|BETWEEN
-                        |LIKE|CONTAINS|STARTSWITH|BEGINSWITH|ENDSWITH
+                        |NOT\s+LIKE|LIKE
+                        |NOT\s+ILIKE|ILIKE
+                        |NOT\s+CONTAINS|CONTAINS
+                        |NOT\s+ICONTAINS|ICONTAINS
+                        |NOT\s+STARTSWITH|STARTSWITH
+                        |NOT\s+ISTARTSWITH|ISTARTSWITH
+                        |NOT\s+BEGINSWITH|BEGINSWITH
+                        |NOT\s+IBEGINSWITH|IBEGINSWITH
+                        |NOT\s+ENDSWITH|ENDSWITH
+                        |NOT\s+IENDSWITH|IENDSWITH
+                        |IS\s+NOT|IS
                     )
                     \s*
                     (?:\(\s*(?<rhs>.*?)\s*\)|(?<rhs>.+?))?
@@ -993,6 +1000,9 @@ namespace DynamicDbQueryApi.Services
 
             string op = m.Groups["op"].Value.ToUpperInvariant();
             string rhs = m.Groups["rhs"].Value.Trim();
+
+            Console.WriteLine($"Condition: {s}, Col: {col}, Op: {op}, Rhs: {rhs}");
+            
 
             // Genel operatorler (>=, <=, !=, <>, ==, =, >, <, CONTAINS, STARTSWITH, BEGINSWITH, ENDSWITH, LIKE)
             // var m = Regex.Match(s,
@@ -1021,11 +1031,26 @@ namespace DynamicDbQueryApi.Services
                 case "<": comp = ComparisonOperator.Lt; break;
                 case ">=": comp = ComparisonOperator.Gte; break;
                 case "<=": comp = ComparisonOperator.Lte; break;
+                case "LIKE": comp = ComparisonOperator.Like; break;
+                case "ILIKE": comp = ComparisonOperator.ILike; break;
+                case "NOT LIKE": comp = ComparisonOperator.NotLike; break;
+                case "NOT ILIKE": comp = ComparisonOperator.NotILike; break;
                 case "CONTAINS": comp = ComparisonOperator.Contains; break;
+                case "ICONTAINS": comp = ComparisonOperator.IContains; break;
+                case "NOT CONTAINS": comp = ComparisonOperator.NotContains; break;
+                case "NOT ICONTAINS": comp = ComparisonOperator.NotIContains; break;
                 case "STARTSWITH": comp = ComparisonOperator.BeginsWith; break;
                 case "BEGINSWITH": comp = ComparisonOperator.BeginsWith; break;
+                case "ISTARTSWITH": comp = ComparisonOperator.IBeginsWith; break;
+                case "IBEGINSWITH": comp = ComparisonOperator.IBeginsWith; break;
+                case "NOT STARTSWITH": comp = ComparisonOperator.NotBeginsWith; break;
+                case "NOT BEGINSWITH": comp = ComparisonOperator.NotBeginsWith; break;
+                case "NOT ISTARTSWITH": comp = ComparisonOperator.NotIBeginsWith; break;
+                case "NOT IBEGINSWITH": comp = ComparisonOperator.NotIBeginsWith; break;
                 case "ENDSWITH": comp = ComparisonOperator.EndsWith; break;
-                case "LIKE": comp = ComparisonOperator.Like; break;
+                case "IENDSWITH": comp = ComparisonOperator.IEndsWith; break;
+                case "NOT ENDSWITH": comp = ComparisonOperator.NotEndsWith; break;
+                case "NOT IENDSWITH": comp = ComparisonOperator.NotIEndsWith; break;
                 case "IS": comp = ComparisonOperator.IsNull; break;
                 case "IS NOT": comp = ComparisonOperator.IsNotNull; break;
                 case "IN": comp = ComparisonOperator.In; break;

@@ -382,4 +382,95 @@
 			"mssql": "SELECT TOP 10 sc.city, COUNT(st.id) AS cnt FROM students st LEFT JOIN classes cl ON cl.id = st.class_id LEFT JOIN schools sc ON sc.id = cl.school_id GROUP BY sc.city ORDER BY cnt DESC",
 			"oracle": "SELECT sc.city, COUNT(st.id) cnt FROM students st LEFT JOIN classes cl ON cl.id = st.class_id LEFT JOIN schools sc ON sc.id = cl.school_id GROUP BY sc.city ORDER BY cnt DESC FETCH FIRST 10 ROWS ONLY"
 		}
+,
+	{
+		"id": "string_ops_istartswith",
+		"description": "Case-insensitive startswith using ISTARTSWITH",
+		"dsl": "FETCH(id, first_name) FROM students FILTER(first_name ISTARTSWITH 'm') LIMIT(20)",
+		"postgres": "SELECT id, first_name FROM students WHERE first_name ILIKE 'm%' LIMIT 20",
+		"mysql": "SELECT id, first_name FROM students WHERE LOWER(first_name) LIKE 'm%' LIMIT 20",
+		"mssql": "SELECT TOP 20 id, first_name FROM students WHERE LOWER(first_name) LIKE 'm%'",
+		"oracle": "SELECT id, first_name FROM students WHERE LOWER(first_name) LIKE 'm%' FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "string_ops_iendswith",
+		"description": "Case-insensitive endswith using IENDSWITH",
+		"dsl": "FETCH(id, last_name) FROM students FILTER(last_name IENDSWITH 'son') LIMIT(20)",
+		"postgres": "SELECT id, last_name FROM students WHERE last_name ILIKE '%son' LIMIT 20",
+		"mysql": "SELECT id, last_name FROM students WHERE LOWER(last_name) LIKE '%son' LIMIT 20",
+		"mssql": "SELECT TOP 20 id, last_name FROM students WHERE LOWER(last_name) LIKE '%son'",
+		"oracle": "SELECT id, last_name FROM students WHERE LOWER(last_name) LIKE '%son' FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "string_ops_icontains",
+		"description": "Case-insensitive contains using ICONTAINS",
+		"dsl": "FETCH(id, email) FROM students FILTER(email ICONTAINS 'edu') LIMIT(20)",
+		"postgres": "SELECT id, email FROM students WHERE email ILIKE '%edu%' LIMIT 20",
+		"mysql": "SELECT id, email FROM students WHERE LOWER(email) LIKE '%edu%' LIMIT 20",
+		"mssql": "SELECT TOP 20 id, email FROM students WHERE LOWER(email) LIKE '%edu%'",
+		"oracle": "SELECT id, email FROM students WHERE LOWER(email) LIKE '%edu%' FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "string_ops_not_startswith",
+		"description": "Negated startswith using NOT STARTSWITH",
+		"dsl": "FETCH(id, first_name) FROM students FILTER(first_name NOT STARTSWITH 'A') LIMIT(20)",
+		"postgres": "SELECT id, first_name FROM students WHERE first_name NOT LIKE 'A%' LIMIT 20",
+		"mysql": "SELECT id, first_name FROM students WHERE first_name NOT LIKE 'A%' LIMIT 20",
+		"mssql": "SELECT TOP 20 id, first_name FROM students WHERE first_name NOT LIKE 'A%'",
+		"oracle": "SELECT id, first_name FROM students WHERE first_name NOT LIKE 'A%' FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "string_ops_not_between",
+		"description": "Numeric NOT BETWEEN example",
+		"dsl": "FETCH(id, progress_percent) FROM enrollments FILTER(progress_percent NOT BETWEEN 40 AND 60) LIMIT(20)",
+		"postgres": "SELECT id, progress_percent FROM enrollments WHERE progress_percent NOT BETWEEN 40 AND 60 LIMIT 20",
+		"mysql": "SELECT id, progress_percent FROM enrollments WHERE progress_percent NOT BETWEEN 40 AND 60 LIMIT 20",
+		"mssql": "SELECT TOP 20 id, progress_percent FROM enrollments WHERE progress_percent NOT BETWEEN 40 AND 60",
+		"oracle": "SELECT id, progress_percent FROM enrollments WHERE progress_percent NOT BETWEEN 40 AND 60 FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "string_ops_not_in",
+		"description": "Negated IN with Turkish characters",
+		"dsl": "FETCH(id, name, city) FROM schools FILTER(city NOT IN ('İstanbul','Ankara')) LIMIT(20)",
+		"postgres": "SELECT id, name, city FROM schools WHERE city NOT IN ('İstanbul','Ankara') LIMIT 20",
+		"mysql": "SELECT id, name, city FROM schools WHERE city NOT IN ('İstanbul','Ankara') LIMIT 20",
+		"mssql": "SELECT TOP 20 id, name, city FROM schools WHERE city NOT IN (N'İstanbul', N'Ankara')",
+		"oracle": "SELECT id, name, city FROM schools WHERE city NOT IN ('İstanbul','Ankara') FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "string_ops_is_not_null",
+		"description": "IS NOT NULL simple filter",
+		"dsl": "FETCH(id, first_name, gpa) FROM students FILTER(gpa IS NOT NULL) LIMIT(20)",
+		"postgres": "SELECT id, first_name, gpa FROM students WHERE gpa IS NOT NULL LIMIT 20",
+		"mysql": "SELECT id, first_name, gpa FROM students WHERE gpa IS NOT NULL LIMIT 20",
+		"mssql": "SELECT TOP 20 id, first_name, gpa FROM students WHERE gpa IS NOT NULL",
+		"oracle": "SELECT id, first_name, gpa FROM students WHERE gpa IS NOT NULL FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "string_ops_not_iendswith",
+		"description": "Negated case-insensitive endswith (NOT IENDSWITH)",
+		"dsl": "FETCH(id, email) FROM students FILTER(email NOT IENDSWITH '.com') LIMIT(20)",
+		"postgres": "SELECT id, email FROM students WHERE email NOT ILIKE '%.com' LIMIT 20",
+		"mysql": "SELECT id, email FROM students WHERE NOT (LOWER(email) LIKE '%.com') LIMIT 20",
+		"mssql": "SELECT TOP 20 id, email FROM students WHERE NOT (LOWER(email) LIKE '%.com')",
+		"oracle": "SELECT id, email FROM students WHERE NOT (LOWER(email) LIKE '%.com') FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "string_ops_beginswith_syn",
+		"description": "BEGINSWITH synonym for STARTSWITH",
+		"dsl": "FETCH(id, first_name) FROM students FILTER(first_name BEGINSWITH 'A') LIMIT(15)",
+		"postgres": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' LIMIT 15",
+		"mysql": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' LIMIT 15",
+		"mssql": "SELECT TOP 15 id, first_name FROM students WHERE first_name LIKE 'A%'",
+		"oracle": "SELECT id, first_name FROM students WHERE first_name LIKE 'A%' FETCH FIRST 15 ROWS ONLY"
+	},
+	{
+		"id": "string_ops_complex_combo",
+		"description": "Complex combo: ICONTAINS + NOT ILIKE",
+		"dsl": "FETCH(id, first_name, last_name) FROM students FILTER(first_name ICONTAINS 'dem' AND last_name NOT ILIKE '%test%') LIMIT(20)",
+		"postgres": "SELECT id, first_name, last_name FROM students WHERE first_name ILIKE '%dem%' AND last_name NOT ILIKE '%test%' LIMIT 20",
+		"mysql": "SELECT id, first_name, last_name FROM students WHERE LOWER(first_name) LIKE '%dem%' AND NOT (LOWER(last_name) LIKE '%test%') LIMIT 20",
+		"mssql": "SELECT TOP 20 id, first_name, last_name FROM students WHERE LOWER(first_name) LIKE '%dem%' AND NOT (LOWER(last_name) LIKE '%test%')",
+		"oracle": "SELECT id, first_name, last_name FROM students WHERE LOWER(first_name) LIKE '%dem%' AND NOT (LOWER(last_name) LIKE '%test%') FETCH FIRST 20 ROWS ONLY"
+	}
 ]
