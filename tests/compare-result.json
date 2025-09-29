@@ -503,7 +503,7 @@
           "Result": [
             {
               "age": 4,
-              "cnt": 62
+              "cnt": 63
             },
             {
               "age": 1,
@@ -514,12 +514,12 @@
               "cnt": 57
             },
             {
-              "age": 3,
-              "cnt": 57
-            },
-            {
               "age": 0,
               "cnt": 56
+            },
+            {
+              "age": 3,
+              "cnt": 53
             }
           ]
         }
@@ -1474,6 +1474,80 @@
             }
           ]
         }
+      },
+      {
+        "id": 40,
+        "dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DATENAME(DAY, enrolled_at) AS dow, COUNT(*) AS cnt) FROM enrollments GROUPBY(yr, mo, dow) ORDERBY(yr DESC, mo DESC, cnt DESC) LIMIT(21)",
+        "sql": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, TO_CHAR(enrolled_at, 'Day') AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), TO_CHAR(enrolled_at, 'Day') ORDER BY yr DESC, mo DESC, cnt DESC LIMIT 21",
+        "convertedSql": "SELECT EXTRACT(YEAR FROM enrollments.enrolled_at) AS yr, EXTRACT(MONTH FROM enrollments.enrolled_at) AS mo, TRIM(TO_CHAR(enrollments.enrolled_at, 'DAY')) AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY EXTRACT(YEAR FROM enrollments.enrolled_at), EXTRACT(MONTH FROM enrollments.enrolled_at), TRIM(TO_CHAR(enrollments.enrolled_at, 'DAY')) ORDER BY EXTRACT(YEAR FROM enrollments.enrolled_at) DESC, EXTRACT(MONTH FROM enrollments.enrolled_at) DESC, COUNT(*) DESC LIMIT 21 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "yr": 2025,
+              "mo": 9,
+              "dow": "TUESDAY",
+              "cnt": 79
+            },
+            {
+              "yr": 2025,
+              "mo": 9,
+              "dow": "MONDAY",
+              "cnt": 73
+            },
+            {
+              "yr": 2025,
+              "mo": 9,
+              "dow": "SATURDAY",
+              "cnt": 65
+            },
+            {
+              "yr": 2025,
+              "mo": 9,
+              "dow": "FRIDAY",
+              "cnt": 61
+            },
+            {
+              "yr": 2025,
+              "mo": 9,
+              "dow": "SUNDAY",
+              "cnt": 60
+            }
+          ]
+        }
+      },
+      {
+        "id": 41,
+        "dsl": "FETCH(DATENAME(MONTH, enrolled_at) AS mon_name, COUNT(*) AS cnt) FROM enrollments GROUPBY(mon_name) ORDERBY(cnt DESC) LIMIT(12)",
+        "sql": "SELECT TO_CHAR(enrolled_at, 'Month') AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY TO_CHAR(enrolled_at, 'Month') ORDER BY cnt DESC LIMIT 12",
+        "convertedSql": "SELECT TRIM(TO_CHAR(enrollments.enrolled_at, 'MONTH')) AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY TRIM(TO_CHAR(enrollments.enrolled_at, 'MONTH')) ORDER BY COUNT(*) DESC LIMIT 12 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "mon_name": "JULY",
+              "cnt": 639
+            },
+            {
+              "mon_name": "JUNE",
+              "cnt": 617
+            },
+            {
+              "mon_name": "AUGUST",
+              "cnt": 604
+            },
+            {
+              "mon_name": "SEPTEMBER",
+              "cnt": 454
+            },
+            {
+              "mon_name": "MAY",
+              "cnt": 86
+            }
+          ]
+        }
       }
     ]
   },
@@ -1969,22 +2043,22 @@
           "Result": [
             {
               "age": 3,
-              "cnt": 66
-            },
-            {
-              "age": 1,
-              "cnt": 63
+              "cnt": 64
             },
             {
               "age": 4,
-              "cnt": 59
+              "cnt": 61
             },
             {
-              "age": 5,
-              "cnt": 56
+              "age": 1,
+              "cnt": 61
             },
             {
               "age": 2,
+              "cnt": 57
+            },
+            {
+              "age": 5,
               "cnt": 55
             }
           ]
@@ -2891,6 +2965,40 @@
             }
           ]
         }
+      },
+      {
+        "id": 40,
+        "dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DATENAME(DAY, enrolled_at) AS dow, COUNT(*) AS cnt) FROM enrollments GROUPBY(yr, mo, dow) ORDERBY(yr DESC, mo DESC, cnt DESC) LIMIT(21)",
+        "sql": "SELECT TOP 21 YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DATENAME(WEEKDAY, enrolled_at) AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DATENAME(WEEKDAY, enrolled_at) ORDER BY yr DESC, mo DESC, cnt DESC",
+        "convertedSql": "SELECT YEAR(enrollments.enrolled_at) AS yr, MONTH(enrollments.enrolled_at) AS mo, DATENAME(WEEKDAY, enrollments.enrolled_at) AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY YEAR(enrollments.enrolled_at), MONTH(enrollments.enrolled_at), DATENAME(WEEKDAY, enrollments.enrolled_at) ORDER BY YEAR(enrollments.enrolled_at) DESC, MONTH(enrollments.enrolled_at) DESC, COUNT(*) DESC OFFSET 0 ROWS FETCH NEXT 21 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "yr": 2025,
+              "mo": 9,
+              "dow": "Tuesday",
+              "cnt": 2400
+            }
+          ]
+        }
+      },
+      {
+        "id": 41,
+        "dsl": "FETCH(DATENAME(MONTH, enrolled_at) AS mon_name, COUNT(*) AS cnt) FROM enrollments GROUPBY(mon_name) ORDERBY(cnt DESC) LIMIT(12)",
+        "sql": "SELECT TOP 12 DATENAME(MONTH, enrolled_at) AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY DATENAME(MONTH, enrolled_at) ORDER BY cnt DESC",
+        "convertedSql": "SELECT DATENAME(MONTH, enrollments.enrolled_at) AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY DATENAME(MONTH, enrollments.enrolled_at) ORDER BY COUNT(*) DESC OFFSET 0 ROWS FETCH NEXT 12 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "mon_name": "September",
+              "cnt": 2400
+            }
+          ]
+        }
       }
     ]
   },
@@ -3430,7 +3538,7 @@
             },
             {
               "age": 5,
-              "cnt": 48
+              "cnt": 47
             }
           ]
         }
@@ -4341,6 +4449,40 @@
             }
           ]
         }
+      },
+      {
+        "id": 40,
+        "dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DATENAME(DAY, enrolled_at) AS dow, COUNT(*) AS cnt) FROM enrollments GROUPBY(yr, mo, dow) ORDERBY(yr DESC, mo DESC, cnt DESC) LIMIT(21)",
+        "sql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAYNAME(enrolled_at) AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAYNAME(enrolled_at) ORDER BY yr DESC, mo DESC, cnt DESC LIMIT 21",
+        "convertedSql": "SELECT YEAR(enrollments.enrolled_at) AS yr, MONTH(enrollments.enrolled_at) AS mo, DAYNAME(enrollments.enrolled_at) AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY YEAR(enrollments.enrolled_at), MONTH(enrollments.enrolled_at), DAYNAME(enrollments.enrolled_at) ORDER BY YEAR(enrollments.enrolled_at) DESC, MONTH(enrollments.enrolled_at) DESC, COUNT(*) DESC LIMIT 21 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "yr": 2025,
+              "mo": 9,
+              "dow": "Tuesday",
+              "cnt": 2400
+            }
+          ]
+        }
+      },
+      {
+        "id": 41,
+        "dsl": "FETCH(DATENAME(MONTH, enrolled_at) AS mon_name, COUNT(*) AS cnt) FROM enrollments GROUPBY(mon_name) ORDERBY(cnt DESC) LIMIT(12)",
+        "sql": "SELECT MONTHNAME(enrolled_at) AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY MONTHNAME(enrolled_at) ORDER BY cnt DESC LIMIT 12",
+        "convertedSql": "SELECT MONTHNAME(enrollments.enrolled_at) AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY MONTHNAME(enrollments.enrolled_at) ORDER BY COUNT(*) DESC LIMIT 12 OFFSET 0",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "mon_name": "September",
+              "cnt": 2400
+            }
+          ]
+        }
       }
     ]
   },
@@ -4864,7 +5006,7 @@
           "Result": [
             {
               "AGE": 1,
-              "CNT": 69
+              "CNT": 67
             },
             {
               "AGE": 5,
@@ -4876,11 +5018,11 @@
             },
             {
               "AGE": 2,
-              "CNT": 55
+              "CNT": 56
             },
             {
               "AGE": 4,
-              "CNT": 55
+              "CNT": 56
             }
           ]
         }
@@ -5779,6 +5921,40 @@
               "ID": 110,
               "FIRST_NAME": "Derya",
               "LAST_NAME": "Yılmaz"
+            }
+          ]
+        }
+      },
+      {
+        "id": 40,
+        "dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DATENAME(DAY, enrolled_at) AS dow, COUNT(*) AS cnt) FROM enrollments GROUPBY(yr, mo, dow) ORDERBY(yr DESC, mo DESC, cnt DESC) LIMIT(21)",
+        "sql": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, TO_CHAR(enrolled_at, 'Day') AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), TO_CHAR(enrolled_at, 'Day') ORDER BY yr DESC, mo DESC, cnt DESC FETCH FIRST 21 ROWS ONLY",
+        "convertedSql": "SELECT EXTRACT(YEAR FROM enrollments.enrolled_at) AS yr, EXTRACT(MONTH FROM enrollments.enrolled_at) AS mo, TRIM(TO_CHAR(enrollments.enrolled_at, 'DAY')) AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY EXTRACT(YEAR FROM enrollments.enrolled_at), EXTRACT(MONTH FROM enrollments.enrolled_at), TRIM(TO_CHAR(enrollments.enrolled_at, 'DAY')) ORDER BY EXTRACT(YEAR FROM enrollments.enrolled_at) DESC, EXTRACT(MONTH FROM enrollments.enrolled_at) DESC, COUNT(*) DESC OFFSET 0 ROWS FETCH NEXT 21 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "YR": 2025,
+              "MO": 9,
+              "DOW": "TUESDAY",
+              "CNT": 2400
+            }
+          ]
+        }
+      },
+      {
+        "id": 41,
+        "dsl": "FETCH(DATENAME(MONTH, enrolled_at) AS mon_name, COUNT(*) AS cnt) FROM enrollments GROUPBY(mon_name) ORDERBY(cnt DESC) LIMIT(12)",
+        "sql": "SELECT TO_CHAR(enrolled_at, 'Month') AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY TO_CHAR(enrolled_at, 'Month') ORDER BY cnt DESC FETCH FIRST 12 ROWS ONLY",
+        "convertedSql": "SELECT TRIM(TO_CHAR(enrollments.enrolled_at, 'MONTH')) AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY TRIM(TO_CHAR(enrollments.enrolled_at, 'MONTH')) ORDER BY COUNT(*) DESC OFFSET 0 ROWS FETCH NEXT 12 ROWS ONLY",
+        "same": true,
+        "isEmpty": false,
+        "Example": {
+          "Result": [
+            {
+              "MON_NAME": "SEPTEMBER",
+              "CNT": 2400
             }
           ]
         }

@@ -560,20 +560,40 @@ namespace DynamicDbQueryApi.Services
             // Tek parametreli numeric fonksiyonları kontrol et
             if (numericFuncs.Contains(functionString))
             {
-                if (innerParams.Count == 1)
+                if (functionString == "ABS" || functionString == "CEIL" || functionString == "CEILING" || functionString == "FLOOR" || functionString == "SQRT" || functionString == "EXP" || functionString == "LN" || functionString == "LOG10")
                 {
+                    if (innerParams.Count != 1)
+                    {
+                        throw new Exception($"Invalid usage of numeric function {functionString} with multiple parameters.");
+                    }
                     return $"{functionString}({innerParams[0]})";
                 }
-                else if (innerParams.Count == 2)
+                if (functionString == "ROUND" || functionString == "LOG")
                 {
+                    if (innerParams.Count == 1)
+                    {
+                        return $"{functionString}({innerParams[0]})";
+                    }
+                    else if (innerParams.Count == 2)
+                    {
+                        return $"{functionString}({innerParams[0]}, {innerParams[1]})";
+                    }
+                    else
+                    {
+                        throw new Exception($"Invalid usage of numeric function {functionString} with incorrect number of parameters.");
+                    }
+                }
+                if (functionString == "POWER" || functionString == "MOD")
+                {
+                    if (innerParams.Count != 2)
+                    {
+                        throw new Exception($"Invalid usage of numeric function {functionString} with incorrect number of parameters.");
+                    }
                     return $"{functionString}({innerParams[0]}, {innerParams[1]})";
                 }
-                else
-                {
-                    throw new Exception($"Invalid usage of numeric function {functionString} with incorrect number of parameters.");
-                }
-            }
 
+                throw new Exception($"Unknown numeric function {functionString}.");
+            }
 
             // Metin fonksiyonlarını yakala (LENGTH, LEN, SUBSTRING, SUBSTR, CONCAT, LOWER, UPPER, TRIM, LTRIM, RTRIM, INDEXOF, REPLACE, REVERSE)
             var stringFuncs = new[] { "LENGTH", "LEN", "SUBSTRING", "SUBSTR", "CONCAT", "LOWER", "UPPER", "TRIM", "LTRIM", "RTRIM", "INDEXOF", "REPLACE", "REVERSE" };
@@ -1002,7 +1022,7 @@ namespace DynamicDbQueryApi.Services
             string rhs = m.Groups["rhs"].Value.Trim();
 
             Console.WriteLine($"Condition: {s}, Col: {col}, Op: {op}, Rhs: {rhs}");
-            
+
 
             // Genel operatorler (>=, <=, !=, <>, ==, =, >, <, CONTAINS, STARTSWITH, BEGINSWITH, ENDSWITH, LIKE)
             // var m = Regex.Match(s,

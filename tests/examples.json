@@ -473,4 +473,105 @@
 		"mssql": "SELECT TOP 20 id, first_name, last_name FROM students WHERE LOWER(first_name) LIKE '%dem%' AND NOT (LOWER(last_name) LIKE '%test%')",
 		"oracle": "SELECT id, first_name, last_name FROM students WHERE LOWER(first_name) LIKE '%dem%' AND NOT (LOWER(last_name) LIKE '%test%') FETCH FIRST 20 ROWS ONLY"
 	}
+,
+	{
+		"id": "classes_created_last_24h",
+		"description": "Classes created in the last 24 hours (tests DATEADD HOUR + NOW/CURRENT_TIMESTAMP)",
+		"dsl": "FETCH(id, name, created_at) FROM classes FILTER(created_at >= DATEADD(HOUR, NOW(), -24)) ORDERBY(created_at DESC) LIMIT(20)",
+		"postgres": "SELECT id, name, created_at FROM classes WHERE created_at >= (NOW() - INTERVAL '24 hours') ORDER BY created_at DESC LIMIT 20",
+		"mysql": "SELECT id, name, created_at FROM classes WHERE created_at >= (NOW() - INTERVAL 24 HOUR) ORDER BY created_at DESC LIMIT 20",
+		"mssql": "SELECT TOP 20 id, name, created_at FROM classes WHERE created_at >= DATEADD(HOUR, -24, SYSDATETIME()) ORDER BY created_at DESC",
+		"oracle": "SELECT id, name, created_at FROM classes WHERE created_at >= (SYSTIMESTAMP - INTERVAL '24' HOUR) ORDER BY created_at DESC FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "enrollments_today",
+		"description": "Enrollments created today (tests TODAY() and day boundary)",
+		"dsl": "FETCH(id, student_id, course_id, enrolled_at) FROM enrollments FILTER(enrolled_at >= TODAY() AND enrolled_at < DATEADD(DAY, TODAY(), 1)) ORDERBY(enrolled_at DESC) LIMIT(20)",
+		"postgres": "SELECT id, student_id, course_id, enrolled_at FROM enrollments WHERE enrolled_at >= CURRENT_DATE AND enrolled_at < (CURRENT_DATE + INTERVAL '1 day') ORDER BY enrolled_at DESC LIMIT 20",
+		"mysql": "SELECT id, student_id, course_id, enrolled_at FROM enrollments WHERE enrolled_at >= CURRENT_DATE() AND enrolled_at < (CURRENT_DATE() + INTERVAL 1 DAY) ORDER BY enrolled_at DESC LIMIT 20",
+		"mssql": "SELECT TOP 20 id, student_id, course_id, enrolled_at FROM enrollments WHERE enrolled_at >= CAST(GETDATE() AS date) AND enrolled_at < DATEADD(DAY, 1, CAST(GETDATE() AS date)) ORDER BY enrolled_at DESC",
+		"oracle": "SELECT id, student_id, course_id, enrolled_at FROM enrollments WHERE enrolled_at >= TRUNC(SYSDATE) AND enrolled_at < (TRUNC(SYSDATE) + INTERVAL '1' DAY) ORDER BY enrolled_at DESC FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "enrollments_days_since",
+		"description": "Days since enrollment (tests DATEDIFF with DAY)",
+		"dsl": "FETCH(id, DATEDIFF(DAY, enrolled_at, TODAY()) AS days_since) FROM enrollments ORDERBY(days_since ASC) LIMIT(20)",
+		"postgres": "SELECT id, (CURRENT_DATE - DATE(enrolled_at)) AS days_since FROM enrollments ORDER BY days_since ASC LIMIT 20",
+		"mysql": "SELECT id, TIMESTAMPDIFF(DAY, enrolled_at, CURRENT_DATE()) AS days_since FROM enrollments ORDER BY days_since ASC LIMIT 20",
+		"mssql": "SELECT TOP 20 id, DATEDIFF(DAY, enrolled_at, CAST(GETDATE() AS date)) AS days_since FROM enrollments ORDER BY days_since ASC",
+		"oracle": "SELECT id, (TRUNC(SYSDATE) - TRUNC(enrolled_at)) AS days_since FROM enrollments ORDER BY days_since ASC FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "enrollments_last_week",
+		"description": "Enrollments in the last week (tests DATEADD WEEK + TODAY)",
+		"dsl": "FETCH(id, enrolled_at) FROM enrollments FILTER(enrolled_at >= DATEADD(WEEK, TODAY(), -1)) ORDERBY(enrolled_at DESC) LIMIT(20)",
+		"postgres": "SELECT id, enrolled_at FROM enrollments WHERE enrolled_at >= (CURRENT_DATE - INTERVAL '1 week') ORDER BY enrolled_at DESC LIMIT 20",
+		"mysql": "SELECT id, enrolled_at FROM enrollments WHERE enrolled_at >= (CURRENT_DATE() - INTERVAL 1 WEEK) ORDER BY enrolled_at DESC LIMIT 20",
+		"mssql": "SELECT TOP 20 id, enrolled_at FROM enrollments WHERE enrolled_at >= DATEADD(WEEK, -1, CAST(GETDATE() AS date)) ORDER BY enrolled_at DESC",
+		"oracle": "SELECT id, enrolled_at FROM enrollments WHERE enrolled_at >= (TRUNC(SYSDATE) - INTERVAL '7' DAY) ORDER BY enrolled_at DESC FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "enrollments_by_month_name",
+		"description": "Enrollment counts grouped by month name (tests DATENAME(MONTH,...))",
+		"dsl": "FETCH(DATENAME(MONTH, enrolled_at) AS mon_name, COUNT(*) AS cnt) FROM enrollments GROUPBY(mon_name) ORDERBY(cnt DESC) LIMIT(12)",
+		"postgres": "SELECT TO_CHAR(enrolled_at, 'Month') AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY TO_CHAR(enrolled_at, 'Month') ORDER BY cnt DESC LIMIT 12",
+		"mysql": "SELECT MONTHNAME(enrolled_at) AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY MONTHNAME(enrolled_at) ORDER BY cnt DESC LIMIT 12",
+		"mssql": "SELECT TOP 12 DATENAME(MONTH, enrolled_at) AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY DATENAME(MONTH, enrolled_at) ORDER BY cnt DESC",
+		"oracle": "SELECT TO_CHAR(enrolled_at, 'Month') AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY TO_CHAR(enrolled_at, 'Month') ORDER BY cnt DESC FETCH FIRST 12 ROWS ONLY"
+	},
+	{
+		"id": "teachers_hired_this_year",
+		"description": "Teachers hired in the current year (tests YEAR(date) and TODAY())",
+		"dsl": "FETCH(id, first_name, last_name, hire_date) FROM teachers FILTER(YEAR(hire_date) = YEAR(TODAY())) ORDERBY(hire_date DESC) LIMIT(20)",
+		"postgres": "SELECT id, first_name, last_name, hire_date FROM teachers WHERE EXTRACT(YEAR FROM hire_date) = EXTRACT(YEAR FROM CURRENT_DATE) ORDER BY hire_date DESC LIMIT 20",
+		"mysql": "SELECT id, first_name, last_name, hire_date FROM teachers WHERE YEAR(hire_date) = YEAR(CURRENT_DATE()) ORDER BY hire_date DESC LIMIT 20",
+		"mssql": "SELECT TOP 20 id, first_name, last_name, hire_date FROM teachers WHERE YEAR(hire_date) = YEAR(GETDATE()) ORDER BY hire_date DESC",
+		"oracle": "SELECT id, first_name, last_name, hire_date FROM teachers WHERE EXTRACT(YEAR FROM hire_date) = EXTRACT(YEAR FROM SYSDATE) ORDER BY hire_date DESC FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "recent_enrollments_90min",
+		"description": "Enrollments in the last 90 minutes (tests DATEADD MINUTE + CURRENT_TIMESTAMP)",
+		"dsl": "FETCH(id, student_id, course_id, enrolled_at) FROM enrollments FILTER(enrolled_at >= DATEADD(MINUTE, CURRENT_TIMESTAMP(), -90)) ORDERBY(enrolled_at DESC) LIMIT(20)",
+		"postgres": "SELECT id, student_id, course_id, enrolled_at FROM enrollments WHERE enrolled_at >= (CURRENT_TIMESTAMP - INTERVAL '90 minutes') ORDER BY enrolled_at DESC LIMIT 20",
+		"mysql": "SELECT id, student_id, course_id, enrolled_at FROM enrollments WHERE enrolled_at >= (CURRENT_TIMESTAMP() - INTERVAL 90 MINUTE) ORDER BY enrolled_at DESC LIMIT 20",
+		"mssql": "SELECT TOP 20 id, student_id, course_id, enrolled_at FROM enrollments WHERE enrolled_at >= DATEADD(MINUTE, -90, SYSDATETIME()) ORDER BY enrolled_at DESC",
+		"oracle": "SELECT id, student_id, course_id, enrolled_at FROM enrollments WHERE enrolled_at >= (SYSTIMESTAMP - INTERVAL '90' MINUTE) ORDER BY enrolled_at DESC FETCH FIRST 20 ROWS ONLY"
+	},
+	{
+		"id": "enrollments_year_month_dayname",
+		"description": "Enrollments grouped by year, month number and day name (tests YEAR/MONTH + DATENAME(DAY,...))",
+		"dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DATENAME(DAY, enrolled_at) AS dow, COUNT(*) AS cnt) FROM enrollments GROUPBY(yr, mo, dow) ORDERBY(yr DESC, mo DESC, cnt DESC) LIMIT(21)",
+		"postgres": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, TO_CHAR(enrolled_at, 'Day') AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), TO_CHAR(enrolled_at, 'Day') ORDER BY yr DESC, mo DESC, cnt DESC LIMIT 21",
+		"mysql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAYNAME(enrolled_at) AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAYNAME(enrolled_at) ORDER BY yr DESC, mo DESC, cnt DESC LIMIT 21",
+		"mssql": "SELECT TOP 21 YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DATENAME(WEEKDAY, enrolled_at) AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DATENAME(WEEKDAY, enrolled_at) ORDER BY yr DESC, mo DESC, cnt DESC",
+		"oracle": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, TO_CHAR(enrolled_at, 'Day') AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), TO_CHAR(enrolled_at, 'Day') ORDER BY yr DESC, mo DESC, cnt DESC FETCH FIRST 21 ROWS ONLY"
+	}
+,
+	{
+		"id": "now_basic",
+		"description": "Single-row NOW() selection",
+		"dsl": "FETCH(NOW() AS now_ts) FROM classes LIMIT(1)",
+		"postgres": "SELECT NOW() AS now_ts FROM classes LIMIT 1",
+		"mysql": "SELECT NOW() AS now_ts FROM classes LIMIT 1",
+		"mssql": "SELECT TOP 1 SYSDATETIME() AS now_ts FROM classes",
+		"oracle": "SELECT SYSTIMESTAMP now_ts FROM classes FETCH FIRST 1 ROWS ONLY"
+	},
+	{
+		"id": "today_basic",
+		"description": "Single-row TODAY() selection",
+		"dsl": "FETCH(TODAY() AS today_date) FROM teachers LIMIT(1)",
+		"postgres": "SELECT CURRENT_DATE AS today_date FROM teachers LIMIT 1",
+		"mysql": "SELECT CURRENT_DATE() AS today_date FROM teachers LIMIT 1",
+		"mssql": "SELECT TOP 1 CAST(GETDATE() AS date) AS today_date FROM teachers",
+		"oracle": "SELECT TRUNC(SYSDATE) today_date FROM teachers FETCH FIRST 1 ROWS ONLY"
+	},
+	{
+		"id": "time_basic",
+		"description": "Single-row TIME() selection (HH:MM:SS)",
+		"dsl": "FETCH(TIME() AS now_time) FROM students LIMIT(1)",
+		"postgres": "SELECT TO_CHAR(CURRENT_TIME, 'HH24:MI:SS') AS now_time FROM students LIMIT 1",
+		"mysql": "SELECT DATE_FORMAT(CURRENT_TIME(), '%H:%i:%s') AS now_time FROM students LIMIT 1",
+		"mssql": "SELECT TOP 1 CONVERT(varchar(8), GETDATE(), 108) AS now_time FROM students",
+		"oracle": "SELECT TO_CHAR(SYSTIMESTAMP, 'HH24:MI:SS') now_time FROM students FETCH FIRST 1 ROWS ONLY"
+	}
 ]

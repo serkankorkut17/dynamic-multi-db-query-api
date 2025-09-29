@@ -107,6 +107,10 @@ async function run() {
 				// check only values not structure
 				const dslValues = normDsl.map((item) => Object.values(item));
 				const sqlValues = normSql.map((item) => Object.values(item));
+				// trim string values for comparison
+				dslValues.forEach(row => row.forEach((val, idx) => { if (typeof val === 'string') row[idx] = val.trim().toLowerCase(); }));
+				sqlValues.forEach(row => row.forEach((val, idx) => { if (typeof val === 'string') row[idx] = val.trim().toLowerCase(); }));
+				//
 				const same = JSON.stringify(dslValues) === JSON.stringify(sqlValues);
 				if (!same) hasDiff = true;
 

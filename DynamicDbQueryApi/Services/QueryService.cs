@@ -514,7 +514,7 @@ namespace DynamicDbQueryApi.Services
                             }
                             else if (outputDbType == "oracle" || outputDbType == "oracle")
                             {
-                                columnDataTypes[col] = "INTERVAL DAY TO SECOND";
+                                columnDataTypes[col] = "TIMESTAMP";
                             }
                             else
                             {

@@ -361,6 +361,22 @@
 			"mysql": "SELECT id, first_name, last_name FROM students WHERE LOWER(first_name) LIKE '%der%' AND NOT (LOWER(last_name) LIKE '%lan%') ORDER BY id, first_name, last_name LIMIT 20",
 			"mssql": "SELECT TOP 20 id, first_name, last_name FROM students WHERE LOWER(first_name) LIKE '%der%' AND NOT (LOWER(last_name) LIKE '%lan%') ORDER BY id, first_name, last_name",
 			"oracle": "SELECT id, first_name, last_name FROM students WHERE LOWER(first_name) LIKE '%der%' AND NOT (LOWER(last_name) LIKE '%lan%') ORDER BY id, first_name, last_name FETCH FIRST 20 ROWS ONLY"
+		},
+		{
+			"id": 40,
+			"dsl": "FETCH(YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DATENAME(DAY, enrolled_at) AS dow, COUNT(*) AS cnt) FROM enrollments GROUPBY(yr, mo, dow) ORDERBY(yr DESC, mo DESC, cnt DESC) LIMIT(21)",
+			"postgres": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, TO_CHAR(enrolled_at, 'Day') AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), TO_CHAR(enrolled_at, 'Day') ORDER BY yr DESC, mo DESC, cnt DESC LIMIT 21",
+			"mysql": "SELECT YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DAYNAME(enrolled_at) AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DAYNAME(enrolled_at) ORDER BY yr DESC, mo DESC, cnt DESC LIMIT 21",
+			"mssql": "SELECT TOP 21 YEAR(enrolled_at) AS yr, MONTH(enrolled_at) AS mo, DATENAME(WEEKDAY, enrolled_at) AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY YEAR(enrolled_at), MONTH(enrolled_at), DATENAME(WEEKDAY, enrolled_at) ORDER BY yr DESC, mo DESC, cnt DESC",
+			"oracle": "SELECT EXTRACT(YEAR FROM enrolled_at) AS yr, EXTRACT(MONTH FROM enrolled_at) AS mo, TO_CHAR(enrolled_at, 'Day') AS dow, COUNT(*) AS cnt FROM enrollments GROUP BY EXTRACT(YEAR FROM enrolled_at), EXTRACT(MONTH FROM enrolled_at), TO_CHAR(enrolled_at, 'Day') ORDER BY yr DESC, mo DESC, cnt DESC FETCH FIRST 21 ROWS ONLY"
+		},
+		{
+			"id": 41,
+			"dsl": "FETCH(DATENAME(MONTH, enrolled_at) AS mon_name, COUNT(*) AS cnt) FROM enrollments GROUPBY(mon_name) ORDERBY(cnt DESC) LIMIT(12)",
+			"postgres": "SELECT TO_CHAR(enrolled_at, 'Month') AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY TO_CHAR(enrolled_at, 'Month') ORDER BY cnt DESC LIMIT 12",
+			"mysql": "SELECT MONTHNAME(enrolled_at) AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY MONTHNAME(enrolled_at) ORDER BY cnt DESC LIMIT 12",
+			"mssql": "SELECT TOP 12 DATENAME(MONTH, enrolled_at) AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY DATENAME(MONTH, enrolled_at) ORDER BY cnt DESC",
+			"oracle": "SELECT TO_CHAR(enrolled_at, 'Month') AS mon_name, COUNT(*) AS cnt FROM enrollments GROUP BY TO_CHAR(enrolled_at, 'Month') ORDER BY cnt DESC FETCH FIRST 12 ROWS ONLY"
 		}
 	]
 }
