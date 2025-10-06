@@ -358,7 +358,7 @@ namespace DynamicDbQueryApi.Services
                     }
                 }
 
-                else if (functionName.Equals("CEIL", StringComparison.OrdinalIgnoreCase) || functionName.Equals("CEILING", StringComparison.OrdinalIgnoreCase) && args.Count == 1)
+                else if ((functionName.Equals("CEIL", StringComparison.OrdinalIgnoreCase) || functionName.Equals("CEILING", StringComparison.OrdinalIgnoreCase)) && args.Count == 1)
                 {
                     return $"CEILING({args[0]})";
                 }
@@ -1012,7 +1012,7 @@ namespace DynamicDbQueryApi.Services
 
                 var value = condition.Value;
                 string? funcValue = null;
-                
+
                 // Eğer value value1, value2 gibi birden fazla değer içeriyorsa her birini işle
                 if (value != null && value.Contains(","))
                 {
@@ -1068,7 +1068,7 @@ namespace DynamicDbQueryApi.Services
                 else if (comparisonOperator == ComparisonOperator.Like ||
                          comparisonOperator == ComparisonOperator.Contains ||
                          comparisonOperator == ComparisonOperator.BeginsWith ||
-                         comparisonOperator == ComparisonOperator.EndsWith || 
+                         comparisonOperator == ComparisonOperator.EndsWith ||
                          comparisonOperator == ComparisonOperator.NotLike ||
                          comparisonOperator == ComparisonOperator.NotContains ||
                          comparisonOperator == ComparisonOperator.NotBeginsWith ||
@@ -1097,7 +1097,7 @@ namespace DynamicDbQueryApi.Services
                         {
                             valueRaw = ConcatExpressions(dbType, new List<string> { "'%'", value.ToString() });
                         }
-                        
+
                         if (comparisonOperator == ComparisonOperator.NotLike || comparisonOperator == ComparisonOperator.NotContains || comparisonOperator == ComparisonOperator.NotBeginsWith || comparisonOperator == ComparisonOperator.NotEndsWith)
                         {
                             return $"{columnName} NOT LIKE {valueRaw}";
@@ -1134,7 +1134,7 @@ namespace DynamicDbQueryApi.Services
                 else if (comparisonOperator == ComparisonOperator.ILike ||
                          comparisonOperator == ComparisonOperator.IContains ||
                          comparisonOperator == ComparisonOperator.IBeginsWith ||
-                         comparisonOperator == ComparisonOperator.IEndsWith || 
+                         comparisonOperator == ComparisonOperator.IEndsWith ||
                          comparisonOperator == ComparisonOperator.NotILike ||
                          comparisonOperator == ComparisonOperator.NotIContains ||
                          comparisonOperator == ComparisonOperator.NotIBeginsWith ||
@@ -1201,33 +1201,33 @@ namespace DynamicDbQueryApi.Services
 
 
                 else if (comparisonOperator == ComparisonOperator.In || comparisonOperator == ComparisonOperator.NotIn)
+                {
+                    return $"{columnName} {(comparisonOperator == ComparisonOperator.In ? "IN" : "NOT IN")} ({value})";
+                }
+                else if (comparisonOperator == ComparisonOperator.Between || comparisonOperator == ComparisonOperator.NotBetween)
+                {
+                    var parts = value.ToString().Split(new[] { ',' }, 2);
+                    if (parts.Length != 2)
                     {
-                        return $"{columnName} {(comparisonOperator == ComparisonOperator.In ? "IN" : "NOT IN")} ({value})";
+                        throw new ArgumentException($"Value for BETWEEN operator must contain two comma-separated values.");
                     }
-                    else if (comparisonOperator == ComparisonOperator.Between || comparisonOperator == ComparisonOperator.NotBetween)
+                    return $"{columnName} {(comparisonOperator == ComparisonOperator.Between ? "BETWEEN" : "NOT BETWEEN")} {parts[0].Trim()} AND {parts[1].Trim()}";
+                }
+                else
+                {
+                    string sqlOperator = comparisonOperator switch
                     {
-                        var parts = value.ToString().Split(new[] { ',' }, 2);
-                        if (parts.Length != 2)
-                        {
-                            throw new ArgumentException($"Value for BETWEEN operator must contain two comma-separated values.");
-                        }
-                        return $"{columnName} {(comparisonOperator == ComparisonOperator.Between ? "BETWEEN" : "NOT BETWEEN")} {parts[0].Trim()} AND {parts[1].Trim()}";
-                    }
-                    else
-                    {
-                        string sqlOperator = comparisonOperator switch
-                        {
-                            ComparisonOperator.Eq => "=",
-                            ComparisonOperator.Neq => "!=",
-                            ComparisonOperator.Lt => "<",
-                            ComparisonOperator.Lte => "<=",
-                            ComparisonOperator.Gt => ">",
-                            ComparisonOperator.Gte => ">=",
-                            _ => throw new NotSupportedException($"Unsupported operator {comparisonOperator}")
-                        };
+                        ComparisonOperator.Eq => "=",
+                        ComparisonOperator.Neq => "!=",
+                        ComparisonOperator.Lt => "<",
+                        ComparisonOperator.Lte => "<=",
+                        ComparisonOperator.Gt => ">",
+                        ComparisonOperator.Gte => ">=",
+                        _ => throw new NotSupportedException($"Unsupported operator {comparisonOperator}")
+                    };
 
-                        return $"{columnName} {sqlOperator} {value}";
-                    }
+                    return $"{columnName} {sqlOperator} {value}";
+                }
             }
             else if (filter is LogicalFilterModel logical)
             {

@@ -1,4 +1,5 @@
 using System;
+using System.ClientModel.Primitives;
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
@@ -15,6 +16,7 @@ using DynamicDbQueryApi.Interfaces;
 using Humanizer;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.VisualStudio.TextTemplating;
+using MongoDB.Bson;
 using Serilog;
 
 namespace DynamicDbQueryApi.Services
@@ -24,14 +26,43 @@ namespace DynamicDbQueryApi.Services
         private readonly ILogger<QueryService> _logger;
         private readonly IQueryParserService _queryParserService;
         private readonly ISqlBuilderService _sqlBuilderService;
+        private readonly IMongoPipelineBuilderService _mongoDbService;
         private readonly IQueryRepository _queryRepo;
 
-        public QueryService(ILogger<QueryService> logger, IQueryParserService queryParserService, ISqlBuilderService sqlBuilderService, IQueryRepository queryRepo)
+        public QueryService(ILogger<QueryService> logger, IQueryParserService queryParserService, ISqlBuilderService sqlBuilderService, IMongoPipelineBuilderService mongoDbService, IQueryRepository queryRepo)
         {
             _logger = logger;
             _queryParserService = queryParserService;
             _sqlBuilderService = sqlBuilderService;
+            _mongoDbService = mongoDbService;
             _queryRepo = queryRepo;
+        }
+
+        // MongoDB sorgusu çalıştırır
+        public async Task<QueryResultDTO> MongoQueryAsync(QueryRequestDTO request)
+        {
+            // Input stringini QueryModel'e çevir
+            var model = _queryParserService.Parse(request.Query);
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true
+            };
+            Console.WriteLine($"Model: {JsonSerializer.Serialize(model, options)}");
+
+            var pipeline = _mongoDbService.BuildPipeline(model);
+            Console.WriteLine("Pipeline:");
+            foreach (var stage in pipeline)
+            {
+                Console.WriteLine(stage.ToJson());
+            }
+
+            return new QueryResultDTO
+            {
+                Sql = "MongoDB Pipeline",
+                Data = new List<dynamic>(),
+                WrittenToOutputDb = false
+            };
+
         }
 
         // Düz SQL sorgusu çalıştırır
@@ -120,7 +151,7 @@ namespace DynamicDbQueryApi.Services
                 {
                     continue;
                 }
-                
+
                 var updatedInclude = await UpdateIncludeModel(connection, dbType, include);
                 // _logger.LogInformation("Updated Include: {Include}", JsonSerializer.Serialize(updatedInclude));
 

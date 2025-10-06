@@ -61,6 +61,24 @@ namespace DynamicDbQueryApi.Controllers
             }
         }
 
+        [HttpPost("mongo")]
+        public async Task<IActionResult> MongoQuery([FromBody] QueryRequestDTO request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+            try
+            {
+                var result = await _queryService.MongoQueryAsync(request);
+                return Ok(result);
+            }
+            catch (NotSupportedException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
         [HttpPost("inspect")]
         public async Task<IActionResult> InspectDatabase([FromBody] InspectRequestDTO request)
         {

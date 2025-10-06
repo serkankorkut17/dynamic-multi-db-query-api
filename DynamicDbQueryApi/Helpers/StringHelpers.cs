@@ -335,5 +335,13 @@ namespace DynamicDbQueryApi.Helpers
                 return sb.ToString();
             }
         }
+
+        public static string NormalizeString(string expr)
+        {
+            if (string.IsNullOrWhiteSpace(expr)) return expr;
+            // Geçersiz karakterleri alt çizgi ile değiştir
+            var cleaned = Regex.Replace(expr, @"[^\w]", "_");
+            return cleaned.Trim('_');
+        }
     }
 }

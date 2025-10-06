@@ -49,8 +49,21 @@ services:
     volumes:
       - oracle-data:/opt/oracle/oradata
 
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo
+      MONGO_INITDB_ROOT_PASSWORD: mongo
+      MONGO_INITDB_DATABASE: querydb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
 volumes:
   postgres-data:
   mssql-data:
   mysql-data:
   oracle-data:
+  mongo-data:
