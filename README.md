@@ -218,6 +218,16 @@ LIMIT  10;
   > <br>
   > LOWER(name) CONTAINS('serkan')
 
+- LIKE: % is wildcard for multiple characters, \_ is wildcard for single character.
+
+  > name LIKE 'serkan' → name LIKE 'serkan'
+  > <br>
+  > name CONTAINS('serkan') → name LIKE '%serkan%'
+  > <br>
+  > name STARTSWITH('serkan') → name LIKE 'serkan%'
+  > <br>
+  > name ENDSWITH('serkan') → name LIKE '%serkan'
+
 - For case-insensitive operators (ILIKE, ICONTAINS, ISTARTSWITH, IENDSWITH), the column is converted to LOWER() and the value is also converted to lowercase.
   > name ILIKE 'serkan' → LOWER(name) LIKE 'serkan'
   > <br>

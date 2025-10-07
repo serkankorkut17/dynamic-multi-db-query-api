@@ -245,6 +245,11 @@ namespace DynamicDbQueryApi.Services
 
         public IncludeModel GetIncludeModel(string fromTable, string include, string joinType = "LEFT")
         {
+            if (fromTable.Contains('(') && fromTable.Contains(')'))
+            {
+                fromTable = fromTable.Substring(0, fromTable.IndexOf('(')).Trim();
+
+            }
             // table (column1, column2) şeklinde include varsa tablo ismini ve kolonları ayır
             if (include.Contains('(') && include.Contains(')'))
             {

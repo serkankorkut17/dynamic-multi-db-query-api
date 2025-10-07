@@ -56,13 +56,71 @@ namespace DynamicDbQueryApi.Services
                 Console.WriteLine(stage.ToJson());
             }
 
+            // MongoDB bağlantısı oluştur
+            var mongoCtx = new MongoContext(request.ConnectionString, null);
+            var db = mongoCtx.GetDatabase();
+            var collectionName = model.Table;
+
+            // Aggregate komutunu çalıştır
+            var command = new BsonDocument
+            {
+                { "aggregate", collectionName },
+                { "pipeline", new BsonArray(pipeline) },
+                { "collation", new BsonDocument { { "locale", "tr" }, { "strength", 1 } } },
+                { "cursor", new BsonDocument() }
+            };
+
+            var cmdResult = await db.RunCommandAsync<BsonDocument>(command);
+
+            // Sonuçları al
+            var firstBatch = cmdResult.GetValue("cursor").AsBsonDocument.GetValue("firstBatch").AsBsonArray
+                .Select(v => v.AsBsonDocument)
+                .ToList();
+
+            // Sonuçları düz .NET nesnelerine (Dictionary) dönüştür
+            List<dynamic> data = firstBatch.Select(d => (dynamic)BsonDocumentToDictionary(d)).ToList();
+
             return new QueryResultDTO
             {
-                Sql = "MongoDB Pipeline",
-                Data = new List<dynamic>(),
+                Sql = "MongoDB Pipeline\n" + string.Join("\n", pipeline.Select(s => s.ToJson())),
+                Data = data,
                 WrittenToOutputDb = false
             };
 
+            // return new QueryResultDTO
+            // {
+            //     Sql = "MongoDB Pipeline",
+            //     Data = new List<dynamic>(),
+            //     WrittenToOutputDb = false
+            // };
+
+        }
+
+        private static IDictionary<string, object?> BsonDocumentToDictionary(BsonDocument doc)
+        {
+            var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            foreach (var el in doc.Elements)
+            {
+                dict[el.Name] = ConvertBsonValue(el.Value);
+            }
+            return dict;
+        }
+
+        // helper: convert BsonValue -> primitive / nested .NET types
+        private static object? ConvertBsonValue(BsonValue v)
+        {
+            if (v == null || v.IsBsonNull) return null;
+            if (v.IsBoolean) return v.AsBoolean;
+            if (v.IsString) return v.AsString;
+            if (v.IsInt32) return v.AsInt32;
+            if (v.IsInt64) return v.AsInt64;
+            if (v.IsDouble) return v.AsDouble;
+            if (v.IsDecimal128) return Decimal128.ToDecimal(v.AsDecimal128);
+            if (v.IsObjectId) return v.AsObjectId.ToString();
+            if (v.IsGuid) return v.AsGuid;
+            if (v.IsBsonArray) return v.AsBsonArray.Select(ConvertBsonValue).ToList();
+            if (v.IsBsonDocument) return BsonDocumentToDictionary(v.AsBsonDocument);
+            return v.ToString();
         }
 
         // Düz SQL sorgusu çalıştırır

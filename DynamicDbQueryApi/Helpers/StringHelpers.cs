@@ -13,7 +13,7 @@ namespace DynamicDbQueryApi.Helpers
         public static bool IsDateOrTimestamp(string s)
         {
             if (string.IsNullOrWhiteSpace(s)) return false;
-            s = s.Trim();
+            s = s.Trim().Trim('\'').Trim('"').Trim();
 
             // 'YYYY-MM-DD' ya da YYYY-MM-DD
             var dateOnly = new Regex(@"^'?(\d{4}-\d{2}-\d{2})'?$", RegexOptions.Compiled);
@@ -24,7 +24,13 @@ namespace DynamicDbQueryApi.Helpers
             // 'YYYY-MM-DDTHH:MM:SSZ' ya da 'YYYY-MM-DDTHH:MM:SS+03:00' ya da YYYY-MM-DDTHH:MM:SSZ ya da YYYY-MM-DDTHH:MM:SS+03:00
             var tsIso = new Regex(@"^'?(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d{1,3})?(Z|[+\-]\d{2}:\d{2})?'?$", RegexOptions.Compiled);
 
-            return dateOnly.IsMatch(s) || tsSpace.IsMatch(s) || tsIso.IsMatch(s);
+            // 'YYYY-MM-DDTHH:MM:SS.ssssssZ' ya da 'YYYY-MM-DDTHH:MM:SS.ssssss+03:00'
+            var tsWithTz = new Regex(
+                @"^'?\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,7})?(Z|[+\-](?:\d{2}:\d{2}|\d{4}|\d{2}))?'?$",
+                RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase
+            );
+
+            return dateOnly.IsMatch(s) || tsSpace.IsMatch(s) || tsIso.IsMatch(s) || tsWithTz.IsMatch(s);
         }
 
         // En dıştaki parantezleri kaldırma
@@ -342,6 +348,19 @@ namespace DynamicDbQueryApi.Helpers
             // Geçersiz karakterleri alt çizgi ile değiştir
             var cleaned = Regex.Replace(expr, @"[^\w]", "_");
             return cleaned.Trim('_');
+        }
+
+        public static string NormalizeField(string collectionName, string fieldName)
+        {            
+            // fieldName içinde collectionName ile başlayan kısımları kaldır
+            if (!string.IsNullOrWhiteSpace(collectionName) && !string.IsNullOrWhiteSpace(fieldName))
+            {
+                if (fieldName.StartsWith(collectionName + "."))
+                {
+                    fieldName = fieldName.Substring(collectionName.Length + 1);
+                }
+            }
+            return fieldName;
         }
     }
 }

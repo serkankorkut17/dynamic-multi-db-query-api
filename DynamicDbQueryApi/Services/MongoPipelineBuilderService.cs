@@ -13,7 +13,6 @@ namespace DynamicDbQueryApi.Services
     public class MongoPipelineBuilderService : IMongoPipelineBuilderService
     {
         private readonly ILogger<MongoPipelineBuilderService> _logger;
-        private BsonDocument? _addFieldsDoc;
         public MongoPipelineBuilderService(ILogger<MongoPipelineBuilderService> logger)
         {
             _logger = logger;
@@ -30,28 +29,97 @@ namespace DynamicDbQueryApi.Services
             {
                 foreach (var inc in model.Includes)
                 {
-                    var (lookup, unwind) = BuildLookupStage(inc);
+                    var (lookup, unwind) = BuildLookupStage(inc, collectionName);
                     stages.Add(lookup);
                     if (unwind != null)
                         stages.Add(unwind);
                 }
             }
 
-            // ADD FIELDS dokumanı (fonksiyonlar için)
+            // ADD FIELDS dokumanı (filter - fonksiyonlar için)
             var addFieldsDoc = new BsonDocument();
-            _addFieldsDoc = addFieldsDoc;
             stages.Add(new BsonDocument("$addFields", addFieldsDoc));
-            var groupDoc = new BsonDocument();
 
             // 2) FILTER (MATCH) İşlemi
             if (model.Filters != null)
             {
-                var matchDoc = BuildMatchFromFilter(addFieldsDoc, groupDoc, collectionName, model.Filters, isAfterGroup: false);
+                var matchDoc = BuildMatchFromFilter(addFieldsDoc, collectionName, model.Filters);
                 if (matchDoc != null && !matchDoc.IsBsonNull && matchDoc.ElementCount > 0)
                 {
                     stages.Add(new BsonDocument("$match", matchDoc));
                 }
             }
+
+            // GROUP dokumanı (group by için)
+            var groupDoc = new BsonDocument();
+            stages.Add(new BsonDocument("$group", groupDoc));
+
+            // GROUP sonrası AddFields dokumanı ($_id.<field> için)
+            var addFieldsAfterGroupDoc = new BsonDocument();
+            stages.Add(new BsonDocument("$addFields", addFieldsAfterGroupDoc));
+
+            // 3) GROUP BY (GROUP) İşlemi
+            if (model.GroupBy != null && model.GroupBy.Any())
+            {
+                BuildGroupByStage(addFieldsDoc, groupDoc, addFieldsAfterGroupDoc, collectionName, model.GroupBy);
+            }
+
+            // 4) HAVING (MATCH) İşlemi - Group sonrası filtreleme
+            if (model.GroupBy != null && model.Having != null)
+            {
+                var havingMatch = BuildMatchFromFilter(addFieldsAfterGroupDoc, collectionName, model.Having, groupDoc);
+                if (havingMatch != null && havingMatch.ElementCount > 0)
+                    stages.Add(new BsonDocument("$match", havingMatch));
+            }
+
+            // group _id içi doluysa bool true, boşsa false
+            bool isGroupIdNotEmpty = groupDoc.Contains("_id") && groupDoc["_id"].AsBsonDocument.ElementCount > 0;
+
+            // 5) FETCH (PROJECT) İşlemi - Group yoksa direkt projection
+            bool isFetchEmpty = model.Columns == null || !model.Columns.Any() || (model.Columns.Count == 1 && model.Columns[0].Expression.Trim() == "*");
+            if (!isFetchEmpty && model.Columns != null)
+            {
+                var proj = new BsonDocument();
+                // _id fieldının auto eklenmesini engelle
+                if (!model.Columns.Any(c => c.Expression.Trim() == "_id"))
+                {
+                    proj["_id"] = 0;
+                }
+                
+                foreach (var col in model.Columns)
+                {
+                    var columnName = col.Expression;
+                    var alias = string.IsNullOrWhiteSpace(col.Alias) ? StringHelpers.NormalizeString(columnName) : col.Alias;
+                    var bsonValue = GetFieldName(addFieldsAfterGroupDoc, collectionName, columnName, alias, groupDoc);
+                    proj[alias] = bsonValue;
+                }
+
+                stages.Add(new BsonDocument("$project", proj));
+            }
+
+            // 6) ORDER BY İşlemi
+            if (model.OrderBy != null && model.OrderBy.Any())
+            {
+                var sort = new BsonDocument();
+                foreach (var ob in model.OrderBy)
+                {
+                    var columnName = ob.Column;
+                    var alias = StringHelpers.NormalizeString(columnName);
+                    var bsonValue = GetFieldName(addFieldsDoc, collectionName, columnName, alias);
+                    var fieldName = bsonValue.AsString.StartsWith("$") ? bsonValue.AsString.Substring(1) : bsonValue.AsString;
+                    sort[fieldName] = ob.Desc ? -1 : 1;
+                }
+                stages.Add(new BsonDocument("$sort", sort));
+            }
+
+            // 7) OFFSET / LIMIT İşlemleri
+            if (model.Offset.HasValue && model.Offset.Value > 0) stages.Add(new BsonDocument("$skip", model.Offset.Value));
+            if (model.Limit.HasValue && model.Limit.Value > 0) stages.Add(new BsonDocument("$limit", model.Limit.Value));
+
+
+
+
+            /*
 
             // GROUP dokumanı (group by için)
             stages.Add(new BsonDocument("$group", groupDoc));
@@ -114,28 +182,10 @@ namespace DynamicDbQueryApi.Services
                     stages.Add(new BsonDocument("$project", proj));
                 }
             }
-
-            // 6) ORDER BY İşlemi
-            if (model.OrderBy != null && model.OrderBy.Any())
-            {
-                var sort = new BsonDocument();
-                foreach (var ob in model.OrderBy)
-                {
-                    var columnName = ob.Column;
-                    var alias = StringHelpers.NormalizeString(columnName);
-                    var bsonValue = GetFieldName(addFieldsDoc, groupDoc, collectionName, columnName, alias, isAfterGroup: true);
-                    string fieldName = bsonValue?.ToString() ?? alias;
-                    sort[fieldName] = ob.Desc ? -1 : 1;
-                }
-                stages.Add(new BsonDocument("$sort", sort));
-            }
-
-            // 7) OFFSET / LIMIT İşlemleri
-            if (model.Offset.HasValue && model.Offset.Value > 0) stages.Add(new BsonDocument("$skip", model.Offset.Value));
-            if (model.Limit.HasValue && model.Limit.Value > 0) stages.Add(new BsonDocument("$limit", model.Limit.Value));
+            */
 
             // Eğer addFields boş ise kaldır
-            if (_addFieldsDoc != null && _addFieldsDoc.ElementCount == 0)
+            if (addFieldsDoc != null && addFieldsDoc.ElementCount == 0)
             {
                 var idx = stages.FindIndex(s => s.Contains("$addFields"));
                 if (idx >= 0) stages.RemoveAt(idx);
@@ -148,13 +198,20 @@ namespace DynamicDbQueryApi.Services
                 if (idx >= 0) stages.RemoveAt(idx);
             }
 
-            // Referans için _addFieldsDoc'u null yap
-            _addFieldsDoc = null;
+            // Eğer addFieldsAfterGroupDoc boş ise kaldır
+            if (addFieldsAfterGroupDoc != null && addFieldsAfterGroupDoc.ElementCount == 0)
+            {
+                var idx = stages.FindIndex(s => s.Contains("$addFields"));
+                if (idx >= 0) stages.RemoveAt(idx);
+            }
+
+            // group ve addFields dokümanlarını kaldır
+            // stages = stages.Where(s => !s.Contains("$group")).ToList();
 
             return stages;
         }
 
-        private BsonValue GetFieldName(BsonDocument addFieldsDoc, BsonDocument groupDoc, string table, string column, string alias, bool isAfterGroup = false)
+        private BsonValue GetFieldName(BsonDocument addFieldsDoc, string table, string column, string alias, BsonDocument? groupDoc = null)
         {
             // Eğer 'null' ise null döndür
             if (string.IsNullOrWhiteSpace(column))
@@ -196,20 +253,42 @@ namespace DynamicDbQueryApi.Services
                 return new BsonDateTime(dateVal);
             }
 
-            // var m = Regex.Match(column, "^\"(.*)\"$|^'(.*)'$");
-            // if (m.Success)
-            // {
-            //     var val = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value;
-            //     return new BsonString(val);
-            // }
+            else if (StringHelpers.IsDateOrTimestamp(column))
+            {
+                // Eğer tırnaklı ise tırnak kaldır
+                var s = column;
+                if ((s.StartsWith("\"") && s.EndsWith("\"")) || (s.StartsWith("'") && s.EndsWith("'")))
+                {
+                    s = s.Substring(1, s.Length - 2);
+                }
+
+                if (DateTimeOffset.TryParse(s, out var dto))
+                {
+                    var dtUtc = dto.UtcDateTime;
+
+                    return new BsonDateTime(dtUtc);
+                }
+                else if (DateTime.TryParse(s, out var dt))
+                {
+                    // 1) Eğer input UTC olarak verilmiş sayılacaksa:
+                    var dtUtc = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+                    return new BsonDateTime(dtUtc);
+
+                    // 2) Eğer input yerel (local) olarak verildiyse ve UTC'ye çevrilecekse:
+                    // var dtUtc = DateTime.SpecifyKind(dt, DateTimeKind.Local).ToUniversalTime();
+                    // return new BsonDateTime(dtUtc);
+                }
+                else
+                {
+                    throw new Exception($"Invalid date format: {column}");
+                }
+            }
 
             // Eğer tek tırnaklı string ise tırnak kaldır
             if ((column.StartsWith("\"") && column.EndsWith("\"")) || (column.StartsWith("'") && column.EndsWith("'")))
             {
                 return new BsonString(column.Substring(1, column.Length - 2));
             }
-
-            List<string> aggregateFuncs = new List<string> { "COUNT", "SUM", "AVG", "MIN", "MAX" };
 
             // Eğer fonksiyon ise fonksiyonu işle
             var funcInfo = GetFunction(column);
@@ -218,9 +297,11 @@ namespace DynamicDbQueryApi.Services
                 var funcName = funcInfo.Value.funcName;
                 var inner = funcInfo.Value.inner;
                 var args = StringHelpers.SplitByCommas(inner);
-                var bsonValue = BuildFunction(groupDoc, table, funcName, args, isAfterGroup);
+                var bsonValue = BuildFunction(table, funcName, args, groupDoc);
+                Console.WriteLine($"bson field name: {bsonValue}");
+
                 // Eğer alias verilmişse addFields dokumanına ekle
-                if (!string.IsNullOrWhiteSpace(alias) && addFieldsDoc != null)
+                if (!string.IsNullOrWhiteSpace(alias))
                 {
                     addFieldsDoc[alias] = bsonValue;
                     return new BsonString($"${alias}");
@@ -229,7 +310,7 @@ namespace DynamicDbQueryApi.Services
                 {
                     // Alias yoksa benzersiz bir alias oluşturup addFields dokumanına ekle
                     var i = 1;
-                    if (addFieldsDoc != null && !aggregateFuncs.Contains(funcName))
+                    if (addFieldsDoc != null)
                     {
                         while (addFieldsDoc.Contains($"{funcName}_{i}"))
                         {
@@ -299,21 +380,52 @@ namespace DynamicDbQueryApi.Services
         }
 
         // Fonksiyon isimlerine göre MongoDB karşılığı oluşturma
-        private BsonValue BuildFunction(BsonDocument groupDoc, string table, string functionName, List<string> args, bool isAfterGroup = false)
+        private BsonValue BuildFunction(string table, string functionName, List<string> args, BsonDocument? groupDoc = null)
         {
             List<BsonValue> bsonArgs = new List<BsonValue>();
             // Eğer argumanlarda fonksiyonlar varsa onları da işle
             for (int i = 0; i < args.Count; i++)
             {
-                // !!! fix
                 var funcInfo = GetFunction(args[i]);
                 if (funcInfo != null)
                 {
                     var funcName = funcInfo.Value.funcName;
                     var inner = funcInfo.Value.inner;
                     var innerArgs = StringHelpers.SplitByCommas(inner);
-                    var funcField = BuildFunction(groupDoc, table, funcName, innerArgs, isAfterGroup);
+                    var funcField = BuildFunction(table, funcName, innerArgs);
                     bsonArgs.Add(funcField);
+                }
+                else if (args[i] == "*")
+                {
+                    bsonArgs.Add(new BsonString("*"));
+                }
+                else if (StringHelpers.IsDateOrTimestamp(args[i]))
+                {
+                    // Eğer tırnaklı ise tırnak kaldır
+                    var s = args[i];
+                    if ((s.StartsWith("\"") && s.EndsWith("\"")) || (s.StartsWith("'") && s.EndsWith("'")))
+                    {
+                        s = s.Substring(1, s.Length - 2);
+                    }
+
+                    if (DateTimeOffset.TryParse(s, out var dto))
+                    {
+                        bsonArgs.Add(new BsonDateTime(dto.UtcDateTime));
+                    }
+                    else if (DateTime.TryParse(s, out var dt))
+                    {
+                        // 1) Eğer input UTC olarak verilmiş sayılacaksa:
+                        var dtUtc = DateTime.SpecifyKind(dt, DateTimeKind.Utc);
+                        bsonArgs.Add(new BsonDateTime(dtUtc));
+
+                        // 2) Eğer input yerel (local) olarak verildiyse ve UTC'ye çevrilecekse:
+                        // var dtUtc = DateTime.SpecifyKind(dt, DateTimeKind.Local).ToUniversalTime();
+                        // bsonArgs.Add(new BsonDateTime(dtUtc));
+                    }
+                    else
+                    {
+                        throw new Exception($"Invalid date format: {args[i]}");
+                    }
                 }
                 else if (args[i].StartsWith("'") && args[i].EndsWith("'"))
                 {
@@ -343,18 +455,18 @@ namespace DynamicDbQueryApi.Services
                         // Eğer table ile col table aynı ise direk colName kullan
                         if (string.Equals(colTable, table, StringComparison.OrdinalIgnoreCase))
                         {
-                            return new BsonString($"${colName}");
+                            bsonArgs.Add(new BsonString($"${colName}"));
                         }
                         else
                         {
                             // Farklı table ise 'table.column' formatında kullan
-                            return new BsonString($"${colTable}.{colName}");
+                            bsonArgs.Add(new BsonString($"${colTable}.{colName}"));
                         }
                     }
                     else if (parts.Length == 1)
                     {
                         var colName = parts[0].Trim();
-                        return new BsonString($"${colName}");
+                        bsonArgs.Add(new BsonString($"${colName}"));
                     }
                     else
                     {
@@ -363,27 +475,37 @@ namespace DynamicDbQueryApi.Services
                 }
             }
 
+            Console.WriteLine($"Text function: {functionName}, Args: {string.Join(", ", bsonArgs)}");
+
+
             // Aggregate fonksiyonlarını oluştur (COUNT, SUM, AVG, MIN, MAX)
             var aggregateFuncs = new[] { "COUNT", "SUM", "AVG", "MIN", "MAX" };
-            if (aggregateFuncs.Contains(functionName) && isAfterGroup)
+            if (aggregateFuncs.Contains(functionName))
             {
+                if (groupDoc == null)
+                {
+                    throw new Exception($"Aggregate function {functionName} cannot be used without GROUP BY.");
+                }
+
+                // groupDoc içinde _id yoksa ekle
+                if (!groupDoc.Contains("_id"))
+                {
+                    groupDoc.Add("_id", BsonNull.Value);
+                }
+
                 var i = 1;
                 string uniqueAlias = functionName;
-                if (groupDoc != null)
+                while (groupDoc.Contains($"{functionName}_{i}"))
                 {
-                    while (groupDoc.Contains($"{functionName}_{i}"))
-                    {
-                        i++;
-                    }
-                    uniqueAlias = $"{functionName}_{i}";
+                    i++;
                 }
+                uniqueAlias = $"{functionName}_{i}";
 
 
                 if (functionName.Equals("COUNT", StringComparison.OrdinalIgnoreCase))
                 {
                     if (args.Count == 1 && args[0] == "*")
                     {
-
                         groupDoc.Add(uniqueAlias, new BsonDocument("$sum", 1));
                         return new BsonString($"${uniqueAlias}");
                     }
@@ -589,7 +711,46 @@ namespace DynamicDbQueryApi.Services
 
                 if (functionName.Equals("REVERSE", StringComparison.OrdinalIgnoreCase) && bsonArgs.Count == 1)
                 {
-                    return new BsonDocument("$reverseArray", new BsonArray { new BsonDocument("$split", new BsonArray { bsonArgs[0], "" }) });
+                    // Eğer argüman null ise boş string olarak kabul et
+                    var sExpr = new BsonDocument("$ifNull", new BsonArray { bsonArgs[0], "" });
+
+                    // Karakter uzunluğunu al
+                    var lenExpr = new BsonDocument("$strLenCP", new BsonArray { sExpr });
+
+                    // String'i karakterlerine ayırmak için $map ve $range kullan
+                    var mapExpr = new BsonDocument(
+                        "$map",
+                        new BsonDocument
+                        {
+                            { "input", new BsonDocument("$range", new BsonArray { 0, "$$len" }) },
+                            { "as", "i" },
+                            { "in", new BsonDocument("$substrCP", new BsonArray { "$$s", "$$i", 1 }) }
+                        }
+                    );
+
+                    // Karakter dizisini ters çevir
+                    var reversedArrayExpr = new BsonDocument("$reverseArray", mapExpr);
+
+                    // Ters çevrilmiş karakter dizisini tekrar birleştir
+                    var reduceExpr = new BsonDocument(
+                        "$reduce",
+                        new BsonDocument
+                        {
+                            { "input", reversedArrayExpr },
+                            { "initialValue", "" },
+                            { "in", new BsonDocument("$concat", new BsonArray { "$$value", "$$this" }) }
+                        }
+                    );
+
+                    // $let ile değişkenleri tanımla ve kullan
+                    return new BsonDocument(
+                        "$let",
+                        new BsonDocument
+                        {
+                            { "vars", new BsonDocument { { "s", sExpr }, { "len", lenExpr } } },
+                            { "in", reduceExpr }
+                        }
+                    );
                 }
 
                 else
@@ -642,10 +803,18 @@ namespace DynamicDbQueryApi.Services
                 if ((functionName.Equals("CURRENT_DATE", StringComparison.OrdinalIgnoreCase) || functionName.Equals("TODAY", StringComparison.OrdinalIgnoreCase)) && args.Count == 1)
                 {
                     var tz = args[0].Trim('\'', '"');
-                    return new BsonDocument("$dateTrunc", new BsonDocument
+                    var dateTruncExpr = new BsonDocument("$dateTrunc", new BsonDocument
                     {
                         { "date", "$$NOW" },
                         { "unit", "day" },
+                        { "timezone", tz }
+                    });
+
+                    // Sonra dateToString ile istenen formatta ve aynı timezone'la string'e çevir
+                    return new BsonDocument("$dateToString", new BsonDocument
+                    {
+                        { "date", dateTruncExpr },
+                        { "format", "%Y-%m-%d" }, // 2025-10-06 gibi
                         { "timezone", tz }
                     });
                 }
@@ -676,7 +845,6 @@ namespace DynamicDbQueryApi.Services
                     var unit = interval switch
                     {
                         "year" => "year",
-                        "quarter" => "quarter",
                         "month" => "month",
                         "week" => "week",
                         "day" => "day",
@@ -699,7 +867,6 @@ namespace DynamicDbQueryApi.Services
                     var unit = interval switch
                     {
                         "year" => "year",
-                        "quarter" => "quarter",
                         "month" => "month",
                         "week" => "week",
                         "day" => "day",
@@ -721,39 +888,47 @@ namespace DynamicDbQueryApi.Services
                     var part = args[0].Trim('\'', '"').ToLowerInvariant();
                     var format = part switch
                     {
-                        "year" => "%Y",
-                        "month" => "%m",
-                        "day" => "%d",
-                        "hour" => "%H",
-                        "minute" => "%M",
-                        "second" => "%S",
-                        "dayofweek" => "%A",
-                        "dayofyear" => "%j",
+                        // "year" => "%Y",
+                        // "month" => "%m",
+                        "month" => "%B",
+                        // "day" => "%d",
+                        "day" => "%A",
+                        // "hour" => "%H",
+                        // "minute" => "%M",
+                        // "second" => "%S",
+                        // "dayofweek" => "%A",
+                        // "dayofyear" => "%j",
                         _ => throw new Exception("Invalid part for DATENAME.")
                     };
-                    return new BsonDocument("$dateToString", new BsonDocument
+                    if (part == "month")
                     {
-                        { "date", bsonArgs[1] },
-                        { "format", format }
-                    });
-                }
-
-                if (functionName.Equals("DATEPART", StringComparison.OrdinalIgnoreCase) && bsonArgs.Count == 2)
-                {
-                    var part = args[0].Trim('\'', '"').ToLowerInvariant();
-                    var datePart = part switch
+                        return new BsonDocument("$dateToString", new BsonDocument
+                        {
+                            { "date", bsonArgs[1] },
+                            { "format", format }
+                        });
+                    }
+                    else if (part == "day")
                     {
-                        "year" => new BsonDocument("$year", bsonArgs[1]),
-                        "month" => new BsonDocument("$month", bsonArgs[1]),
-                        "day" => new BsonDocument("$dayOfMonth", bsonArgs[1]),
-                        "hour" => new BsonDocument("$hour", bsonArgs[1]),
-                        "minute" => new BsonDocument("$minute", bsonArgs[1]),
-                        "second" => new BsonDocument("$second", bsonArgs[1]),
-                        "dayofweek" => new BsonDocument("$dayOfWeek", bsonArgs[1]),
-                        "dayofyear" => new BsonDocument("$dayOfYear", bsonArgs[1]),
-                        _ => throw new Exception("Invalid part for DATEPART.")
-                    };
-                    return datePart;
+                        return new BsonDocument(
+                            "$let",
+                            new BsonDocument
+                            {
+                                { "vars", new BsonDocument { { "d", new BsonDocument("$dayOfWeek", bsonArgs[1]) } } },
+                                { "in", new BsonDocument(
+                                    "$arrayElemAt",
+                                    new BsonArray
+                                    {
+                                        new BsonArray { "Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday" },
+                                        new BsonDocument("$subtract", new BsonArray { "$$d", 1 })
+                                    })
+                                }
+                            });
+                    }
+                    else
+                    {
+                        throw new Exception("DATENAME currently supports only 'month' and 'day' parts.");
+                    }
                 }
 
                 if (functionName.Equals("DAY", StringComparison.OrdinalIgnoreCase) && bsonArgs.Count == 1)
@@ -781,7 +956,7 @@ namespace DynamicDbQueryApi.Services
         }
 
         // IncludeModel için MongoDB $lookup ve $unwind dökümanları oluşturma
-        private (BsonDocument lookup, BsonDocument? unwind) BuildLookupStage(IncludeModel inc)
+        private (BsonDocument lookup, BsonDocument? unwind) BuildLookupStage(IncludeModel inc, string collectionName)
         {
             // Table ve IncludeTable için columnları belirle
             var localField = string.IsNullOrWhiteSpace(inc.TableKey) ? "_id" : inc.TableKey;
@@ -790,8 +965,15 @@ namespace DynamicDbQueryApi.Services
             var rightCollection = inc.IncludeTable;
             var joinType = inc.JoinType ?? "LEFT";
 
+            bool isLeftCollectionMain = string.Equals(collectionName, leftCollection, StringComparison.OrdinalIgnoreCase);
+
             // Include Table için LOOKUP aşaması
             var asName = inc.IncludeTable;
+            if (!isLeftCollectionMain)
+            {
+                // Eğer leftCollection main collection değilse alias ekle
+                localField = $"{leftCollection}.{localField}";
+            }
             var lookup = new BsonDocument("$lookup", new BsonDocument
                 {
                     { "from", rightCollection },
@@ -842,18 +1024,16 @@ namespace DynamicDbQueryApi.Services
         }
 
         // FilterModel için MongoDB $match dökümanı oluşturma
-        private BsonDocument BuildMatchFromFilter(BsonDocument addFieldsDoc, BsonDocument groupDoc, string collectionName, FilterModel filter, bool isAfterGroup = false)
+        private BsonDocument BuildMatchFromFilter(BsonDocument addFieldsDoc, string collectionName, FilterModel filter, BsonDocument? groupDoc = null)
         {
             if (filter is ConditionFilterModel c)
             {
-                // If after group, condition may reference aggregated aliases (no $ prefix)
-
-                return BuildCondition(addFieldsDoc, groupDoc, collectionName, c.Column, c.Operator, c.Value, isAfterGroup);
+                return BuildCondition(addFieldsDoc, collectionName, c.Column, c.Operator, c.Value, groupDoc);
             }
             else if (filter is LogicalFilterModel l)
             {
-                var left = BuildMatchFromFilter(addFieldsDoc, groupDoc, collectionName, l.Left, isAfterGroup);
-                var right = BuildMatchFromFilter(addFieldsDoc, groupDoc, collectionName, l.Right, isAfterGroup);
+                var left = BuildMatchFromFilter(addFieldsDoc, collectionName, l.Left, groupDoc);
+                var right = BuildMatchFromFilter(addFieldsDoc, collectionName, l.Right, groupDoc);
                 if (l.Operator == LogicalOperator.And)
                     return new BsonDocument("$and", new BsonArray { left, right });
                 else
@@ -864,9 +1044,9 @@ namespace DynamicDbQueryApi.Services
         }
 
         // ConditionFilterModel'i MongoDB karşılığına dönüştürme
-        private BsonDocument BuildCondition(BsonDocument addFieldsDoc, BsonDocument groupDoc, string collectionName, string field, ComparisonOperator op, string? value, bool isAfterGroup = false)
+        private BsonDocument BuildCondition(BsonDocument addFieldsDoc, string collectionName, string field, ComparisonOperator op, string? value, BsonDocument? groupDoc = null)
         {
-            var bsonField = GetFieldName(addFieldsDoc, groupDoc, collectionName, field, "", isAfterGroup);
+            var bsonField = GetFieldName(addFieldsDoc, collectionName, field, string.Empty, groupDoc);
             string fieldKey;
             if (bsonField.IsString)
             {
@@ -881,15 +1061,20 @@ namespace DynamicDbQueryApi.Services
             {
                 throw new Exception("Value cannot be null for the specified operator.");
             }
-
-            var bsonValue = value == null ? BsonNull.Value : GetFieldName(addFieldsDoc, groupDoc, collectionName, value, "", isAfterGroup: true) ?? BsonNull.Value;
+            BsonValue bsonValue;
+            if (value == null || op == ComparisonOperator.In || op == ComparisonOperator.NotIn || op == ComparisonOperator.Between || op == ComparisonOperator.NotBetween)
+            {
+                bsonValue = BsonNull.Value;
+            }
+            else
+            {
+                bsonValue = GetFieldName(addFieldsDoc, collectionName, value, string.Empty, groupDoc);
+            }
 
             bool isValueString = bsonValue.IsString && !bsonValue.AsString.StartsWith("$");
 
             BsonArray operands = new BsonArray { bsonField, bsonValue };
             Console.WriteLine($"Text: {fieldKey}, {op}, {value}");
-
-
 
             switch (op)
             {
@@ -912,6 +1097,7 @@ namespace DynamicDbQueryApi.Services
                         if (isValueString)
                         {
                             var pattern = bsonValue.AsString.Replace("%", ".*").Replace("_", ".") ?? "";
+                            pattern = "^" + pattern + "$";
                             return new BsonDocument("$expr", new BsonDocument("$regexMatch", new BsonDocument
                             {
                                 { "input", bsonField },
@@ -936,6 +1122,7 @@ namespace DynamicDbQueryApi.Services
                         if (isValueString)
                         {
                             var pattern = bsonValue.AsString.Replace("%", ".*").Replace("_", ".") ?? "";
+                            pattern = "^" + pattern + "$"; // Tam eşleşme için başa ve sona ^ $ ekle
                             return new BsonDocument("$expr", new BsonDocument("$not", new BsonDocument("$regexMatch", new BsonDocument
                             {
                                 { "input", bsonField },
@@ -1057,10 +1244,15 @@ namespace DynamicDbQueryApi.Services
                         }
                         else
                         {
+                            var regexExpr = new BsonDocument("$concat", new BsonArray
+                            {
+                                "^",
+                                new BsonDocument("$toString", bsonValue)
+                            });
                             return new BsonDocument("$expr", new BsonDocument("$regexMatch", new BsonDocument
                             {
                                 { "input", bsonField },
-                                { "regex", bsonValue },
+                                { "regex", regexExpr },
                                 { "options", options }
                             }));
                         }
@@ -1081,10 +1273,15 @@ namespace DynamicDbQueryApi.Services
                         }
                         else
                         {
+                            var regexExpr = new BsonDocument("$concat", new BsonArray
+                            {
+                                "^",
+                                new BsonDocument("$toString", bsonValue)
+                            });
                             return new BsonDocument("$expr", new BsonDocument("$not", new BsonDocument("$regexMatch", new BsonDocument
                             {
                                 { "input", bsonField },
-                                { "regex", bsonValue },
+                                { "regex", regexExpr },
                                 { "options", options }
                             })));
                         }
@@ -1106,10 +1303,15 @@ namespace DynamicDbQueryApi.Services
                         }
                         else
                         {
+                            var regexExpr = new BsonDocument("$concat", new BsonArray
+                            {
+                                new BsonDocument("$toString", bsonValue),
+                                new BsonDocument("$literal", "$")
+                            });
                             return new BsonDocument("$expr", new BsonDocument("$regexMatch", new BsonDocument
                             {
                                 { "input", bsonField },
-                                { "regex", bsonValue },
+                                { "regex", regexExpr },
                                 { "options", options }
                             }));
                         }
@@ -1131,10 +1333,15 @@ namespace DynamicDbQueryApi.Services
                         }
                         else
                         {
+                            var regexExpr = new BsonDocument("$concat", new BsonArray
+                            {
+                                new BsonDocument("$toString", bsonValue),
+                                new BsonDocument("$literal", "$")
+                            });
                             return new BsonDocument("$expr", new BsonDocument("$not", new BsonDocument("$regexMatch", new BsonDocument
                             {
                                 { "input", bsonField },
-                                { "regex", bsonValue },
+                                { "regex", regexExpr },
                                 { "options", options }
                             })));
                         }
@@ -1165,8 +1372,8 @@ namespace DynamicDbQueryApi.Services
                         {
                             throw new Exception("BETWEEN operator requires two comma-separated values.");
                         }
-                        var lower = GetFieldName(addFieldsDoc, groupDoc, collectionName, parts[0].Trim(), "") ?? BsonNull.Value;
-                        var upper = GetFieldName(addFieldsDoc, groupDoc, collectionName, parts[1].Trim(), "") ?? BsonNull.Value;
+                        var lower = GetFieldName(addFieldsDoc, collectionName, parts[0].Trim(), string.Empty) ?? BsonNull.Value;
+                        var upper = GetFieldName(addFieldsDoc, collectionName, parts[1].Trim(), string.Empty) ?? BsonNull.Value;
                         return new BsonDocument("$expr", new BsonDocument("$and", new BsonArray
                         {
                             new BsonDocument("$gte", new BsonArray { bsonField, lower }),
@@ -1184,8 +1391,8 @@ namespace DynamicDbQueryApi.Services
                         {
                             throw new Exception("NOT BETWEEN operator requires two comma-separated values.");
                         }
-                        var lower = GetFieldName(addFieldsDoc, groupDoc, collectionName, parts[0].Trim(), "") ?? BsonNull.Value;
-                        var upper = GetFieldName(addFieldsDoc, groupDoc, collectionName, parts[1].Trim(), "") ?? BsonNull.Value;
+                        var lower = GetFieldName(addFieldsDoc, collectionName, parts[0].Trim(), string.Empty) ?? BsonNull.Value;
+                        var upper = GetFieldName(addFieldsDoc, collectionName, parts[1].Trim(), string.Empty) ?? BsonNull.Value;
                         return new BsonDocument("$expr", new BsonDocument("$or", new BsonArray
                         {
                             new BsonDocument("$lt", new BsonArray { bsonField, lower }),
@@ -1198,17 +1405,25 @@ namespace DynamicDbQueryApi.Services
         }
 
         // GroupBy için MongoDB $group dökümanı oluşturma
-        private void BuildGroupByStage(BsonDocument addFieldsDoc, BsonDocument groupDoc, string collectionName, List<string> groupBy)
+        private void BuildGroupByStage(BsonDocument addFieldsDoc, BsonDocument groupDoc, BsonDocument addFieldsAfterGroupDoc, string collectionName, List<string> groupBy)
         {
             var idDoc = new BsonDocument();
 
             foreach (var g in groupBy)
             {
                 var columnName = g;
-                var alias = StringHelpers.NormalizeString(columnName);
-                var bsonValue = GetFieldName(addFieldsDoc, groupDoc, collectionName, columnName, alias);
-                string fieldName = bsonValue?.ToString() ?? alias;
+                var alias = StringHelpers.NormalizeField(collectionName, columnName);
+                var bsonValue = GetFieldName(addFieldsDoc, collectionName, columnName, alias);
                 idDoc[alias] = bsonValue ?? BsonNull.Value;
+
+                // GroupBy sonrası tekrar orijinal isimle ekle
+                var fieldName = bsonValue != null && bsonValue.IsString ? bsonValue.AsString : columnName;
+                // Eğer fieldName '$' ile başlıyorsa '$' işaretini kaldır ve $_id. ile değiştir
+                if (fieldName.StartsWith("$"))
+                {
+                    fieldName = "$_id." + fieldName.Substring(1);
+                    addFieldsAfterGroupDoc[alias] = fieldName;
+                }
             }
 
             groupDoc["_id"] = idDoc;
