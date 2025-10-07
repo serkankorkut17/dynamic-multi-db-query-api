@@ -72,9 +72,6 @@ namespace DynamicDbQueryApi.Services
                     stages.Add(new BsonDocument("$match", havingMatch));
             }
 
-            // group _id içi doluysa bool true, boşsa false
-            bool isGroupIdNotEmpty = groupDoc.Contains("_id") && groupDoc["_id"].AsBsonDocument.ElementCount > 0;
-
             // 5) FETCH (PROJECT) İşlemi - Group yoksa direkt projection
             bool isFetchEmpty = model.Columns == null || !model.Columns.Any() || (model.Columns.Count == 1 && model.Columns[0].Expression.Trim() == "*");
             if (!isFetchEmpty && model.Columns != null)
@@ -105,7 +102,7 @@ namespace DynamicDbQueryApi.Services
                 {
                     var columnName = ob.Column;
                     var alias = StringHelpers.NormalizeString(columnName);
-                    var bsonValue = GetFieldName(addFieldsDoc, collectionName, columnName, alias);
+                    var bsonValue = GetFieldName(addFieldsAfterGroupDoc, collectionName, columnName, alias, groupDoc);
                     var fieldName = bsonValue.AsString.StartsWith("$") ? bsonValue.AsString.Substring(1) : bsonValue.AsString;
                     sort[fieldName] = ob.Desc ? -1 : 1;
                 }
@@ -115,74 +112,6 @@ namespace DynamicDbQueryApi.Services
             // 7) OFFSET / LIMIT İşlemleri
             if (model.Offset.HasValue && model.Offset.Value > 0) stages.Add(new BsonDocument("$skip", model.Offset.Value));
             if (model.Limit.HasValue && model.Limit.Value > 0) stages.Add(new BsonDocument("$limit", model.Limit.Value));
-
-
-
-
-            /*
-
-            // GROUP dokumanı (group by için)
-            stages.Add(new BsonDocument("$group", groupDoc));
-
-            // 3) GROUP BY (GROUP) İşlemi
-            if (model.GroupBy != null && model.GroupBy.Any())
-            {
-                BuildGroupByStage(addFieldsDoc, groupDoc, collectionName, model.GroupBy);
-
-                // 4) HAVING (MATCH) İşlemi - Group sonrası filtreleme
-                if (model.Having != null)
-                {
-                    var havingMatch = BuildMatchFromFilter(addFieldsDoc, groupDoc, collectionName, model.Having, isAfterGroup: true);
-                    if (havingMatch != null && havingMatch.ElementCount > 0)
-                        stages.Add(new BsonDocument("$match", havingMatch));
-                }
-
-                // 5) FETCH (PROJECT) İşlemi - Group sonrası projection
-                var proj = new BsonDocument();
-                foreach (var col in model.Columns)
-                {
-                    var columnName = col.Expression;
-                    var alias = string.IsNullOrWhiteSpace(col.Alias) ? StringHelpers.NormalizeString(columnName) : col.Alias;
-                    var bsonValue = GetFieldName(addFieldsDoc, groupDoc, collectionName, columnName, alias, isAfterGroup: true);
-                    proj[alias] = bsonValue;
-                }
-
-                stages.Add(new BsonDocument("$project", proj));
-            }
-            else
-            {
-                // 6) FETCH (PROJECT) İşlemi - Group yoksa direkt projection
-                if (model.Columns != null && model.Columns.Any())
-                {
-                    var proj = new BsonDocument();
-                    foreach (var col in model.Columns)
-                    {
-                        var columnName = col.Expression;
-                        var alias = string.IsNullOrWhiteSpace(col.Alias) ? StringHelpers.NormalizeString(columnName) : col.Alias;
-                        var bsonValue = GetFieldName(addFieldsDoc, groupDoc, collectionName, columnName, alias, isAfterGroup: true);
-                        proj[alias] = bsonValue;
-                    }
-                    // Eğer fetch içinde aggregate fonksiyonu varsa yani groupDoc boş değilse _id = null olarak tek group oluştur
-                    if (groupDoc != null && groupDoc.ElementCount > 0)
-                    {
-                        var singleGroupDoc = new BsonDocument { { "_id", BsonNull.Value } };
-                        // Mevcut groupDoc içeriğini singleGroupDoc'a kopyala
-                        foreach (var elem in groupDoc.Elements)
-                        {
-                            singleGroupDoc.Add(elem);
-                        }
-                        groupDoc.Clear();
-                        foreach (var elem in singleGroupDoc.Elements)
-                        {
-                            groupDoc.Add(elem);
-                        }
-                        // stages.Insert(stages.FindIndex(s => s.Contains("$group")), new BsonDocument("$group", groupDoc));
-                    }
-
-                    stages.Add(new BsonDocument("$project", proj));
-                }
-            }
-            */
 
             // Eğer addFields boş ise kaldır
             if (addFieldsDoc != null && addFieldsDoc.ElementCount == 0)
@@ -204,9 +133,6 @@ namespace DynamicDbQueryApi.Services
                 var idx = stages.FindIndex(s => s.Contains("$addFields"));
                 if (idx >= 0) stages.RemoveAt(idx);
             }
-
-            // group ve addFields dokümanlarını kaldır
-            // stages = stages.Where(s => !s.Contains("$group")).ToList();
 
             return stages;
         }
@@ -474,9 +400,6 @@ namespace DynamicDbQueryApi.Services
                     }
                 }
             }
-
-            Console.WriteLine($"Text function: {functionName}, Args: {string.Join(", ", bsonArgs)}");
-
 
             // Aggregate fonksiyonlarını oluştur (COUNT, SUM, AVG, MIN, MAX)
             var aggregateFuncs = new[] { "COUNT", "SUM", "AVG", "MIN", "MAX" };
@@ -814,7 +737,7 @@ namespace DynamicDbQueryApi.Services
                     return new BsonDocument("$dateToString", new BsonDocument
                     {
                         { "date", dateTruncExpr },
-                        { "format", "%Y-%m-%d" }, // 2025-10-06 gibi
+                        { "format", "%Y-%m-%d" },
                         { "timezone", tz }
                     });
                 }
@@ -1156,12 +1079,6 @@ namespace DynamicDbQueryApi.Services
                         }
                         else
                         {
-                            // return new BsonDocument("$expr", new BsonDocument("$regexMatch", new BsonDocument
-                            // {
-                            //     { "input", bsonField },
-                            //     { "regex", bsonValue },
-                            //     { "options", options }
-                            // }));
                             if (options == "i")
                             {
                                 return new BsonDocument("$expr", new BsonDocument("$gte", new BsonArray
@@ -1200,12 +1117,6 @@ namespace DynamicDbQueryApi.Services
                         }
                         else
                         {
-                            // return new BsonDocument("$expr", new BsonDocument("$not", new BsonDocument("$regexMatch", new BsonDocument
-                            // {
-                            //     { "input", bsonField },
-                            //     { "regex", bsonValue },
-                            //     { "options", options }
-                            // })));
                             if (options == "i")
                             {
                                 return new BsonDocument("$expr", new BsonDocument("$lt", new BsonArray
