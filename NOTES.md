@@ -23,6 +23,9 @@ system/oracle@localhost/FREEPDB1
 mongodb://mongo:mongo@localhost:27017/querydb?authSource=admin
 mongodb://mongo:mongo@localhost:27017/?authSource=admin
 
+# API
+https://jsonplaceholder.typicode.com/***
+
 
 conditiona kadar ulaş sonra eğer fonksiyonsa add fieldsa ekleme yaptır
 add fields recursive olsun burada işlesin iç içe olanları
@@ -71,4 +74,5 @@ var pipeline = new List<BsonDocument>
 
 
 
-***** mongo string dateler utc döünüşüm sorunu
+***** mongo db tablo gösterme
+mongodb kaydetme

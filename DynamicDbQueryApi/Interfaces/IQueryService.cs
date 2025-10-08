@@ -9,6 +9,7 @@ namespace DynamicDbQueryApi.Interfaces
 {
     public interface IQueryService
     {
+        Task<QueryResultDTO> AllQueryAsync(QueryRequestDTO request);
         Task<QueryResultDTO> MyQueryAsync(QueryRequestDTO request);
         Task<QueryResultDTO> SQLQueryAsync(QueryRequestDTO request);
         Task<QueryResultDTO> MongoQueryAsync(QueryRequestDTO request);

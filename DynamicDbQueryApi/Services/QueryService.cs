@@ -12,6 +12,7 @@ using DynamicDbQueryApi.Data;
 using DynamicDbQueryApi.DTOs;
 using DynamicDbQueryApi.Entities;
 using DynamicDbQueryApi.Entities.Query;
+using DynamicDbQueryApi.Helpers;
 using DynamicDbQueryApi.Interfaces;
 using Humanizer;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
@@ -36,6 +37,68 @@ namespace DynamicDbQueryApi.Services
             _sqlBuilderService = sqlBuilderService;
             _mongoDbService = mongoDbService;
             _queryRepo = queryRepo;
+        }
+
+        // Bütün db sorgularını çalıştırır (Postegre, MySQL, MSSQL, Oracle, MongoDB)
+        public async Task<QueryResultDTO> AllQueryAsync(QueryRequestDTO request)
+        {
+
+            string dbType = request.DbType.ToLower();
+            string ConnectionString = request.ConnectionString;
+            string Query = request.Query;
+
+            IEnumerable<dynamic> data = Array.Empty<dynamic>();
+            string dslTranslated = "";
+            if (dbType == "mongodb" || dbType == "mongo")
+            {
+                (dslTranslated, data) = await QueryDslFromMongoDbAsync(ConnectionString, Query);
+            }
+            else if (dbType == "postgres" || dbType == "postgresql" || dbType == "mysql" || dbType == "mssql" || dbType == "oracle")
+            {
+                (dslTranslated, data) = await QueryDslFromSqlDbAsync(dbType, ConnectionString, Query);
+            }
+            else
+            {
+                throw new NotSupportedException($"Database type '{request.DbType}' is not supported.");
+            }
+
+            bool writtenToOutputDb = false;
+            // Output db bilgilerini ayarla
+            if (request.WriteToOutputDb)
+            {
+                if (string.IsNullOrEmpty(request.OutputDbType) ||
+                    string.IsNullOrEmpty(request.OutputConnectionString) ||
+                    string.IsNullOrEmpty(request.OutputTableName))
+                {
+                    throw new Exception("OutputDbType, OutputConnectionString and OutputTableName must be provided to write to output database.");
+                }
+
+                var outputDbType = request.OutputDbType.ToLower();
+                var outputConnectionString = request.OutputConnectionString;
+                var outputTableName = request.OutputTableName;
+
+                if (outputDbType == "mongodb" || outputDbType == "mongo")
+                {
+                    await SaveDataToOutputMongoDb(outputConnectionString, outputTableName, data);
+                    writtenToOutputDb = true;
+                }
+                else if (outputDbType == "postgres" || outputDbType == "postgresql" || outputDbType == "mysql" || outputDbType == "mssql" || outputDbType == "oracle")
+                {
+                    await SaveDataToOutputSqlDb(outputDbType, outputConnectionString, outputTableName, data);
+                    writtenToOutputDb = true;
+                }
+                else
+                {
+                    throw new NotSupportedException($"Output database type '{request.OutputDbType}' is not supported.");
+                }
+            }
+
+            return new QueryResultDTO
+            {
+                Sql = dslTranslated,
+                Data = data,
+                WrittenToOutputDb = writtenToOutputDb
+            };
         }
 
         // MongoDB sorgusu çalıştırır
@@ -78,49 +141,37 @@ namespace DynamicDbQueryApi.Services
                 .ToList();
 
             // Sonuçları düz .NET nesnelerine (Dictionary) dönüştür
-            List<dynamic> data = firstBatch.Select(d => (dynamic)BsonDocumentToDictionary(d)).ToList();
+            List<dynamic> data = firstBatch.Select(d => (dynamic)BsonHelpers.BsonDocumentToDictionary(d)).ToList();
+
+            bool writtenToOutputDb = false;
+            // Output db bilgilerini ayarla
+            if (request.WriteToOutputDb)
+            {
+                if (string.IsNullOrEmpty(request.OutputDbType) ||
+                    string.IsNullOrEmpty(request.OutputConnectionString) ||
+                    string.IsNullOrEmpty(request.OutputTableName))
+                {
+                    throw new Exception("OutputDbType, OutputConnectionString and OutputTableName must be provided to write to output database.");
+                }
+
+                var outputContext = new MongoContext(request.OutputConnectionString, null);
+                var outputDb = outputContext.GetDatabase();
+                var outputCollection = outputDb.GetCollection<BsonDocument>(request.OutputTableName);
+                var bsonDocs = firstBatch; // Zaten BsonDocument listesi
+                if (bsonDocs.Count > 0)
+                {
+                    await outputCollection.InsertManyAsync(bsonDocs);
+                    writtenToOutputDb = true;
+                }
+
+            }
 
             return new QueryResultDTO
             {
                 Sql = "MongoDB Pipeline\n" + string.Join("\n", pipeline.Select(s => s.ToJson())),
                 Data = data,
-                WrittenToOutputDb = false
+                WrittenToOutputDb = writtenToOutputDb
             };
-
-            // return new QueryResultDTO
-            // {
-            //     Sql = "MongoDB Pipeline",
-            //     Data = new List<dynamic>(),
-            //     WrittenToOutputDb = false
-            // };
-
-        }
-
-        private static IDictionary<string, object?> BsonDocumentToDictionary(BsonDocument doc)
-        {
-            var dict = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-            foreach (var el in doc.Elements)
-            {
-                dict[el.Name] = ConvertBsonValue(el.Value);
-            }
-            return dict;
-        }
-
-        // helper: convert BsonValue -> primitive / nested .NET types
-        private static object? ConvertBsonValue(BsonValue v)
-        {
-            if (v == null || v.IsBsonNull) return null;
-            if (v.IsBoolean) return v.AsBoolean;
-            if (v.IsString) return v.AsString;
-            if (v.IsInt32) return v.AsInt32;
-            if (v.IsInt64) return v.AsInt64;
-            if (v.IsDouble) return v.AsDouble;
-            if (v.IsDecimal128) return Decimal128.ToDecimal(v.AsDecimal128);
-            if (v.IsObjectId) return v.AsObjectId.ToString();
-            if (v.IsGuid) return v.AsGuid;
-            if (v.IsBsonArray) return v.AsBsonArray.Select(ConvertBsonValue).ToList();
-            if (v.IsBsonDocument) return BsonDocumentToDictionary(v.AsBsonDocument);
-            return v.ToString();
         }
 
         // Düz SQL sorgusu çalıştırır
@@ -151,12 +202,11 @@ namespace DynamicDbQueryApi.Services
                     throw new Exception("OutputDbType, OutputConnectionString and OutputTableName must be provided to write to output database.");
                 }
 
-                var outputContext = new DapperContext(request.OutputDbType, request.OutputConnectionString);
                 var outputDbType = request.OutputDbType.ToLower();
+                var outputConnectionString = request.OutputConnectionString;
                 var outputTableName = request.OutputTableName;
-                var outputConnection = await outputContext.GetOpenConnectionAsync();
 
-                await SaveDataToOutputDb(outputDbType, outputConnection, outputTableName, data);
+                await SaveDataToOutputSqlDb(outputDbType, outputConnectionString, outputTableName, data);
                 writtenToOutputDb = true;
             }
 
@@ -245,14 +295,13 @@ namespace DynamicDbQueryApi.Services
                     throw new Exception("OutputDbType, OutputConnectionString and OutputTableName must be provided to write to output database.");
                 }
 
-                var outputContext = new DapperContext(request.OutputDbType, request.OutputConnectionString);
                 var outputDbType = request.OutputDbType.ToLower();
+                var outputConnectionString = request.OutputConnectionString;
                 var outputTableName = request.OutputTableName;
-                var outputConnection = await outputContext.GetOpenConnectionAsync();
 
                 try
                 {
-                    await SaveDataToOutputDb(outputDbType, outputConnection, outputTableName, data);
+                    await SaveDataToOutputSqlDb(outputDbType, outputConnectionString, outputTableName, data);
                     writtenToOutputDb = true;
                 }
                 catch (Exception ex)
@@ -260,7 +309,6 @@ namespace DynamicDbQueryApi.Services
                     _logger.LogError(ex, "Error saving data to output database");
 
                 }
-                outputConnection.Close();
             }
 
             // bağlantıyı kapat
@@ -667,8 +715,11 @@ namespace DynamicDbQueryApi.Services
             return columnDataTypes;
         }
 
-        public async Task SaveDataToOutputDb(string outputDbType, IDbConnection outputConnection, string outputTableName, IEnumerable<dynamic> data)
+        public async Task SaveDataToOutputSqlDb(string outputDbType, string outputConnectionString, string outputTableName, IEnumerable<dynamic> data)
         {
+            var outputContext = new DapperContext(outputDbType, outputConnectionString);
+            var outputConnection = await outputContext.GetOpenConnectionAsync();
+
             var columnDataTypes = GetColumnDataTypes(outputDbType, data);
 
             // Log column data types
@@ -744,6 +795,127 @@ namespace DynamicDbQueryApi.Services
 
             // Bağlantıyı döngü dışında kapatın
             outputConnection.Close();
+        }
+
+        public async Task SaveDataToOutputMongoDb(string outputConnectionString, string outputTableName, IEnumerable<dynamic> data)
+        {
+            var outputContext = new MongoContext(outputConnectionString, null);
+            var outputDb = outputContext.GetDatabase();
+            var outputCollection = outputDb.GetCollection<BsonDocument>(outputTableName);
+
+            var bsonDocs = data
+                .Select(BsonHelpers.ToBsonDocumentSafe)
+                .Where(doc => doc != null)
+                .Cast<BsonDocument>()
+                .ToList();
+
+            if (bsonDocs.Count > 0)
+            {
+                await outputCollection.InsertManyAsync(bsonDocs);
+            }
+        }
+
+        public async Task<(string dslTranslated, IEnumerable<dynamic> data)> QueryDslFromSqlDbAsync(string dbType, string connectionString, string query)
+        {
+            var context = new DapperContext(dbType, connectionString);
+
+            var connection = await context.GetOpenConnectionAsync();
+
+            // Eğer connection null ise hata fırlat
+            if (connection == null)
+            {
+                throw new Exception("Could not open database connection. Please check the connection string and database type.");
+            }
+
+            // Input stringini QueryModel'e çevir
+            var model = _queryParserService.Parse(query);
+
+            // İlişkili tablolardaki foreign keyleri bul ve IncludeModel'leri güncelle
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true
+            };
+            _logger.LogInformation("Initial Model: {Model}", JsonSerializer.Serialize(model, options));
+            var filtersText = FilterPrinter.Dump(model.Filters);
+            Console.WriteLine("Filters:\n" + filtersText);
+
+            var havingText = FilterPrinter.Dump(model.Having);
+            Console.WriteLine("Having:\n" + havingText);
+
+            foreach (var include in model.Includes)
+            {
+                // Eğer queryde tablo anahtarları belirtilmişse atla
+                if (include.TableKey != null && include.IncludeKey != null)
+                {
+                    continue;
+                }
+
+                var updatedInclude = await UpdateIncludeModel(connection, dbType, include);
+                // _logger.LogInformation("Updated Include: {Include}", JsonSerializer.Serialize(updatedInclude));
+
+                if (updatedInclude != null)
+                {
+                    include.TableKey = updatedInclude.TableKey;
+                    include.IncludeKey = updatedInclude.IncludeKey;
+                }
+            }
+            // _logger.LogInformation("Generated Model: {Model}", JsonSerializer.Serialize(model, options));
+
+            var sql = _sqlBuilderService.BuildSqlQuery(dbType, model);
+            _logger.LogInformation("Generated SQL: {Sql}", sql);
+
+            var data = await connection.QueryAsync(sql);
+
+            // bağlantıyı kapat
+            connection.Close();
+
+            return (sql, data);
+        }
+
+        public async Task<(string dslTranslated, IEnumerable<dynamic> data)> QueryDslFromMongoDbAsync(string connectionString, string query)
+        {
+            // Input stringini QueryModel'e çevir
+            var model = _queryParserService.Parse(query);
+            var options = new JsonSerializerOptions
+            {
+                WriteIndented = true
+            };
+            Console.WriteLine($"Model: {JsonSerializer.Serialize(model, options)}");
+
+            var pipeline = _mongoDbService.BuildPipeline(model);
+            string dslTranslated = "MongoDB Pipeline\n" + string.Join("\n", pipeline.Select(s => s.ToJson()));
+
+            Console.WriteLine("Pipeline:");
+            foreach (var stage in pipeline)
+            {
+                Console.WriteLine(stage.ToJson());
+            }
+
+            // MongoDB bağlantısı oluştur
+            var mongoCtx = new MongoContext(connectionString, null);
+            var db = mongoCtx.GetDatabase();
+            var collectionName = model.Table;
+
+            // Aggregate komutunu çalıştır
+            var command = new BsonDocument
+            {
+                { "aggregate", collectionName },
+                { "pipeline", new BsonArray(pipeline) },
+                { "collation", new BsonDocument { { "locale", "tr" }, { "strength", 1 } } },
+                { "cursor", new BsonDocument() }
+            };
+
+            var cmdResult = await db.RunCommandAsync<BsonDocument>(command);
+
+            // Sonuçları al
+            var firstBatch = cmdResult.GetValue("cursor").AsBsonDocument.GetValue("firstBatch").AsBsonArray
+                .Select(v => v.AsBsonDocument)
+                .ToList();
+
+            // Sonuçları düz .NET nesnelerine (Dictionary) dönüştür
+            List<dynamic> data = firstBatch.Select(d => (dynamic)BsonHelpers.BsonDocumentToDictionary(d)).ToList();
+
+            return (dslTranslated, data);
         }
     }
 }

@@ -22,7 +22,29 @@ namespace DynamicDbQueryApi.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> PostQuery([FromBody] QueryRequestDTO request)
+        public async Task<IActionResult> Query([FromBody] QueryRequestDTO request)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+            try
+            {
+                var result = await _queryService.AllQueryAsync(request);
+                return Ok(result);
+            }
+            catch (NotSupportedException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+            // catch (Exception ex)
+            // {
+            //     return StatusCode(500, $"Internal server error: {ex.Message}");
+            // }
+        }
+
+        [HttpPost("my")]
+        public async Task<IActionResult> MyQuery([FromBody] QueryRequestDTO request)
         {
             if (!ModelState.IsValid)
             {

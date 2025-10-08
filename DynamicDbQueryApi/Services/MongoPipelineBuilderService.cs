@@ -1264,12 +1264,12 @@ namespace DynamicDbQueryApi.Services
                     return new BsonDocument("$expr", new BsonDocument("$ne", new BsonArray { bsonField, BsonNull.Value }));
                 case ComparisonOperator.In:
                     {
-                        var values = ToBsonArray(value);
+                        var values = BsonHelpers.ToBsonArray(value);
                         return new BsonDocument("$expr", new BsonDocument("$in", new BsonArray { bsonField, values }));
                     }
                 case ComparisonOperator.NotIn:
                     {
-                        var values = ToBsonArray(value);
+                        var values = BsonHelpers.ToBsonArray(value);
                         return new BsonDocument("$expr", new BsonDocument("$not", new BsonDocument("$in", new BsonArray { bsonField, values })));
                     }
                 case ComparisonOperator.Between:
@@ -1338,35 +1338,6 @@ namespace DynamicDbQueryApi.Services
             }
 
             groupDoc["_id"] = idDoc;
-        }
-
-        private BsonValue ParseBsonValue(string? s)
-        {
-            if (s == null) return BsonNull.Value;
-            if (bool.TryParse(s, out var b)) return new BsonBoolean(b);
-            if (int.TryParse(s, out var i)) return new BsonInt32(i);
-            if (long.TryParse(s, out var l)) return new BsonInt64(l);
-            if (double.TryParse(s, out var d)) return new BsonDouble(d);
-            if (DateTime.TryParse(s, out var dateVal)) return new BsonDateTime(dateVal);
-            if (DateTimeOffset.TryParse(s, out var dateOffVal)) return new BsonDateTime(dateOffVal.UtcDateTime);
-            if (s.Equals("null", StringComparison.OrdinalIgnoreCase)) return BsonNull.Value;
-            // If quoted string, strip quotes
-            var m = Regex.Match(s, "^\"(.*)\"$|^'(.*)'$");
-            if (m.Success)
-            {
-                var val = m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value;
-                return new BsonString(val);
-            }
-            return new BsonString(s);
-        }
-
-        private BsonArray ToBsonArray(string? value)
-        {
-            if (string.IsNullOrEmpty(value)) return new BsonArray();
-            var parts = StringHelpers.SplitByCommas(value)
-                        .Select(p => ParseBsonValue(p.Trim()))
-                        .ToArray();
-            return new BsonArray(parts);
         }
     }
 }
