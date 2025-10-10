@@ -10,6 +10,7 @@ builder.Services.AddScoped<IQueryService, QueryService>();
 builder.Services.AddScoped<IQueryParserService, QueryParserService>();
 builder.Services.AddScoped<ISqlBuilderService, SqlBuilderService>();
 builder.Services.AddScoped<IMongoPipelineBuilderService, MongoPipelineBuilderService>();
+builder.Services.AddScoped<IInMemoryQueryService, InMemoryQueryService>();
 builder.Services.AddScoped<ISqlProvider, SqlProvider>();
 builder.Services.AddScoped<IQueryRepository, QueryRepository>();
 

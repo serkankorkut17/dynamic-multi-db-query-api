@@ -40,7 +40,7 @@ namespace DynamicDbQueryApi.Helpers
                         .ToArray();
             return new BsonArray(parts);
         }
-        
+
         // BsonDocument'i Dictionary'ye dönüştürür
         public static IDictionary<string, object?> BsonDocumentToDictionary(BsonDocument doc)
         {
@@ -153,5 +153,27 @@ namespace DynamicDbQueryApi.Helpers
                     return BsonValue.Create(value);
             }
         }
+
+        // BsonType'ın değerini string olarak döner
+        public static string MapBsonTypeToSqlType(BsonType bsonType)
+        {
+            return bsonType switch
+            {
+                BsonType.ObjectId => "string",
+                BsonType.String => "string",
+                BsonType.Int32 => "int",
+                BsonType.Int64 => "bigint",
+                BsonType.Double => "double",
+                BsonType.Decimal128 => "decimal",
+                BsonType.Boolean => "boolean",
+                BsonType.DateTime => "datetime",
+                BsonType.Timestamp => "timestamp",
+                BsonType.Binary => "binary",
+                BsonType.Array => "array",
+                BsonType.Document => "json",
+                _ => "string"
+            };
+        }
     }
+    
 }

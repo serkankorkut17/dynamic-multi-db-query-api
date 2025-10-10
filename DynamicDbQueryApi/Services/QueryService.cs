@@ -18,6 +18,7 @@ using Humanizer;
 using Microsoft.EntityFrameworkCore.Metadata.Internal;
 using Microsoft.VisualStudio.TextTemplating;
 using MongoDB.Bson;
+using MongoDB.Driver;
 using Serilog;
 
 namespace DynamicDbQueryApi.Services
@@ -28,14 +29,16 @@ namespace DynamicDbQueryApi.Services
         private readonly IQueryParserService _queryParserService;
         private readonly ISqlBuilderService _sqlBuilderService;
         private readonly IMongoPipelineBuilderService _mongoDbService;
+        private readonly IInMemoryQueryService _inMemoryQueryService;
         private readonly IQueryRepository _queryRepo;
 
-        public QueryService(ILogger<QueryService> logger, IQueryParserService queryParserService, ISqlBuilderService sqlBuilderService, IMongoPipelineBuilderService mongoDbService, IQueryRepository queryRepo)
+        public QueryService(ILogger<QueryService> logger, IQueryParserService queryParserService, ISqlBuilderService sqlBuilderService, IMongoPipelineBuilderService mongoDbService, IInMemoryQueryService inMemoryQueryService, IQueryRepository queryRepo)
         {
             _logger = logger;
             _queryParserService = queryParserService;
             _sqlBuilderService = sqlBuilderService;
             _mongoDbService = mongoDbService;
+            _inMemoryQueryService = inMemoryQueryService;
             _queryRepo = queryRepo;
         }
 
@@ -51,11 +54,15 @@ namespace DynamicDbQueryApi.Services
             string dslTranslated = "";
             if (dbType == "mongodb" || dbType == "mongo")
             {
-                (dslTranslated, data) = await QueryDslFromMongoDbAsync(ConnectionString, Query);
+                (dslTranslated, data) = await QueryFromMongoDbAsync(ConnectionString, Query);
             }
             else if (dbType == "postgres" || dbType == "postgresql" || dbType == "mysql" || dbType == "mssql" || dbType == "oracle")
             {
-                (dslTranslated, data) = await QueryDslFromSqlDbAsync(dbType, ConnectionString, Query);
+                (dslTranslated, data) = await QueryFromSqlDbAsync(dbType, ConnectionString, Query);
+            }
+            else if (dbType == "api")
+            {
+                (dslTranslated, data) = await QueryFromApiAsync(ConnectionString, Query);
             }
             else
             {
@@ -364,9 +371,64 @@ namespace DynamicDbQueryApi.Services
             }
         }
 
+        public async Task<InspectResponseDTO> InspectMongoDbAsync(InspectRequestDTO request)
+        {
+            var response = new InspectResponseDTO();
+            var ctx = new MongoContext(request.ConnectionString, null);
+            var db = ctx.GetDatabase();
+
+            // Get all collection names
+            var collectionNames = (await db.ListCollectionNamesAsync()).ToList();
+
+            foreach (var collectionName in collectionNames)
+            {
+                var collection = db.GetCollection<BsonDocument>(collectionName);
+
+                // İlk 100 dokümanı örnek al
+                var sample = await collection.Find(new BsonDocument()).Limit(100).ToListAsync();
+
+                var fieldSet = new HashSet<string>();
+                var fieldTypes = new Dictionary<string, BsonType>();
+
+                foreach (var doc in sample)
+                {
+                    foreach (var elem in doc.Elements)
+                    {
+                        fieldSet.Add(elem.Name);
+
+                        if (!fieldTypes.ContainsKey(elem.Name))
+                        {
+                            fieldTypes[elem.Name] = elem.Value.BsonType;
+                        }
+                    }
+                }
+
+                var columns = fieldSet.Select(fieldName => new ColumnModel
+                {
+                    Name = fieldName,
+                    DataType = BsonHelpers.MapBsonTypeToSqlType(fieldTypes.GetValueOrDefault(fieldName, BsonType.String)),
+                    IsNullable = true,
+                }).ToList();
+
+                response.Tables.Add(new TableModel
+                {
+                    Table = collectionName,
+                    Columns = columns
+                });
+            }
+
+            return response;
+        }
+
+
         // Veritabanını inceleyip tabloları ve ilişkileri döner
         public async Task<InspectResponseDTO> InspectDatabaseAsync(InspectRequestDTO request)
         {
+            if (request.DbType.ToLower() == "mongodb" || request.DbType.ToLower() == "mongo")
+            {
+                return await InspectMongoDbAsync(request);
+            }
+
             var context = new DapperContext(request.DbType, request.ConnectionString);
 
             var connection = await context.GetOpenConnectionAsync();
@@ -815,7 +877,7 @@ namespace DynamicDbQueryApi.Services
             }
         }
 
-        public async Task<(string dslTranslated, IEnumerable<dynamic> data)> QueryDslFromSqlDbAsync(string dbType, string connectionString, string query)
+        public async Task<(string dslTranslated, IEnumerable<dynamic> data)> QueryFromSqlDbAsync(string dbType, string connectionString, string query)
         {
             var context = new DapperContext(dbType, connectionString);
 
@@ -872,7 +934,7 @@ namespace DynamicDbQueryApi.Services
             return (sql, data);
         }
 
-        public async Task<(string dslTranslated, IEnumerable<dynamic> data)> QueryDslFromMongoDbAsync(string connectionString, string query)
+        public async Task<(string dslTranslated, IEnumerable<dynamic> data)> QueryFromMongoDbAsync(string connectionString, string query)
         {
             // Input stringini QueryModel'e çevir
             var model = _queryParserService.Parse(query);
@@ -916,6 +978,53 @@ namespace DynamicDbQueryApi.Services
             List<dynamic> data = firstBatch.Select(d => (dynamic)BsonHelpers.BsonDocumentToDictionary(d)).ToList();
 
             return (dslTranslated, data);
+        }
+
+        public async Task<(string dslTranslated, IEnumerable<dynamic> data)> QueryFromApiAsync(string connectionString, string query)
+        {
+            // API'den veri çek
+            using var httpClient = new HttpClient();
+            var response = await httpClient.GetAsync(connectionString);
+            response.EnsureSuccessStatusCode();
+            var jsonString = await response.Content.ReadAsStringAsync();
+
+            // JSON'u dynamic listeye çevir
+            List<dynamic> apiData;
+            using (JsonDocument doc = JsonDocument.Parse(jsonString))
+            {
+                if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                {
+                    apiData = doc.RootElement.EnumerateArray()
+                        .Select(e => JsonSerializer.Deserialize<Dictionary<string, object>>(e.GetRawText())!)
+                        .Cast<dynamic>()
+                        .ToList();
+                }
+                else
+                {
+                    apiData = new List<dynamic>
+                    {
+                        JsonSerializer.Deserialize<Dictionary<string, object>>(jsonString)!
+                    };
+                }
+            }
+
+            // Query varsa filtrele/transform et
+            IEnumerable<dynamic> filteredData = apiData;
+            string dslTranslated = "API Data (no transformation)";
+
+            if (!string.IsNullOrWhiteSpace(query))
+            {
+                // QueryModel parse et
+                var model = _queryParserService.Parse(query);
+
+                // In-memory filtreleme/transformation (LINQ ile)
+                filteredData = _inMemoryQueryService.ApplyQuery(apiData, model);
+                dslTranslated = $"API Query: {query}";
+            }
+
+            return (dslTranslated, filteredData);
+
+
         }
     }
 }

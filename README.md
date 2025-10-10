@@ -12,7 +12,7 @@
 
 ## Supported databases
 
-- DbType values: postgres | postgresql | mysql | mssql | oracle
+- DbType values: postgres | postgresql | mysql | mssql | oracle | mongo | mongodb
 
 ## API Endpoints
 
@@ -54,7 +54,7 @@ Response body (QueryResultDTO), same shape as above.
 
 ### POST /api/query/inspect
 
-Purpose: Inspect schema: tables, columns, and relationships in the input DB.<br>
+Purpose: Inspect schema: tables/collections, columns/fields, and relationships (SQL only) in the input DB.<br>
 Request body (InspectRequestDTO):
 
 ```json
@@ -155,7 +155,9 @@ LIMIT  10;
 - For RIGHT JOIN use `INCLUDE(table2 RIGHT)`.
 - For FULL JOIN use `INCLUDE(table2 FULL)`.
 - For JOIN chaining use dot notation: `INCLUDE(table2.table3)`.
-- For JOIN with custom keys use: `INCLUDE(table2(table1.col, table2.col))`.
+- For JOIN with custom keys use: `INCLUDE(table2(table1_col, table2_col))`.
+- For MongoDB, relationship keys are must be manually specified.
+
 
 ## Arithmetic Operators
 
