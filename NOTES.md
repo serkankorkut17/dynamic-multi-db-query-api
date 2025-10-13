@@ -10,7 +10,6 @@ Server=tcp:localhost,1433;Initial Catalog=master;User ID=sa;Password=Merhaba123.
 
 # MYSQL
 Server=localhost;Port=3306;Database=querydb;User=mysql;Password=mysql;SslMode=None;AllowPublicKeyRetrieval=True
-
 mysql://mysql:mysql@localhost:3306/querydb
 
 # ORACLE

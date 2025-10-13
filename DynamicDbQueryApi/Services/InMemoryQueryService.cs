@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using DynamicDbQueryApi.Entities.Query;
@@ -21,80 +22,86 @@ namespace DynamicDbQueryApi.Services
                 result = result.Where(row => ExecuteFilter(row, model.Filters));
             }
 
-            // FETCH (projection) uygula
-            if (model.Columns != null && model.Columns.Any() && model.Columns[0].Expression != "*")
+            // GROUP BY uygula (FETCH'ten önce)
+            if (model.GroupBy != null && model.GroupBy.Any())
             {
-                result = result.Select(row =>
-                {
-                    var dict = (IDictionary<string, object?>)row;
-                    var projected = new Dictionary<string, object?>();
-                    foreach (var col in model.Columns)
-                    {
-                        var key = col.Expression;
-                        var alias = col.Alias ?? key;
+                result = ApplyGroupBy(result, model);
+            }
 
-                        // Fonksiyon kontrolü
-                        var funcInfo = GetFunction(key);
-                        if (funcInfo != null)
+            // HAVING uygula (GROUP BY sonrası filtreleme)
+            if (model.Having != null && model.GroupBy != null && model.GroupBy.Any())
+            {
+                result = result.Where(row => ExecuteFilter(row, model.Having));
+            }
+
+            // FETCH (projection) uygula
+            if (model.Columns != null && model.Columns.Any())
+            {
+                bool isFetchEmpty = model.Columns.Count == 1 && model.Columns[0].Expression == "*";
+                if (!isFetchEmpty)
+                {
+                    result = result.Select(row =>
+                    {
+                        var dict = (IDictionary<string, object?>)row;
+                        var projected = new Dictionary<string, object?>();
+                        foreach (var col in model.Columns)
                         {
-                            var funcName = funcInfo.Value.funcName;
-                            var inner = funcInfo.Value.inner;
-                            var args = StringHelpers.SplitByCommas(inner);
-                            var value = ExecuteFunction(dict, funcName, args);
-                            projected[alias] = value;
-                        }
-                        else
-                        {
-                            // Normal alan
-                            key = key.Contains('.') ? key.Split('.').Last() : key;
-                            if (dict.ContainsKey(key))
+                            var key = col.Expression;
+                            var alias = col.Alias ?? key;
+
+                            // Fonksiyon kontrolü
+                            var funcInfo = GetFunction(key);
+                            if (funcInfo != null)
                             {
-                                projected[alias] = dict[key];
+                                var funcName = funcInfo.Value.funcName;
+                                var inner = funcInfo.Value.inner;
+                                var args = StringHelpers.SplitByCommas(inner);
+                                var value = ExecuteFunction(dict, funcName, args);
+
+                                projected[alias] = value;
+                            }
+                            else
+                            {
+                                // Normal alan
+                                key = key.Contains('.') ? key.Split('.').Last() : key;
+                                if (dict.ContainsKey(key))
+                                {
+                                    projected[alias] = dict[key];
+                                }
                             }
                         }
-                    }
-                    return (dynamic)projected;
-                });
+                        return (dynamic)projected;
+                    });
+                }
             }
 
             // ORDERBY uygula
             if (model.OrderBy != null && model.OrderBy.Any())
             {
+                IOrderedEnumerable<dynamic>? orderedResult = null;
+
                 foreach (var order in model.OrderBy)
                 {
                     var column = order.Column;
 
-                    // Fonksiyon kontrolü - eğer column bir fonksiyonsa, ExecuteFunction kullan
-                    var funcInfo = GetFunction(column);
-
-                    if (funcInfo != null)
+                    if (orderedResult == null)
                     {
-                        var funcName = funcInfo.Value.funcName;
-                        var inner = funcInfo.Value.inner;
-                        var args = StringHelpers.SplitByCommas(inner);
-
-                        // Fonksiyon için sıralama
-                        result = order.Desc
-                            ? result.OrderByDescending(r => ExecuteFunction((IDictionary<string, object?>)r, funcName, args))
-                            : result.OrderBy(r => ExecuteFunction((IDictionary<string, object?>)r, funcName, args));
+                        // İlk sıralama
+                        orderedResult = order.Desc
+                            ? result.OrderByDescending(r => GetValueForSorting(r, column))
+                            : result.OrderBy(r => GetValueForSorting(r, column));
                     }
                     else
                     {
-                        // Normal field için sıralama - mevcut yöntem
-                        var key = column.Contains('.') ? column.Split('.').Last() : column;
-                        result = order.Desc
-                            ? result.OrderByDescending(r =>
-                            {
-                                var d = (IDictionary<string, object>)r;
-                                return d.TryGetValue(key, out var val) ? val : null;
-                            })
-                            : result.OrderBy(r =>
-                            {
-                                var d = (IDictionary<string, object>)r;
-                                return d.TryGetValue(key, out var val) ? val : null;
-                            });
+                        // Sonraki sıralamalar (ThenBy/ThenByDescending)
+                        orderedResult = order.Desc
+                            ? orderedResult.ThenByDescending(r => GetValueForSorting(r, column))
+                            : orderedResult.ThenBy(r => GetValueForSorting(r, column));
                     }
                 }
+
+                if (orderedResult != null)
+                    result = orderedResult;
             }
 
             // OFFSET/LIMIT uygula
@@ -122,7 +129,7 @@ namespace DynamicDbQueryApi.Services
                     var funcName = funcInfo.Value.funcName;
                     var inner = funcInfo.Value.inner;
                     var args = StringHelpers.SplitByCommas(inner);
-                    value = ExecuteFunction(dict, funcName, args);
+                    value = ExecuteFunction(dict, funcName, args) ?? string.Empty;
                 }
                 else
                 {
@@ -143,6 +150,13 @@ namespace DynamicDbQueryApi.Services
                         var rightInner = rightFuncInfo.Value.inner;
                         var rightArgs = StringHelpers.SplitByCommas(rightInner);
                         rightValue = ExecuteFunction(dict, rightFuncName, rightArgs);
+                    }
+                    else if (!double.TryParse(compareValue, out double rightNum) && compareValue.Contains('.'))
+                    {
+                        // Normal alan
+                        key = compareValue.Split('.').Last();
+                        if (!dict.ContainsKey(key)) return false;
+                        rightValue = dict[key];
                     }
                     else
                     {
@@ -165,6 +179,7 @@ namespace DynamicDbQueryApi.Services
             return false;
         }
 
+        // Filter değerlerini karşılaştırma
         private bool CompareValues(object left, object? right, ComparisonOperator op)
         {
             if (left == null && right == null)
@@ -394,12 +409,32 @@ namespace DynamicDbQueryApi.Services
                     }
                     else
                     {
-                        evaluatedArgs.Add(null);
+                        // Eğer key year, month, week, day, hour, minute, second ise ekle değilse null ekle
+                        if (key == "year" || key == "month" || key == "week" || key == "day" ||
+                            key == "hour" || key == "minute" || key == "second")
+                        {
+                            evaluatedArgs.Add(key);
+                        }
+                        else
+                        {
+                            evaluatedArgs.Add(null);
+                        }
                     }
                 }
             }
 
-            // String Fonksiyonları
+            // Aggregate Fonksiyonlar (COUNT, SUM, AVG, MIN, MAX) - Grup üzerinde çalıştırılmalı
+            if (functionName == "COUNT" || functionName == "SUM" || functionName == "AVG" ||
+                functionName == "MIN" || functionName == "MAX")
+            {
+                if (row.TryGetValue("#group_items", out var groupItemsObj) && groupItemsObj is List<dynamic> groupItems && groupItems != null)
+                {
+                    return ExecuteAggregateFunction(groupItems, functionName, args);
+                }
+                return null;
+            }
+
+            // String Fonksiyonları (LENGTH, LEN, SUBSTRING, SUBSTR, CONCAT, LOWER, UPPER, TRIM, LTRIM, RTRIM, INDEXOF, REPLACE, REVERSE)
             if (functionName == "LENGTH" || functionName == "LEN")
             {
                 if (evaluatedArgs.Count != 1) throw new Exception("LENGTH function requires 1 argument");
@@ -499,7 +534,16 @@ namespace DynamicDbQueryApi.Services
                 }
             }
 
-            // Sayısal Fonksiyonlar
+            if (functionName == "REVERSE")
+            {
+                if (evaluatedArgs.Count != 1) throw new Exception("REVERSE function requires 1 argument");
+                string str = evaluatedArgs[0]?.ToString() ?? "";
+                char[] charArray = str.ToCharArray();
+                Array.Reverse(charArray);
+                return new string(charArray);
+            }
+
+            // Sayısal Fonksiyonlar (ABS, CEIL, CEILING, FLOOR, ROUND, SQRT, POWER, MOD, EXP, LOG, LOG10)
             if (functionName == "ABS")
             {
                 if (evaluatedArgs.Count != 1) throw new Exception("ABS function requires 1 argument");
@@ -572,7 +616,44 @@ namespace DynamicDbQueryApi.Services
                 return null;
             }
 
-            // Tarih Fonksiyonları
+            if (functionName == "EXP")
+            {
+                if (evaluatedArgs.Count != 1) throw new Exception("EXP function requires 1 argument");
+                if (double.TryParse(evaluatedArgs[0]?.ToString(), out double num))
+                    return Math.Exp(num);
+                return null;
+            }
+
+            if (functionName == "LOG")
+            {
+                if (evaluatedArgs.Count < 1 || evaluatedArgs.Count > 2)
+                    throw new Exception("LOG function requires 1 or 2 arguments");
+
+                if (evaluatedArgs.Count == 1)
+                {
+                    if (double.TryParse(evaluatedArgs[0]?.ToString(), out double num) && num > 0)
+                        return Math.Log(num);
+                    return null;
+                }
+                else
+                {
+                    if (double.TryParse(evaluatedArgs[0]?.ToString(), out double num) &&
+                        double.TryParse(evaluatedArgs[1]?.ToString(), out double baseNum) &&
+                        num > 0 && baseNum > 0 && baseNum != 1)
+                        return Math.Log(num, baseNum);
+                    return null;
+                }
+            }
+
+            if (functionName == "LOG10")
+            {
+                if (evaluatedArgs.Count != 1) throw new Exception("LOG10 function requires 1 argument");
+                if (double.TryParse(evaluatedArgs[0]?.ToString(), out double num) && num > 0)
+                    return Math.Log10(num);
+                return null;
+            }
+
+            // Tarih Fonksiyonları (NOW, GETDATE, CURRENT_TIMESTAMP, CURRENT_DATE, TODAY, CURRENT_TIME, TIME, DATEADD, DATEDIFF, DATENAME, DAY, MONTH, YEAR)
             if (functionName == "NOW" || functionName == "GETDATE" || functionName == "CURRENT_TIMESTAMP")
             {
                 return DateTime.UtcNow;
@@ -678,8 +759,8 @@ namespace DynamicDbQueryApi.Services
                 return DateTime.TryParse(evaluatedArgs[0]?.ToString(), out DateTime date) ? date.Year : null;
             }
 
-            // Null Fonksiyonları
-            if (functionName == "COALESCE" || functionName == "IFNULL" || functionName == "NVL")
+            // Null Fonksiyonları (COALESCE, IFNULL, ISNULL, NVL)
+            if (functionName == "COALESCE" || functionName == "IFNULL" || functionName == "ISNULL" || functionName == "NVL")
             {
                 if (evaluatedArgs.Count < 1) throw new Exception($"{functionName} function requires at least 1 argument");
 
@@ -692,47 +773,251 @@ namespace DynamicDbQueryApi.Services
                 return null;
             }
 
-            // Koşullu fonksiyon
-            if (functionName == "IFS" || functionName == "CASE")
-            {
-                if (evaluatedArgs.Count < 2 || evaluatedArgs.Count % 2 != 0)
-                    throw new Exception("IFS function requires pairs of condition,value and optional default");
-
-                for (int i = 0; i < evaluatedArgs.Count - 1; i += 2)
-                {
-                    bool conditionMet = false;
-
-                    if (evaluatedArgs[i] is bool b)
-                    {
-                        conditionMet = b;
-                    }
-                    else if (bool.TryParse(evaluatedArgs[i]?.ToString(), out bool parsedBool))
-                    {
-                        conditionMet = parsedBool;
-                    }
-                    else if (evaluatedArgs[i]?.ToString()?.Equals("true", StringComparison.OrdinalIgnoreCase) == true)
-                    {
-                        conditionMet = true;
-                    }
-
-                    if (conditionMet)
-                    {
-                        return evaluatedArgs[i + 1];
-                    }
-                }
-
-                // Son değer default değer
-                if (evaluatedArgs.Count % 2 == 1)
-                {
-                    return evaluatedArgs.Last();
-                }
-
-                return null;
-            }
-
             // Desteklenmeyen fonksiyon
             throw new Exception($"Unsupported function: {functionName}");
         }
 
+        // GROUP BY işlemleri
+        private IEnumerable<dynamic> ApplyGroupBy(IEnumerable<dynamic> data, QueryModel model)
+        {
+            // GroupBy alanlarını al
+            var groupByFields = model.GroupBy!;
+
+            // Veriyi gruplara ayır
+            var groups = data.GroupBy(row =>
+            {
+                var dict = (IDictionary<string, object?>)row;
+                var keyDict = new Dictionary<string, object?>();
+
+                foreach (var field in groupByFields)
+                {
+                    var key = field.Contains('.') ? field.Split('.').Last() : field;
+                    keyDict[key] = dict.ContainsKey(key) ? dict[key] : null;
+                }
+
+                return JsonSerializer.Serialize(keyDict);
+            });
+
+            // Her grup için aggregate hesaplamaları yap
+            var result = new List<dynamic>();
+
+            foreach (var group in groups)
+            {
+                var groupData = group.ToList();
+                var firstRow = (IDictionary<string, object?>)groupData.First();
+                var groupResult = new Dictionary<string, object?>();
+
+                // GROUP BY alanlarını ekle
+                foreach (var field in groupByFields)
+                {
+                    var key = field.Contains('.') ? field.Split('.').Last() : field;
+                    var alias = key;
+                    groupResult[alias] = firstRow.ContainsKey(key) ? firstRow[key] : null;
+                }
+
+                // Gruplanan tüm satırları #group_items key'inde sakla
+                groupResult["#group_items"] = groupData;
+
+                result.Add(groupResult);
+            }
+
+            return result;
+        }
+
+        // Aggregate fonksiyonlarını grup üzerinde çalıştırma
+        private object? ExecuteAggregateFunction(List<dynamic> groupData, string functionName, List<string> args)
+        {
+            // COUNT(*) veya COUNT(field)
+            if (functionName == "COUNT")
+            {
+                if (args.Count == 1 && args[0] == "*")
+                {
+                    return groupData.Count;
+                }
+                else if (args.Count == 1)
+                {
+                    var field = args[0].Contains('.') ? args[0].Split('.').Last() : args[0];
+                    return groupData.Count(row =>
+                    {
+                        var dict = (IDictionary<string, object?>)row;
+                        return dict.ContainsKey(field) && dict[field] != null;
+                    });
+                }
+                throw new Exception("COUNT function requires exactly one argument or '*'.");
+            }
+
+            // SUM(field)
+            if (functionName == "SUM" && args.Count == 1)
+            {
+                var field = args[0].Contains('.') ? args[0].Split('.').Last() : args[0];
+                return groupData.Sum(row =>
+                {
+                    var dict = (IDictionary<string, object?>)row;
+                    if (dict.ContainsKey(field) && dict[field] != null)
+                    {
+                        if (double.TryParse(dict[field]?.ToString(), out double val))
+                            return val;
+                    }
+                    return 0.0;
+                });
+            }
+
+            // AVG(field)
+            if (functionName == "AVG" && args.Count == 1)
+            {
+                var field = args[0].Contains('.') ? args[0].Split('.').Last() : args[0];
+                var values = groupData
+                    .Select(row =>
+                    {
+                        var dict = (IDictionary<string, object?>)row;
+                        if (dict.ContainsKey(field) && dict[field] != null)
+                        {
+                            if (double.TryParse(dict[field]?.ToString(), out double val))
+                                return (double?)val;
+                        }
+                        return null;
+                    })
+                    .Where(v => v.HasValue)
+                    .Select(v => v!.Value)
+                    .ToList();
+
+                return values.Any() ? values.Average() : null;
+            }
+
+            // MIN(field)
+            if (functionName == "MIN" && args.Count == 1)
+            {
+                var field = args[0].Contains('.') ? args[0].Split('.').Last() : args[0];
+                var values = groupData
+                    .Select(row =>
+                    {
+                        var dict = (IDictionary<string, object?>)row;
+                        if (dict.ContainsKey(field) && dict[field] != null)
+                        {
+                            if (double.TryParse(dict[field]?.ToString(), out double val))
+                                return (double?)val;
+                        }
+                        return null;
+                    })
+                    .Where(v => v.HasValue)
+                    .Select(v => v!.Value)
+                    .ToList();
+
+                return values.Any() ? values.Min() : null;
+            }
+
+            // MAX(field)
+            if (functionName == "MAX" && args.Count == 1)
+            {
+                var field = args[0].Contains('.') ? args[0].Split('.').Last() : args[0];
+                var values = groupData
+                    .Select(row =>
+                    {
+                        var dict = (IDictionary<string, object?>)row;
+                        if (dict.ContainsKey(field) && dict[field] != null)
+                        {
+                            if (double.TryParse(dict[field]?.ToString(), out double val))
+                                return (double?)val;
+                        }
+                        return null;
+                    })
+                    .Where(v => v.HasValue)
+                    .Select(v => v!.Value)
+                    .ToList();
+
+                return values.Any() ? values.Max() : null;
+            }
+
+            throw new Exception($"Unsupported aggregate function: {functionName}");
+        }
+
+        private IComparable GetValueForSorting(dynamic row, string column)
+        {
+            object? value;
+            var dict = (IDictionary<string, object?>)row;
+
+            // Fonksiyon kontrolü
+            var funcInfo = GetFunction(column);
+            if (funcInfo != null)
+            {
+                var funcName = funcInfo.Value.funcName;
+                var inner = funcInfo.Value.inner;
+                var args = StringHelpers.SplitByCommas(inner);
+                value = ExecuteFunction(dict, funcName, args) ?? string.Empty;
+            }
+            else
+            {
+                var key = column.Contains('.') ? column.Split('.').Last() : column;
+                value = dict.TryGetValue(key, out var val) ? val : null;
+            }
+
+            // Her türlü tipi güvenli şekilde karşılaştırabilen özel wrapper döndür
+            return new ComparableWrapper(value);
+        }
+
+        private class ComparableWrapper : IComparable
+        {
+            private readonly object? _value;
+            private readonly int _typeOrder;
+
+            public ComparableWrapper(object? value)
+            {
+                _value = value;
+
+                // Tip sıralaması: null son, tarihler ilk, sayılar ikinci, stringler üçüncü
+                _typeOrder = value switch
+                {
+                    null => 100,
+                    DateTime => 1,
+                    DateTimeOffset => 1,
+                    int or long or double or float or decimal => 2,
+                    string s when DateTime.TryParse(s, out _) => 1,
+                    string s when double.TryParse(s, out _) => 2,
+                    _ => 3
+                };
+            }
+
+            public int CompareTo(object? obj)
+            {
+                if (obj is not ComparableWrapper other)
+                    return 1;
+
+                // Önce tip sırasına göre karşılaştır
+                if (_typeOrder != other._typeOrder)
+                    return _typeOrder.CompareTo(other._typeOrder);
+
+                // Her iki değer de null
+                if (_value == null && other._value == null)
+                    return 0;
+
+                // Sadece benim değerim null
+                if (_value == null)
+                    return 1;
+
+                // Sadece diğer değer null
+                if (other._value == null)
+                    return -1;
+
+                // Tarihleri karşılaştır
+                if (_value is DateTime dt1 && other._value is DateTime dt2)
+                    return dt1.CompareTo(dt2);
+
+                if (_value is DateTimeOffset dto1 && other._value is DateTimeOffset dto2)
+                    return dto1.CompareTo(dto2);
+
+                string str1 = _value.ToString() ?? "";
+                string str2 = other._value.ToString() ?? "";
+
+                // Sayısal karşılaştırma
+                bool isNum1 = double.TryParse(str1, out double num1);
+                bool isNum2 = double.TryParse(str2, out double num2);
+
+                if (isNum1 && isNum2)
+                    return num1.CompareTo(num2);
+
+                // String karşılaştırma
+                return string.Compare(str1, str2, StringComparison.OrdinalIgnoreCase);
+            }
+        }
     }
 }

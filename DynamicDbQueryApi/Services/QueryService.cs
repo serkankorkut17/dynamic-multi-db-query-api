@@ -999,8 +999,42 @@ namespace DynamicDbQueryApi.Services
                         .Cast<dynamic>()
                         .ToList();
                 }
+                else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                {
+                    // Nesne içinde array içeren ilk property'yi ara
+                    JsonElement arrayElement = default;
+                    string? arrayPropertyName = null;
+
+                    foreach (var property in doc.RootElement.EnumerateObject())
+                    {
+                        if (property.Value.ValueKind == JsonValueKind.Array)
+                        {
+                            arrayElement = property.Value;
+                            arrayPropertyName = property.Name;
+                            break;
+                        }
+                    }
+
+                    if (arrayElement.ValueKind != JsonValueKind.Undefined)  // Fix: ValueEquals yerine ValueKind kontrolü
+                    {
+                        _logger.LogInformation($"Found array property '{arrayPropertyName}' in response root object");
+                        apiData = arrayElement.EnumerateArray()
+                            .Select(e => JsonSerializer.Deserialize<Dictionary<string, object>>(e.GetRawText())!)
+                            .Cast<dynamic>()
+                            .ToList();
+                    }
+                    else
+                    {
+                        // Hiç array bulunamadı, nesnenin kendisini kullan
+                        apiData = new List<dynamic>
+                        {
+                            JsonSerializer.Deserialize<Dictionary<string, object>>(jsonString)!
+                        };
+                    }
+                }
                 else
                 {
+                    // Ne array ne object, sadece tek bir değerse
                     apiData = new List<dynamic>
                     {
                         JsonSerializer.Deserialize<Dictionary<string, object>>(jsonString)!
