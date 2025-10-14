@@ -12,7 +12,8 @@
 
 ## Supported databases
 
-- DbType values: postgres | postgresql | mysql | mssql | oracle | mongo | mongodb
+- DbType values: postgres | postgresql | mysql | mssql | oracle | mongo | mongodb | api
+- OutputDbType values: postgres | postgresql | mysql | mssql | oracle | mongo | mongodb
 
 ## API Endpoints
 
@@ -157,7 +158,7 @@ LIMIT  10;
 - For JOIN chaining use dot notation: `INCLUDE(table2.table3)`.
 - For JOIN with custom keys use: `INCLUDE(table2(table1_col, table2_col))`.
 - For MongoDB, relationship keys are must be manually specified.
-
+- For API, JOINs are not supported.
 
 ## Arithmetic Operators
 
@@ -284,6 +285,8 @@ Internal: a = 1 OR (b = 2 AND c = 3)
 
 - IF(condition, true_val, false_val)
 - CASE/IFS(cond1, val1, cond2, val2, ..., elseVal) → SQL: CASE WHEN cond1 THEN val1 WHEN cond2 THEN val2 ... ELSE elseVal END
+
+- For MongoDB and API databases, conditional functions are not supported.
 
 Example:
 

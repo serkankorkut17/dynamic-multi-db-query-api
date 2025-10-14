@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
 
 namespace DynamicDbQueryApi.Helpers
 {
@@ -96,62 +97,102 @@ namespace DynamicDbQueryApi.Helpers
         // object'i uygun BsonValue'ye dönüştürür
         public static BsonValue ConvertToBsonValue(object? value)
         {
-            if (value == null) return BsonNull.Value;
+            if (value == null)
+                return BsonNull.Value;
 
-            // Zaten BsonValue ise direkt döner
-            if (value is BsonValue bv) return bv;
+            // Primitive tipler
+            if (value is string s)
+                return new BsonString(s);
 
-            switch (value)
+            if (value is int i)
+                return new BsonInt32(i);
+
+            if (value is long l)
+                return new BsonInt64(l);
+
+            if (value is double d)
+                return new BsonDouble(d);
+
+            if (value is decimal dec)
+                return new BsonDecimal128(dec);
+
+            if (value is bool b)
+                return new BsonBoolean(b);
+
+            if (value is DateTime dt)
+                return new BsonDateTime(dt);
+
+            if (value is DateTimeOffset dto)
+                return new BsonDateTime(dto.UtcDateTime);
+
+            // JsonElement'ler
+            if (value is JsonElement je)
             {
-                case bool b: return BsonBoolean.Create(b);
-                case int i: return BsonInt32.Create(i);
-                case long l: return BsonInt64.Create(l);
-                case short s: return BsonInt32.Create(s);
-                case byte by: return BsonInt32.Create(by);
-                case uint ui: return BsonInt64.Create(ui);
-                case ulong ul: return BsonInt64.Create((long)ul);
-                case ushort us: return BsonInt32.Create(us);
-                case float f: return BsonDouble.Create(f);
-                case double d: return BsonDouble.Create(d);
-                case decimal dec: return BsonDecimal128.Create(dec);
-                case DateTime dt: return new BsonDateTime(dt);
-                case DateTimeOffset dto: return new BsonDateTime(dto.UtcDateTime);
-                case TimeSpan ts: return BsonInt64.Create(ts.Ticks);
-                case Guid g: return new BsonBinaryData(g, GuidRepresentation.Standard);
-                case IEnumerable<object?> list:
-                    return new BsonArray(list.Select(ConvertToBsonValue));
-                case JsonElement jsonEl:
-                    return BsonDocument.Parse(jsonEl.GetRawText());
-                case IDictionary<string, object?> nestedDict:
-                    return new BsonDocument(nestedDict.ToDictionary(k => k.Key, k => ConvertToBsonValue(k.Value)));
-                case string str:
-                    {
-                        var trimmed = str.Trim();
-                        if (StringHelpers.IsDateOrTimestamp(trimmed) && DateTimeOffset.TryParse(trimmed, out var dto))
-                        {
-                            return new BsonDateTime(dto.UtcDateTime);
-                        }
-                        if (int.TryParse(trimmed, out var si)) return BsonInt32.Create(si);
-                        if (long.TryParse(trimmed, out var sl)) return BsonInt64.Create(sl);
-                        if (decimal.TryParse(trimmed, out var sdec)) return BsonDecimal128.Create(sdec);
-                        if (double.TryParse(trimmed, out var sd)) return BsonDouble.Create(sd);
-                        if (bool.TryParse(trimmed, out var sb)) return BsonBoolean.Create(sb);
-
-                        // JSON text?
-                        if ((trimmed.StartsWith("{") && trimmed.EndsWith("}")) ||
-                            (trimmed.StartsWith("[") && trimmed.EndsWith("]")))
-                        {
-                            try
-                            {
-                                return BsonDocument.Parse(trimmed);
-                            }
-                            catch { /* ignore */ }
-                        }
-                        return BsonString.Create(str);
-                    }
-                default:
-                    return BsonValue.Create(value);
+                return je.ValueKind switch
+                {
+                    JsonValueKind.String => new BsonString(je.GetString() ?? ""),
+                    JsonValueKind.Number => je.TryGetInt64(out long longVal)
+                        ? new BsonInt64(longVal)
+                        : new BsonDouble(je.GetDouble()),
+                    JsonValueKind.True => BsonBoolean.True,
+                    JsonValueKind.False => BsonBoolean.False,
+                    JsonValueKind.Null => BsonNull.Value,
+                    JsonValueKind.Array => BsonArray.Create(
+                        je.EnumerateArray().Select(e => ConvertToBsonValue(e))
+                    ),
+                    JsonValueKind.Object => BsonDocument.Parse(je.GetRawText()),
+                    _ => BsonNull.Value
+                };
             }
+
+            // Array/List
+            if (value is IEnumerable<object> enumerable && !(value is string))
+            {
+                var array = new BsonArray();
+                foreach (var item in enumerable)
+                {
+                    array.Add(ConvertToBsonValue(item));
+                }
+                return array;
+            }
+
+            // Dictionary
+            if (value is IDictionary<string, object> dict)
+            {
+                var doc = new BsonDocument();
+                foreach (var kvp in dict)
+                {
+                    doc[kvp.Key] = ConvertToBsonValue(kvp.Value);
+                }
+                return doc;
+            }
+
+            // JSON string kontrolü (string ama JSON formatında)
+            if (value is string jsonStr &&
+                (jsonStr.TrimStart().StartsWith("{") || jsonStr.TrimStart().StartsWith("[")))
+            {
+                try
+                {
+                    // JSON array
+                    if (jsonStr.TrimStart().StartsWith("["))
+                    {
+                        return BsonSerializer.Deserialize<BsonArray>(jsonStr);
+                    }
+                    // JSON object
+                    else
+                    {
+                        return BsonDocument.Parse(jsonStr);
+                    }
+                }
+                catch
+                {
+                    // JSON parse başarısız, normal string olarak kaydet
+                    return new BsonString(jsonStr);
+                }
+            }
+
+            // Son çare: ToString() ile string'e çevir
+            return new BsonString(value.ToString() ?? "");
         }
 
         // BsonType'ın değerini string olarak döner
@@ -175,5 +216,5 @@ namespace DynamicDbQueryApi.Helpers
             };
         }
     }
-    
+
 }

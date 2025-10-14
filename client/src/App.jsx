@@ -79,10 +79,11 @@ function App() {
           results={queryResults}
           status={queryStatus}
         />
-        
-        <ComparisonTool 
-          dbConfig={dbConfig}
-        />
+        {dbConfig.dbType == "postgres" || dbConfig.dbType == "mysql" || dbConfig.dbType == "mssql" || dbConfig.dbType == "oracle" ? (
+          <ComparisonTool 
+            dbConfig={dbConfig}
+          />
+        ) : null}
       </main>
     </div>
   )

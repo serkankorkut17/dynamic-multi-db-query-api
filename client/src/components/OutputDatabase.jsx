@@ -78,6 +78,7 @@ const OutputDatabase = ({ config, onChange }) => {
                     <option value="mysql">MySQL</option>
                     <option value="mssql">SQL Server</option>
                     <option value="oracle">Oracle</option>
+                    <option value="mongodb">MongoDB</option>
                   </select>
                 </div>
                 <div className="col">

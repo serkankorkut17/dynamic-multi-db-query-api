@@ -420,6 +420,164 @@ namespace DynamicDbQueryApi.Services
             return response;
         }
 
+        // API endpoint'ini inceleyip şemayı döner
+        public async Task<InspectResponseDTO> InspectApiAsync(InspectRequestDTO request)
+        {
+            var response = new InspectResponseDTO();
+
+            try
+            {
+                // API'den veri çek
+                using var httpClient = new HttpClient();
+                var apiResponse = await httpClient.GetAsync(request.ConnectionString);
+                apiResponse.EnsureSuccessStatusCode();
+                var jsonString = await apiResponse.Content.ReadAsStringAsync();
+
+                // JSON'u parse et
+                List<dynamic> apiData;
+                using (JsonDocument doc = JsonDocument.Parse(jsonString))
+                {
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                    {
+                        apiData = doc.RootElement.EnumerateArray()
+                            .Select(e => JsonSerializer.Deserialize<Dictionary<string, object>>(e.GetRawText())!)
+                            .Cast<dynamic>()
+                            .ToList();
+                    }
+                    else if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                    {
+                        // Nesne içinde array içeren ilk property'yi ara
+                        JsonElement arrayElement = default;
+                        string? arrayPropertyName = null;
+
+                        foreach (var property in doc.RootElement.EnumerateObject())
+                        {
+                            if (property.Value.ValueKind == JsonValueKind.Array)
+                            {
+                                arrayElement = property.Value;
+                                arrayPropertyName = property.Name;
+                                break;
+                            }
+                        }
+
+                        if (arrayElement.ValueKind != JsonValueKind.Undefined)
+                        {
+                            _logger.LogInformation($"Found array property '{arrayPropertyName}' in response root object");
+                            apiData = arrayElement.EnumerateArray()
+                                .Select(e => JsonSerializer.Deserialize<Dictionary<string, object>>(e.GetRawText())!)
+                                .Cast<dynamic>()
+                                .ToList();
+                        }
+                        else
+                        {
+                            // Hiç array bulunamadı, nesnenin kendisini kullan
+                            apiData = new List<dynamic>
+                            {
+                                JsonSerializer.Deserialize<Dictionary<string, object>>(jsonString)!
+                            };
+                        }
+                    }
+                    else
+                    {
+                        apiData = new List<dynamic>
+                        {
+                            JsonSerializer.Deserialize<Dictionary<string, object>>(jsonString)!
+                        };
+                    }
+                }
+
+                if (apiData.Count == 0)
+                {
+                    _logger.LogWarning("API returned empty data, cannot infer schema");
+                    return response;
+                }
+
+                // Şemayı çıkar - ilk birkaç kaydı kullanarak
+                var sampleSize = Math.Min(10, apiData.Count);
+                var samples = apiData.Take(sampleSize).ToList();
+
+                // Tüm alanları topla
+                var allFields = new Dictionary<string, HashSet<string>>();
+
+                foreach (var sample in samples)
+                {
+                    var dict = (IDictionary<string, object>)sample;
+                    foreach (var kvp in dict)
+                    {
+                        if (!allFields.ContainsKey(kvp.Key))
+                        {
+                            allFields[kvp.Key] = new HashSet<string>();
+                        }
+
+                        // Değerin tipini belirle
+                        string dataType = InferDataType(kvp.Value);
+                        allFields[kvp.Key].Add(dataType);
+                    }
+                }
+
+                // TableModel oluştur (API endpoint'i "table" gibi davranır)
+                var table = new TableModel
+                {
+                    Table = "api_data",
+                    Columns = new List<ColumnModel>()
+                };
+
+                foreach (var field in allFields.OrderBy(f => f.Key))
+                {
+                    // Eğer birden fazla tip varsa, en genel tipi seç
+                    string finalType = field.Value.Count > 1 ? "string" : field.Value.First();
+
+                    table.Columns.Add(new ColumnModel
+                    {
+                        Name = field.Key,
+                        DataType = finalType,
+                        IsNullable = true // API verisinde her alan nullable kabul edilir
+                    });
+                }
+
+                response.Tables.Add(table);
+                _logger.LogInformation($"API inspection completed. Found {table.Columns.Count} fields in response data");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error inspecting API endpoint");
+                throw;
+            }
+
+            return response;
+        }
+
+        // Değerin veri tipini çıkar
+        private string InferDataType(object? value)
+        {
+            if (value == null) return "null";
+
+            // JsonElement olabilir
+            if (value is JsonElement je)
+            {
+                return je.ValueKind switch
+                {
+                    JsonValueKind.String => "string",
+                    JsonValueKind.Number => "number",
+                    JsonValueKind.True or JsonValueKind.False => "boolean",
+                    JsonValueKind.Object => "object",
+                    JsonValueKind.Array => "array",
+                    JsonValueKind.Null => "null",
+                    _ => "string"
+                };
+            }
+
+            // .NET tipleri
+            return value switch
+            {
+                string => "string",
+                int or long or short or byte => "integer",
+                float or double or decimal => "number",
+                bool => "boolean",
+                DateTime or DateTimeOffset => "date",
+                _ => value.GetType().IsArray || value is System.Collections.IEnumerable ? "array" : "object"
+            };
+        }
 
         // Veritabanını inceleyip tabloları ve ilişkileri döner
         public async Task<InspectResponseDTO> InspectDatabaseAsync(InspectRequestDTO request)
@@ -427,6 +585,10 @@ namespace DynamicDbQueryApi.Services
             if (request.DbType.ToLower() == "mongodb" || request.DbType.ToLower() == "mongo")
             {
                 return await InspectMongoDbAsync(request);
+            }
+            else if (request.DbType.ToLower() == "api")
+            {
+                return await InspectApiAsync(request);
             }
 
             var context = new DapperContext(request.DbType, request.ConnectionString);
@@ -782,7 +944,39 @@ namespace DynamicDbQueryApi.Services
             var outputContext = new DapperContext(outputDbType, outputConnectionString);
             var outputConnection = await outputContext.GetOpenConnectionAsync();
 
-            var columnDataTypes = GetColumnDataTypes(outputDbType, data);
+            // JsonElement tiplerini dönüştür (ön işleme)
+            var processedData = data.Select(row =>
+            {
+                var dict = (IDictionary<string, object>)row;
+                var processedRow = new Dictionary<string, object?>();
+
+                foreach (var kvp in dict)
+                {
+                    var value = kvp.Value;
+
+                    // JsonElement'i uygun tipe dönüştür
+                    if (value is JsonElement je)
+                    {
+                        value = je.ValueKind switch
+                        {
+                            JsonValueKind.String => je.GetString(),
+                            JsonValueKind.Number => je.TryGetInt64(out long l) ? l : je.GetDouble(),
+                            JsonValueKind.True => true,
+                            JsonValueKind.False => false,
+                            JsonValueKind.Null => null,
+                            JsonValueKind.Object => je.GetRawText(), // JSON string olarak kaydet
+                            JsonValueKind.Array => je.GetRawText(),  // JSON string olarak kaydet
+                            _ => je.GetRawText()
+                        };
+                    }
+
+                    processedRow[kvp.Key] = value;
+                }
+
+                return (dynamic)processedRow;
+            }).ToList();
+
+            var columnDataTypes = GetColumnDataTypes(outputDbType, processedData);
 
             // Log column data types
             _logger.LogInformation("Column Data Types for Output DB: {ColumnDataTypes}", JsonSerializer.Serialize(columnDataTypes));
@@ -817,7 +1011,7 @@ namespace DynamicDbQueryApi.Services
             _logger.LogInformation("Insert SQL: {Sql}", insertSql);
 
             // Datadaki her bir satırı insert et
-            foreach (IDictionary<string, object> row in data)
+            foreach (IDictionary<string, object> row in processedData)
             {
                 var dp = new DynamicParameters();
                 for (int i = 0; i < targetColumns.Count; i++)
@@ -844,12 +1038,28 @@ namespace DynamicDbQueryApi.Services
                         }
                         else
                         {
-                            dp.Add($"p{i}", val ?? DBNull.Value);
+                            // NULL değerler için DbType belirt
+                            if (val == null)
+                            {
+                                dp.Add($"p{i}", null, GetDbTypeForColumn(outputDbType, columnDataTypes[key]));
+                            }
+                            else
+                            {
+                                dp.Add($"p{i}", val);
+                            }
                         }
                     }
                     else
                     {
-                        dp.Add($"p{i}", val ?? DBNull.Value);
+                        // NULL değerler için DbType belirt
+                        if (val == null)
+                        {
+                            dp.Add($"p{i}", null, GetDbTypeForColumn(outputDbType, columnDataTypes[key]));
+                        }
+                        else
+                        {
+                            dp.Add($"p{i}", val);
+                        }
                     }
                 }
                 await outputConnection.ExecuteAsync(insertSql, dp);
@@ -1057,8 +1267,36 @@ namespace DynamicDbQueryApi.Services
             }
 
             return (dslTranslated, filteredData);
+        }
 
+        // Veritabanı kolon tipi için DbType döner
+        private DbType GetDbTypeForColumn(string outputDbType, string sqlDataType)
+        {
+            var upperType = sqlDataType.ToUpperInvariant();
 
+            if (upperType.Contains("INT") || upperType.Contains("NUMBER"))
+                return DbType.Int64;
+
+            if (upperType.Contains("DOUBLE") || upperType.Contains("FLOAT") || upperType.Contains("BINARY_DOUBLE"))
+                return DbType.Double;
+
+            if (upperType.Contains("DECIMAL") || upperType.Contains("NUMERIC"))
+                return DbType.Decimal;
+
+            if (upperType.Contains("BOOL") || upperType.Contains("BIT"))
+                return DbType.Boolean;
+
+            if (upperType.Contains("TIME") || upperType.Contains("DATE"))
+                return DbType.DateTime;
+
+            if (upperType.Contains("JSON") || upperType.Contains("TEXT") || upperType.Contains("CLOB") || upperType.Contains("VARCHAR") || upperType.Contains("CHAR"))
+                return DbType.String;
+
+            if (upperType.Contains("BINARY") || upperType.Contains("BLOB"))
+                return DbType.Binary;
+
+            // Default
+            return DbType.String;
         }
     }
 }
