@@ -1,9 +1,10 @@
 # Dynamic DB Query
 
-## Overview Dynamic DB Query is a .NET Web API that:
+## Overview of Dynamic DB Query .NET Web API:
 
 - Parses a custom query DSL into dialect-specific SQL
 - Executes queries against Postgres, MySQL, SQL Server, and Oracle
+- Executes queries against MongoDB and REST APIs (limited functionality)
 - Inspects database schemas (tables, columns, relationships)
 - Optionally writes query results into an output database
 - DSL → SQL builder with JOINs, filters, grouping, ordering, and pagination
